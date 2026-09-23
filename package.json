@@ -6,6 +6,13 @@
     "node": ">=22"
   },
   "devDependencies": {
-    "turbo": "2.11.3"
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "22.20.4",
+    "turbo": "2.11.3",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome format --write ."
   }
 }

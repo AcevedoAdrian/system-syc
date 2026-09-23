@@ -1,0 +1,10 @@
+{
+  "name": "@syc/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "tsconfig base y biome.json compartidos del monorepo",
+  "files": [
+    "tsconfig.base.json",
+    "biome.json"
+  ]
+}
