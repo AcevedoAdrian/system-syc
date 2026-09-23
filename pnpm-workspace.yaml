@@ -12,3 +12,9 @@ minimumReleaseAgeExclude:
   - '@turbo/windows-64@2.11.3'
   - '@turbo/windows-arm64@2.11.3'
   - turbo@2.11.3
+  - '@orpc/client@1.15.4'
+  - '@orpc/contract@1.15.4'
+  - '@orpc/shared@1.15.4'
+  - '@orpc/standard-server-fetch@1.15.4'
+  - '@orpc/standard-server-peer@1.15.4'
+  - '@orpc/standard-server@1.15.4'

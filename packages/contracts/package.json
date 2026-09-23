@@ -1,0 +1,19 @@
+{
+  "name": "@syc/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orpc/contract": "1.15.4",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@syc/config": "workspace:*"
+  }
+}
