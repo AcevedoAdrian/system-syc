@@ -7,7 +7,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!.claude", "!.agents", "!skills", "!skills-lock.json", "!specs"]
+    "includes": [
+      "**",
+      "!.claude",
+      "!.agents",
+      "!skills",
+      "!skills-lock.json",
+      "!specs",
+      "!**/routeTree.gen.ts"
+    ]
   },
   "overrides": [
     {

@@ -29,3 +29,4 @@ minimumReleaseAgeExclude:
   - '@orpc/standard-server-aws-lambda@1.15.4'
   - '@orpc/standard-server-fastify@1.15.4'
   - '@orpc/standard-server-node@1.15.4'
+  - '@tanstack/react-router@1.170.39'
