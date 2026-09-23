@@ -1,0 +1,24 @@
+{
+  "name": "@syc/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsdown --watch --on-success \"node --env-file-if-exists=../../.env dist/main.mjs\"",
+    "build": "tsdown",
+    "start": "node dist/main.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.1.0",
+    "@nestjs/core": "12.1.0",
+    "@nestjs/platform-express": "12.1.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@syc/config": "workspace:*",
+    "tsdown": "0.23.0"
+  }
+}
