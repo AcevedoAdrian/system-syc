@@ -8,5 +8,17 @@
   },
   "files": {
     "includes": ["**", "!.claude", "!.agents", "!skills", "!skills-lock.json", "!specs"]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/api/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
+    }
+  ]
 }

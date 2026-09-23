@@ -6,6 +6,7 @@ import { loadEnv } from "./config/env.schema";
 async function bootstrap() {
   const env = loadEnv(process.env);
   const app = await NestFactory.create(AppModule);
+  app.enableCors({ origin: env.WEB_ORIGIN });
   await app.listen(env.API_PORT);
 }
 
