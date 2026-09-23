@@ -11,6 +11,12 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",
+    "@orpc/client": "1.15.4",
+    "@orpc/contract": "1.15.4",
+    "@orpc/openapi-client": "1.15.4",
+    "@orpc/tanstack-query": "1.15.4",
+    "@syc/contracts": "workspace:*",
+    "@tanstack/react-query": "5.103.2",
     "@tanstack/react-router": "1.170.39",
     "class-variance-authority": "0.7.1",
     "cn": "0.4.0",
@@ -19,7 +25,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "shadcn": "4.21.0",
-    "tw-animate-css": "1.4.0"
+    "tw-animate-css": "1.4.0",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@syc/config": "workspace:*",

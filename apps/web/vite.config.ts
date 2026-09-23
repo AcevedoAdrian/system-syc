@@ -9,5 +9,6 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "src") },
   },
+  envDir: path.resolve(import.meta.dirname, "../.."),
   server: { port: 5173 },
 });
