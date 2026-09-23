@@ -1,6 +1,6 @@
 # SPEC 01 — Esqueleto del monorepo
 
-> **Status:** Borrador
+> **Status:** Approved 
 > **Depends on:** ninguna
 > **Date:** 2026-09-23
 > **Objective:** Armar un monorepo pnpm + Turborepo ejecutable con `docker compose up`, donde la web muestra el resultado de un procedimiento oRPC `health.check` implementado en NestJS que consulta Postgres vía Prisma.
