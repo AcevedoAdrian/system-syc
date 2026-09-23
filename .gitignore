@@ -1,0 +1,51 @@
+# Dependencies (pnpm workspaces)
+node_modules
+.pnpm-store
+.pnpm-debug.log*
+
+# Turborepo
+.turbo
+
+# Build output (NestJS, Vite, tsc)
+dist
+dist-ssr
+build
+*.tsbuildinfo
+
+# Vite
+.vite
+*.local
+
+# Prisma generated client (schema and migrations stay tracked)
+**/generated/prisma
+
+# Environment (commit .env.example)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Tests (Vitest + Playwright)
+coverage
+.nyc_output
+test-results
+playwright-report
+blob-report
+playwright/.cache
+
+# Local Docker data and machine-specific compose overrides
+.data
+docker-compose.override.yml
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea
+*.swp
+*.swo
+*~
