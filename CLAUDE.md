@@ -4,9 +4,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado del repositorio
 
-Este repositorio todavía **no tiene código**: solo contiene `STACK.md` (fuente única de verdad sobre arquitectura y stack) y `README.md` (resumen derivado de `STACK.md`). El monorepo descrito abajo aún no está armado — es el plan a seguir cuando se empiece a construir. No inventes comandos de build/lint/test: no existen todavía porque no hay `package.json`, workspaces ni herramientas configuradas. Antes de asumir que algo existe (un script, una carpeta, una dependencia), verificalo con `ls`/`find`, no lo des por hecho a partir de este archivo.
+El esqueleto del monorepo existe (SPEC 01, `specs/01-esqueleto-monorepo.md`). Solo hay un procedimiento de ejemplo, `health.check`, que recorre contracts → api → db → web. **Todavía no hay autenticación ni modelos Prisma** (schema vacío, sin migraciones): eso es SPEC 02. Antes de asumir que algo existe (un script, una carpeta, una dependencia), verificalo con `ls`/`find`.
 
-Cuando se arme el esqueleto inicial, actualizá esta sección con los comandos reales (`pnpm install`, `turbo build`, `turbo test --filter=...`, etc.).
+Paquetes existentes: `apps/api` (`@syc/api`), `apps/web` (`@syc/web`), `packages/contracts` (`@syc/contracts`), `packages/db` (`@syc/db`), `packages/config` (`@syc/config`). `packages/ui` no existe todavía (se crea con la segunda app).
+
+### Comandos
+
+Requisitos: Node 22 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
+
+```bash
+pnpm install                              # instala todo el workspace
+docker compose up                         # postgres + api + web con hot reload (web :5173, api :3000, postgres :5432)
+docker compose down                       # detiene el stack (conserva volúmenes)
+
+pnpm lint                                 # biome check sobre todo el repo
+pnpm format                               # biome format --write
+pnpm typecheck                            # turbo typecheck (tsc --noEmit en cada paquete)
+pnpm test                                 # turbo test (Vitest)
+pnpm build                                # turbo build
+pnpm turbo lint typecheck test build      # las cuatro tareas, como en el CI
+
+pnpm --filter @syc/db generate            # prisma generate (turbo ya lo corre antes de typecheck/test/build)
+pnpm --filter @syc/api test               # tests de un solo paquete
+pnpm --filter @syc/web dev                # web fuera de Docker (necesita VITE_API_URL)
+pnpm --filter @syc/api dev                # api fuera de Docker (necesita DATABASE_URL, WEB_ORIGIN, NODE_ENV; ver .env.example)
+```
+
+El `.env` es opcional con Docker (todas las variables tienen default en `docker-compose.yml`); `.env.example` lista las variables. El CI está en `.github/workflows/ci.yml` y filtra con `turbo --filter="...[origin/<base>]"`.
+
+### Particularidades que no son obvias
+
+- **`apps/api` se empaqueta con `tsdown`** (ESM, `dist/main.mjs`) y `@syc/contracts` y `@syc/db` son `devDependencies` que entran en el bundle: los paquetes del workspace exportan su fuente `.ts`, sin build propio. Prisma y `@orpc/*` van como `dependencies` (externos al bundle). Emite la decorator metadata que Nest necesita.
+- **Biome está desactivado para `useImportType` en `apps/api/**`**: Nest necesita los imports como valor para la inyección de dependencias. No los conviertas a `import type`.
+- **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`), no como RPC en `/rpc`. El cliente de la web usa `OpenAPILink`.
+- **Prisma 7.10** (no `latest`, que hoy es un RC de la 8): requiere `prisma.config.ts`, el generator `prisma-client` y el adapter `pg`. El cliente generado (`packages/db/src/generated`) está en `.gitignore`.
+- **`turbo.json`**: `typecheck`, `test` y `build` dependen de `^typecheck`; sin eso Turbo da cache hit al cambiar un contrato y no detecta el error en los consumidores.
+- **pnpm 11 bloquea scripts de build** por defecto: `allowBuilds` en `pnpm-workspace.yaml` autoriza solo `prisma` y `@prisma/engines`. pnpm también agrega entradas a `minimumReleaseAgeExclude` por su cuenta; es esperable.
+- **Versiones exactas** (sin `^`) en todos los `package.json`.
+- El `biome.json` de la raíz solo extiende `packages/config/biome.json` (Biome exige una config en la raíz).
 
 ## Decisión de arquitectura
 

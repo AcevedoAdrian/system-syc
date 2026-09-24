@@ -14,26 +14,32 @@ Tres reglas sostienen esa decisión:
 2. **Evolución del esquema por migraciones**, no por un motor de entidades genérico. La mayoría de los campos nuevos los agrega el equipo de desarrollo: eso es una migración + un contrato actualizado.
 3. **Campos personalizados como mecanismo aparte** (JSONB + tabla de definiciones), solo para cuando un administrador necesite crear campos sin pasar por un deploy.
 
+
+
 ## Stack elegido
 
-| Capa | Elección |
-|---|---|
-| Gestor de paquetes | `pnpm` workspaces |
-| Orquestador de monorepo | Turborepo |
-| Lenguaje | TypeScript en modo `strict`, Node LTS (22/24) |
-| Backend | NestJS |
-| Contratos de API | oRPC + Zod (paquete `packages/contracts`) |
-| Base de datos | PostgreSQL |
-| ORM | Prisma (versión mayor fijada explícitamente, no `latest`) |
-| Autenticación y usuarios/grupos | Better Auth (plugin `organization`) |
-| Frontend | Vite + React (SPA) |
-| Routing / estado de servidor / tablas | TanStack Router + TanStack Query + TanStack Table |
-| Formularios | react-hook-form + los mismos esquemas Zod de `contracts` |
-| UI | Tailwind CSS + shadcn/ui |
-| Calidad | Biome (lint + formato) |
-| Tests | Vitest + Playwright |
-| Infraestructura | Docker Compose (postgres + api + web) |
-| CI | GitHub Actions, ejecutando solo lo afectado con `turbo --filter` |
+
+| Capa                                  | Elección                                                         |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| Gestor de paquetes                    | `pnpm` workspaces                                                |
+| Orquestador de monorepo               | Turborepo                                                        |
+| Lenguaje                              | TypeScript en modo `strict`, Node LTS (22/24)                    |
+| Backend                               | NestJS                                                           |
+| Contratos de API                      | oRPC + Zod (paquete `packages/contracts`)                        |
+| Base de datos                         | PostgreSQL                                                       |
+| ORM                                   | Prisma (versión mayor fijada explícitamente, no `latest`)        |
+| Autenticación y usuarios/grupos       | Better Auth (plugin `organization`)                              |
+| Frontend                              | Vite + React (SPA)                                               |
+| Routing / estado de servidor / tablas | TanStack Router + TanStack Query + TanStack Table                |
+| Formularios                           | react-hook-form + los mismos esquemas Zod de `contracts`         |
+| UI                                    | Tailwind CSS + shadcn/ui                                         |
+| Calidad                               | Biome (lint + formato)                                           |
+| Tests                                 | Vitest + Playwright                                              |
+| Infraestructura                       | Docker Compose (postgres + api + web)                            |
+| CI                                    | GitHub Actions, ejecutando solo lo afectado con `turbo --filter` |
+
+
+
 
 ### Por qué este stack y no las variantes propuestas
 
@@ -43,6 +49,8 @@ Tres reglas sostienen esa decisión:
 - **Directus (BaaS) — descartado como núcleo:** resolvería la flexibilidad de campos con una UI visual sin deploys, pero cede el control del modelo de datos y de la lógica de negocio a la herramienta. Para un dominio con reglas propias (permisos por grupo, auditoría, relaciones entre entidades) conviene mantener el modelo y las migraciones bajo control directo del equipo. Se descarta como pieza central; no impide evaluarlo puntualmente para paneles internos si en el futuro hiciera falta.
 - **Next.js — descartado:** es una app interna detrás de login, sin necesidad de SEO. El SSR solo agrega complejidad. Si algún día hace falta, TanStack Start es el paso natural sobre el mismo router.
 - **Microservicios, colas, CQRS/event sourcing, MongoDB, modelo EAV, motor de entidades dinámico genérico — descartados** para esta etapa: todos pagan un costo de complejidad que no se necesita todavía y que se puede introducir más adelante si el volumen o el equipo lo piden.
+
+
 
 ## Estructura del monorepo
 
@@ -57,6 +65,8 @@ packages/
   ui/                     # componentes compartidos (cuando haya más de una app)
 docker-compose.yml
 ```
+
+
 
 ### `apps/api` (NestJS)
 
@@ -91,10 +101,13 @@ apps/api/
 ```
 
 Reglas del módulo:
+
 - El controller (o router oRPC) solo orquesta: valida con el esquema de `packages/contracts`, delega en el service.
 - El service contiene la lógica de negocio y llama al repository; nunca importa Prisma directamente en el controller.
 - El repository es la única capa que conoce Prisma; si el día de mañana cambia el ORM, el resto del módulo no se entera.
 - Los permisos se resuelven con guards a nivel de módulo o de endpoint, nunca dentro del service.
+
+
 
 ### `apps/web` (Vite + React + TanStack)
 
@@ -131,9 +144,12 @@ apps/web/
 ```
 
 Reglas del feature:
+
 - Cada carpeta de `features/<dominio>` expone hooks (`useTickets`, `useCreateTicket`) que envuelven el cliente oRPC + TanStack Query; las rutas y componentes de layout nunca llaman al cliente oRPC directamente.
 - `routes/` solo compone: arma la página combinando hooks y componentes de `features/`; no contiene lógica de negocio ni fetching manual.
 - `components/ui` no conoce el dominio (son los primitivos de shadcn); `features/*/components` sí.
+
+
 
 ## Cómo crecen los campos y las tablas
 
@@ -154,6 +170,8 @@ Las relaciones importantes entre entidades **no van como IDs dentro de JSONB**: 
 - `docker-compose.yml` en la raíz levanta Postgres, la API y el frontend con un solo comando, tanto en desarrollo como en el servidor de destino.
 - Variables de entorno validadas con Zod al arrancar cada servicio.
 - Versiones mayores de dependencias en transición (Prisma, Drizzle si se reconsiderara, etc.) se fijan explícitamente en `package.json`, nunca en `latest`.
+
+
 
 ## Próximo paso
 
