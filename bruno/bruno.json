@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "system-syc",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

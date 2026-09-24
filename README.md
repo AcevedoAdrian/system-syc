@@ -34,6 +34,7 @@ packages/
   db/                     # schema.prisma, migraciones, cliente generado
   config/                 # tsconfig base, biome.json
   ui/                     # componentes compartidos (cuando haya más de una app)
+bruno/                    # colección Bruno: peticiones HTTP de la API
 docker-compose.yml
 ```
 
@@ -102,6 +103,10 @@ apps/web/
   index.html
   vite.config.ts
 ```
+
+## Peticiones a la API
+
+Las peticiones HTTP están en [`bruno/`](./bruno/). Bruno lee `VITE_API_URL` del `.env` de la raíz. Si no existe, copiá `.env.example` a `.env`. En Bruno: Open Collection sobre la carpeta `bruno/`. Hoy incluye `GET /health` (`health.check`).
 
 ## Más información
 

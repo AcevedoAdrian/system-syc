@@ -24,6 +24,8 @@ build
 .env.*
 !.env.example
 !.env.*.example
+# Symlink to the repo .env so Bruno can read it. The link is tracked; the target is not.
+!bruno/.env
 
 # Tests (Vitest + Playwright)
 coverage

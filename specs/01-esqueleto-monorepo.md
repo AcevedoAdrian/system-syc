@@ -86,11 +86,11 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] `pnpm install` en un checkout limpio termina sin errores ni advertencias de peer dependencies.
-- [ ] `pnpm turbo lint typecheck test build` termina con código 0.
-- [ ] `docker compose up` desde cero levanta `postgres`, `api` y `web` sin intervención manual.
-- [ ] `http://localhost:5173/` muestra el estado `ok` y la base `up`.
-- [ ] Con `docker compose stop postgres`, recargar la web muestra `degraded` y la base `down`, sin error de red.
+- [X] `pnpm install` en un checkout limpio termina sin errores ni advertencias de peer dependencies.
+- [X] `pnpm turbo lint typecheck test build` termina con código 0.
+- [X] `docker compose up` desde cero levanta `postgres`, `api` y `web` sin intervención manual.
+- [X] `http://localhost:5173/` muestra el estado `ok` y la base `up`.
+- [X] Con `docker compose stop postgres`, recargar la web muestra `degraded` y la base `down`, sin error de red.
 - [ ] Arrancar la API sin `DATABASE_URL` aborta el proceso con un mensaje que nombra la variable faltante.
 - [ ] Cambiar el campo `status` en `healthStatusSchema` produce un error de `typecheck` en `apps/api` y en `apps/web`.
 - [ ] Editar un archivo de `apps/api/src` o `apps/web/src` con el compose corriendo recarga el servicio sin reiniciar el contenedor.

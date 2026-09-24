@@ -1,0 +1,39 @@
+meta {
+  name: health.check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/health
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: isString
+  res.body.database: isString
+  res.body.timestamp: isString
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Comprueba que la API responde y si Postgres está disponible.
+  
+  Contrato: `health.check` en `packages/contracts`.
+  Método: GET
+  Ruta: /health
+  URL: `VITE_API_URL` del `.env` de la raíz.
+  
+  Respuesta 200:
+  - status: `ok` si la base responde; `degraded` si no
+  - database: `up` o `down`
+  - timestamp: fecha y hora en ISO 8601
+  
+  `degraded` también responde 200. La petición falla solo si la API no responde.
+}
