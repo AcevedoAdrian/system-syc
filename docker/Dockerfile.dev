@@ -1,0 +1,20 @@
+# Imagen SOLO para desarrollo (docker compose). No es una imagen de producción.
+FROM node:22-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates procps \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm@11.25.0
+
+# Los directorios que docker-compose.yml monta como volúmenes nombrados deben existir
+# en la imagen con dueño `node`, para que Docker herede ese dueño al crear el volumen.
+RUN mkdir -p /pnpm-store /app/node_modules \
+    /app/apps/api/node_modules /app/apps/web/node_modules \
+    /app/packages/config/node_modules /app/packages/contracts/node_modules \
+    /app/packages/db/node_modules \
+  && chown -R node:node /pnpm-store /app
+
+USER node
+WORKDIR /app
+ENV PNPM_CONFIG_STORE_DIR=/pnpm-store

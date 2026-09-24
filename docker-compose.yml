@@ -1,0 +1,78 @@
+# Entorno de desarrollo: postgres + api + web con hot reload.
+# Uso: `docker compose up` (las variables tienen valores por defecto; `.env` es opcional).
+name: system-syc
+
+x-dev-node: &dev-node
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.dev
+  image: system-syc-dev
+  working_dir: /app
+  volumes:
+    - .:/app
+    - node_modules_root:/app/node_modules
+    - node_modules_api:/app/apps/api/node_modules
+    - node_modules_web:/app/apps/web/node_modules
+    - node_modules_config:/app/packages/config/node_modules
+    - node_modules_contracts:/app/packages/contracts/node_modules
+    - node_modules_db:/app/packages/db/node_modules
+    - pnpm_store:/pnpm-store
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-syc}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  install:
+    <<: *dev-node
+    command: sh -c "pnpm install --frozen-lockfile && pnpm --filter @syc/db generate"
+    restart: "no"
+
+  api:
+    <<: *dev-node
+    command: pnpm --filter @syc/api dev
+    depends_on:
+      install:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      API_PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-syc}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  web:
+    <<: *dev-node
+    command: pnpm --filter @syc/web exec vite --host 0.0.0.0
+    depends_on:
+      install:
+        condition: service_completed_successfully
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    ports:
+      - "5173:5173"
+
+volumes:
+  postgres_data:
+  pnpm_store:
+  node_modules_root:
+  node_modules_api:
+  node_modules_web:
+  node_modules_config:
+  node_modules_contracts:
+  node_modules_db:
