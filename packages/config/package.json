@@ -6,5 +6,8 @@
   "files": [
     "tsconfig.base.json",
     "biome.json"
-  ]
+  ],
+  "scripts": {
+    "lint": "biome check ."
+  }
 }

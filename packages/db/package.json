@@ -8,7 +8,8 @@
   },
   "scripts": {
     "generate": "prisma generate",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
