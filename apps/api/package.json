@@ -7,7 +7,8 @@
     "dev": "tsdown --watch --on-success \"node --env-file-if-exists=../../.env dist/main.mjs\"",
     "build": "tsdown",
     "start": "node dist/main.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@nestjs/common": "12.1.0",
@@ -26,6 +27,7 @@
     "@syc/config": "workspace:*",
     "@syc/contracts": "workspace:*",
     "@syc/db": "workspace:*",
-    "tsdown": "0.23.0"
+    "tsdown": "0.23.0",
+    "vitest": "5.0.1"
   }
 }
