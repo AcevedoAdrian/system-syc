@@ -160,15 +160,6 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 | CI                       | GitHub Actions con `turbo --filter`   |                                                                                                         |
 
 
-**Comparación de las propuestas previas:**
-
-- El PRD original hablaba de "endpoints REST" y STACK propone oRPC; se adopta **oRPC** por el tipado de punta a punta sin generar código y porque ya funciona.
-- El PRD agregaba **Zustand**; STACK lo limita a estado de UI puro. Se adopta lo de STACK: TanStack Query cubre el estado de servidor y Zustand no se incluye.
-- El PRD listaba solo Vitest; STACK suma **Playwright**. Por decisión del autor **no se instala por ahora**: las pruebas de permisos por departamento se hacen manualmente.
-- El PRD proponía una tabla `TicketHistory`; se reemplaza por el **módulo** `audit` **genérico** de STACK, que sirve a los módulos futuros.
-- El PRD modelaba departamentos con `Organization` **y** una tabla `Departamento`; se unifica en `Organization`.
-
-
 
 ## 8. Arquitectura
 
