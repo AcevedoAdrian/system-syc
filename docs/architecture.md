@@ -1,8 +1,8 @@
 # Stack tecnológico — punto de entrada
 
-Este documento es la **fuente única de verdad** sobre qué tecnología usar para construir la aplicación (backend + frontend + base de datos, todo en un monorepo, corriendo con Docker). Reemplaza a `claude.md`, `fable.md`, `gemini.md`, `gpt.md` y `grok.md`, que quedan como historial de las propuestas que se compararon para llegar a esta decisión.
+Este documento es la **fuente de verdad del stack y la arquitectura**: qué tecnología se usa para construir la aplicación (backend + frontend + base de datos, todo en un monorepo, corriendo con Docker) y por qué.
 
-Este documento describe la **arquitectura y el stack**, no el producto. Todavía no hay dominios de negocio definidos: lo único seguro por ahora es que habrá **registro y autenticación de usuarios** (módulo `users`/`auth`). El resto de los módulos (qué entidades, qué reglas de negocio) se van a agregar y definir sobre la marcha a medida que el desarrollo avance; cuando aparezcan, se documentan en otro lugar (o se amplía este archivo), pero no hace falta anticiparlos acá.
+Describe la **arquitectura y el stack**, no el producto. El producto (módulos de negocio, permisos, modelo de datos y etapas) está en [`prd.md`](./prd.md). Ante una diferencia entre ambos, el PRD manda sobre el producto y este documento manda sobre la tecnología.
 
 ## Decisión de fondo
 
@@ -28,13 +28,13 @@ Tres reglas sostienen esa decisión:
 | Contratos de API                      | oRPC + Zod (paquete `packages/contracts`)                        |
 | Base de datos                         | PostgreSQL                                                       |
 | ORM                                   | Prisma (versión mayor fijada explícitamente, no `latest`)        |
-| Autenticación y usuarios/grupos       | Better Auth (plugin `organization`)                              |
+| Autenticación y departamentos         | Better Auth (plugins `organization` y `admin`)                   |
 | Frontend                              | Vite + React (SPA)                                               |
 | Routing / estado de servidor / tablas | TanStack Router + TanStack Query + TanStack Table                |
 | Formularios                           | react-hook-form + los mismos esquemas Zod de `contracts`         |
 | UI                                    | Tailwind CSS + shadcn/ui                                         |
 | Calidad                               | Biome (lint + formato)                                           |
-| Tests                                 | Vitest + Playwright                                              |
+| Tests                                 | Vitest (Playwright pendiente: por ahora las pruebas de permisos se hacen a mano) |
 | Infraestructura                       | Docker Compose (postgres + api + web)                            |
 | CI                                    | GitHub Actions, ejecutando solo lo afectado con `turbo --filter` |
 
@@ -46,7 +46,7 @@ Tres reglas sostienen esa decisión:
 - **NestJS vs. Hono/tRPC/Fastify puro:** las alternativas livianas obligan a inventar la propia estructura de módulos. Con requerimientos indefinidos, eso deriva en desorden. NestJS trae esa estructura de fábrica (módulos, DI, guards, interceptores).
 - **Prisma vs. Drizzle:** Drizzle es una opción válida, pero al momento de decidir estaba a mitad de una transición de versión mayor (API relacional reescrita). No es el momento de apostar un proyecto nuevo a esa transición.
 - **oRPC vs. REST clásico + Orval:** oRPC evita el paso de generación de código y da OpenAPI gratis. Si se prefiere máxima estabilidad sobre la pieza más joven del stack, la alternativa de repuesto es REST + `@nestjs/swagger` + cliente generado con `orval` — mismo resultado, un paso extra.
-- **Directus (BaaS) — descartado como núcleo:** resolvería la flexibilidad de campos con una UI visual sin deploys, pero cede el control del modelo de datos y de la lógica de negocio a la herramienta. Para un dominio con reglas propias (permisos por grupo, auditoría, relaciones entre entidades) conviene mantener el modelo y las migraciones bajo control directo del equipo. Se descarta como pieza central; no impide evaluarlo puntualmente para paneles internos si en el futuro hiciera falta.
+- **Directus (BaaS) — descartado como núcleo:** resolvería la flexibilidad de campos con una UI visual sin deploys, pero cede el control del modelo de datos y de la lógica de negocio a la herramienta. Para un dominio con reglas propias (permisos por departamento, auditoría, relaciones entre entidades) conviene mantener el modelo y las migraciones bajo control directo del equipo. Se descarta como pieza central; no impide evaluarlo puntualmente para paneles internos si en el futuro hiciera falta.
 - **Next.js — descartado:** es una app interna detrás de login, sin necesidad de SEO. El SSR solo agrega complejidad. Si algún día hace falta, TanStack Start es el paso natural sobre el mismo router.
 - **Microservicios, colas, CQRS/event sourcing, MongoDB, modelo EAV, motor de entidades dinámico genérico — descartados** para esta etapa: todos pagan un costo de complejidad que no se necesita todavía y que se puede introducir más adelante si el volumen o el equipo lo piden.
 
@@ -70,7 +70,7 @@ docker-compose.yml
 
 ### `apps/api` (NestJS)
 
-Un módulo por dominio de negocio. Cada módulo es autocontenido: controla sus propias entidades, permisos y casos de uso, y no depende de los internos de otro módulo. Los únicos módulos garantizados desde el inicio son `auth`, `organizations`, `users` y `groups` (registro y autenticación); el resto (`<dominio>` en el árbol de abajo) es un placeholder de los módulos de negocio que se irán agregando.
+Un módulo por dominio de negocio. Cada módulo es autocontenido: controla sus propias entidades, permisos y casos de uso, y no depende de los internos de otro módulo. Los módulos transversales garantizados son `auth`, `organizations` (departamentos), `users` y `audit`; los de negocio están definidos en `prd.md`, sección 8.2. El resto (`<dominio>` en el árbol de abajo) es un placeholder de los módulos de negocio que se irán agregando.
 
 ```text
 apps/api/
@@ -88,7 +88,6 @@ apps/api/
       auth/                      # integración Better Auth con Nest
       organizations/
       users/
-      groups/
       <dominio>/                 # módulo de negocio (a definir en el desarrollo)
         <dominio>.module.ts
         <dominio>.controller.ts # o router oRPC vía @orpc/nest
@@ -97,7 +96,7 @@ apps/api/
         <dominio>.service.spec.ts
       audit/                     # servicio inyectable: audit.log(entityType, entityId, action, payload)
       custom-fields/             # solo si hace falta (ver "Cómo crecen los campos")
-  test/                          # e2e (Playwright/Supertest)
+  test/                          # e2e (Supertest; Playwright pendiente)
 ```
 
 Reglas del módulo:
@@ -175,4 +174,4 @@ Las relaciones importantes entre entidades **no van como IDs dentro de JSONB**: 
 
 ## Próximo paso
 
-Armar el esqueleto del monorepo con estas piezas cableadas: autenticación con usuarios y grupos (lo único definido por ahora), migración inicial y `docker-compose.yml`. Los módulos de negocio concretos se agregan después, uno por uno, a medida que se definan.
+El esqueleto del monorepo ya está construido (SPEC 01). Las etapas siguientes están en `prd.md`, sección 10, y cada una se escribe como un SPEC en `specs/` antes de implementarse.

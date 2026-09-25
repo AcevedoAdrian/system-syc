@@ -1,11 +1,11 @@
 # PRD — Sistema de Gestión Interna y Seguimiento de Tickets
 
 **Autor:** Adrián Hugo Acevedo
-**Versión:** 2 (unifica `STACK.md` y `README.md`)
+**Versión:** 3
 **Fecha:** 25 de septiembre de 2026
-**Estado:** Definición de producto y stack cerrada. Quedan detalles menores por confirmar en la sección 11. Esqueleto del monorepo ya construido (SPEC 01).
+**Estado:** Aprobado
 
-> **Este documento es la fuente única de verdad** sobre qué es el sistema, con qué se construye y en qué orden se desarrolla. `STACK.md` conserva el razonamiento detallado de cada elección tecnológica. 
+> **Este documento es la fuente de verdad del producto**: qué es el sistema, para quién y en qué orden se desarrolla. La fuente de verdad del stack y la arquitectura es `docs/architecture.md`, que conserva el razonamiento detallado de cada elección tecnológica.
 
 ---
 

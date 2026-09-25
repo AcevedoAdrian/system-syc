@@ -7,7 +7,7 @@
 
 ## Por qué existe este spec
 
-`STACK.md` define el stack pero el repositorio no tiene código. Su "Próximo paso" mezcla el esqueleto con autenticación, usuarios/grupos y migración inicial. Este spec cubre **solo el esqueleto**: prueba que todas las piezas del stack están cableadas de punta a punta antes de agregar dominio. Autenticación queda para SPEC 02.
+`docs/architecture.md` define el stack pero el repositorio no tiene código. Su "Próximo paso" mezcla el esqueleto con autenticación, usuarios/grupos y migración inicial. Este spec cubre **solo el esqueleto**: prueba que todas las piezas del stack están cableadas de punta a punta antes de agregar dominio. Autenticación queda para SPEC 02.
 
 ## Alcance
 
@@ -103,24 +103,24 @@ Convenciones:
 
 ## Decisiones
 
-- **Sí:** dividir el "Próximo paso" de `STACK.md` y dejar auth para SPEC 02. Un spec que toca esqueleto, auth y migraciones tiene demasiadas áreas para verificarse de una vez.
+- **Sí:** dividir el "Próximo paso" de `docs/architecture.md` y dejar auth para SPEC 02. Un spec que toca esqueleto, auth y migraciones tiene demasiadas áreas para verificarse de una vez.
 - **Sí:** `health.check` con oRPC y consulta a Postgres. Recorre contracts, api, db y web sin inventar dominio.
 - **Sí:** `packages/contracts` y `packages/db` en este spec. Sin ellos el `health` end-to-end no existe; se descartó la opción "solo api, web y config" por esa contradicción.
-- **No:** `packages/ui`. `STACK.md` dice que se crea cuando haya más de una app; shadcn vive en `apps/web/src/components/ui`.
+- **No:** `packages/ui`. `docs/architecture.md` dice que se crea cuando haya más de una app; shadcn vive en `apps/web/src/components/ui`.
 - **Sí:** schema Prisma vacío, sin migraciones. Evita un modelo dummy que haya que borrar; la primera migración real llega con Better Auth.
 - **No:** Playwright. Se agrega cuando exista un flujo de usuario que valga la pena cubrir.
 - **Sí:** GitHub Actions escrito pero sin `git init`. El CI no se puede verificar en local; se valida al empujar el repo.
 - **Sí:** compose de desarrollo con hot reload. Los Dockerfiles de producción se difieren para no diseñar el despliegue sin una app real.
 - **Sí:** `health` degradado devuelve 200 con `degraded`, no un error. Permite a la web mostrar el estado de la base sin tratarlo como falla de red.
 - **Sí:** puertos por defecto 5173 / 3000 / 5432 y prefijo `@syc/` para los paquetes. Valores convencionales, cambiables sin impacto.
-- **No:** reabrir las decisiones ya descartadas en `STACK.md` (Drizzle, Next.js, Directus, microservicios, etc.).
+- **No:** reabrir las decisiones ya descartadas en `docs/architecture.md` (Drizzle, Next.js, Directus, microservicios, etc.).
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 | --- | --- |
 | `prisma generate` con schema sin modelos falla o avisa en la versión elegida | Verificar en el paso 3; si falla, dejar el `datasource`/`generator` y usar `$queryRaw` con el cliente generado, o documentar el motivo en una decisión nueva antes de seguir. |
-| `@orpc/nest` es la pieza más joven del stack y puede tener fricción con Nest | El alcance es un solo procedimiento; si falla, la alternativa documentada en `STACK.md` es REST + `@nestjs/swagger` + `orval`, y se reabre la decisión con justificación. |
+| `@orpc/nest` es la pieza más joven del stack y puede tener fricción con Nest | El alcance es un solo procedimiento; si falla, la alternativa documentada en `docs/architecture.md` es REST + `@nestjs/swagger` + `orval`, y se reabre la decisión con justificación. |
 | Hot reload dentro de Docker es lento o no detecta cambios en volúmenes | Usar `docker compose watch` o polling en Vite; verificado por el criterio de recarga. |
 | El monorepo monta `node_modules` de pnpm en contenedores con symlinks rotos | Instalar dentro del contenedor y no montar `node_modules` del host. |
 | El CI no se puede probar sin repo remoto | Las mismas tareas `pnpm turbo ...` corren en local; el workflow solo las invoca. |
