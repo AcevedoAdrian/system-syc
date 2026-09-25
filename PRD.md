@@ -1,11 +1,11 @@
 # PRD — Sistema de Gestión Interna y Seguimiento de Tickets
 
 **Autor:** Adrián Hugo Acevedo
-**Versión:** 2 (unifica `PRD.md`, `STACK.md` y `README.md`)
+**Versión:** 2 (unifica `STACK.md` y `README.md`)
 **Fecha:** 25 de septiembre de 2026
 **Estado:** Definición de producto y stack cerrada. Quedan detalles menores por confirmar en la sección 11. Esqueleto del monorepo ya construido (SPEC 01).
 
-> **Este documento es la fuente única de verdad** sobre qué es el sistema, con qué se construye y en qué orden se desarrolla. `STACK.md` conserva el razonamiento detallado de cada elección tecnológica. `PRD.md` queda como historial.
+> **Este documento es la fuente única de verdad** sobre qué es el sistema, con qué se construye y en qué orden se desarrolla. `STACK.md` conserva el razonamiento detallado de cada elección tecnológica. 
 
 ---
 
@@ -249,5 +249,3 @@ Cada etapa se escribe como un SPEC en `specs/` antes de implementarse.
 - **P10.** El proveedor lleva nombre, contacto, teléfono, correo y sitio web.
 - **P11.** `referenciaExterna` nunca se repite: se valida como única por proveedor (los tickets eliminados lógicamente no cuentan).
 - **P12.** `TE` es solo el prefijo fijo del número interno, que se genera automáticamente al crear el ticket (ej. `TE-000013`). No significa "ticket externo" ni identifica áreas: es el mismo para todos los tickets, tengan o no proveedor, con una única numeración continua.
-
-No
