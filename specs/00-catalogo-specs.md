@@ -389,30 +389,30 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** Largo mínimo 8, máximo 128, sin complejidad; sesión de 12 horas con renovación diaria; sin casilla "recordarme"
 
 **Q4.** El PRD §5.1 pide desactivar usuarios por soft delete, pero P4 dice que las tablas de Better Auth no llevan `deletedAt`. ¿Desactivar equivale al `ban` del plugin `admin`? ¿Cierra de inmediato las sesiones abiertas? ¿Se puede reactivar al usuario?
-**Respuesta:**
+**Respuesta:** Desactivar es el ban del plugin admin, sin vencimiento. Cierra las sesiones al instante y el usuario no puede volver a entrar. Se reactiva con unban. No se agrega deletedAt a las tablas de Better Auth y no hay borrado físico. El usuario desactivado sigue visible para el admin y como autor en el historial.
 
 **Q5.** ¿Los 4 departamentos son fijos (seed) o el admin puede crearlos, renombrarlos o desactivarlos desde la UI?
-**Respuesta:**
+**Respuesta:** ABM completo, como los catálogos. Amplía SPEC 02 con reglas que el PRD no tiene: qué pasa con los tickets y con los agentes de un departamento desactivado.
 
 **Q6.** ¿El MVP permite que un usuario esté en varios departamentos? Si es así, ¿en cuál crea tickets y cuál es su filtro por defecto?
-**Respuesta:**
+**Respuesta:** Un solo departamento por agente. El admin se lo asigna en el alta. Crea ahí y la bandeja arranca filtrada por ese. El esquema sigue pudiendo tener varios miembros en el futuro; el MVP no lo ofrece. Pertenecer a varios queda fuera del MVP.
 
 **Q7.** ¿Puede existir un agente sin departamento? Si es así, ¿qué puede hacer?
-**Respuesta:**
+**Respuesta:** Un agente no puede existir sin departamento. El alta y la edición exigen exactamente uno. Si el cambio lo dejaría sin departamento, se rechaza.
 
 **Q8.** En el reseteo de contraseña, ¿el admin escribe la nueva o el sistema genera una temporal? ¿Se obliga a cambiarla en el primer ingreso? ¿El usuario puede cambiar su propia contraseña?
-**Respuesta:**
+**Respuesta:** El admin escribe la contraseña en el alta y en el reseteo (entre 8 y 128 caracteres). No hay clave temporal ni obligación de cambiarla al primer ingreso. El usuario puede cambiar la suya si conoce la actual. El reseteo del admin no pide la contraseña anterior.
 
 **Q9.** ¿El admin pertenece a algún departamento? ¿Se impide desactivar o degradar al último admin activo, o a uno mismo?
-**Respuesta:**
+**Respuesta:** El admin no pertenece a ningún departamento. El departamento es obligatorio solo para el rol agente. No se puede desactivar ni degradar al último admin activo, ni a uno mismo. Al degradar a otro admin hay que asignarle un departamento en esa misma acción.
 
 ### SPEC 03: Auditoría y eliminación lógica
 
 **Q10.** ¿El `payload` de auditoría guarda un diff (antes/después por campo) o un snapshot completo? ¿Se auditan logins, logouts e intentos fallidos?
-**Respuesta:**
+**Respuesta:** El payload guarda un diff: por cada campo modificado, el valor anterior y el nuevo. En un alta se guarda la acción create con los valores iniciales. No se auditan logins, logouts ni intentos fallidos. Nunca se guardan contraseñas, hashes ni tokens.
 
 **Q11.** ¿Quién ve el historial? ¿Cualquiera que pueda ver el ticket, incluso de otro departamento? ¿El MVP tiene una pantalla de auditoría global para el admin?
-**Respuesta:**
+**Respuesta:** Igual que la anterior, más una pantalla global solo para el admin. Ahí se ve quién desactivó a un usuario o quién editó un catálogo. Amplía el MVP con filtros y paginación que ninguna etapa pide.
 
 **Q12.** ¿Se pueden restaurar registros eliminados? ¿El admin puede listar los eliminados?
 **Respuesta:**
