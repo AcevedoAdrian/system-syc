@@ -161,6 +161,7 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 
 
 
+
 ## 8. Arquitectura
 
 
@@ -220,23 +221,3 @@ Cada etapa se escribe como un SPEC en `specs/` antes de implementarse.
 | —   | **Fase 2**                           | Adjuntos, exportar CSV, campos personalizados, asignación a individuos, otros módulos (inventario, notas, tareas).                                       |                                                                    |
 
 
-
-
-## 11. Decisiones registradas y puntos abiertos
-
-
-
-### 11.1 Decisiones cerradas
-
-- **P1.** El número del proveedor tiene formato `Número/año`; `19092/2026` es solo un ejemplo. Vive en el ticket como `referenciaExterna`; el catálogo de Proveedores solo guarda datos del proveedor.
-- **P2.** Los estados son un catálogo editable en base de datos, no una lista fija en código.
-- **P3.** Sin Zustand. Playwright no se instala por ahora; el autor prueba a mano.
-- **P4.** Las tablas de Better Auth se cubren con el módulo `audit`, sin columnas de auditoría propias.
-- **P5.** Área y Edificio son independientes y se eligen por separado en cada ticket.
-- **P6.** No hay auto-registro: solo el admin crea usuarios.
-- **P7.** Sin derivación entre departamentos: cada agente crea tickets solo en el suyo.
-- **P8.** Los estados llevan una casilla "cerrado" en lugar de categorías fijas.
-- **P9.** El número interno es continuo, sin año, con prefijo (ej. `TE-000013`).
-- **P10.** El proveedor lleva nombre, contacto, teléfono, correo y sitio web.
-- **P11.** `referenciaExterna` nunca se repite: se valida como única por proveedor (los tickets eliminados lógicamente no cuentan).
-- **P12.** `TE` es solo el prefijo fijo del número interno, que se genera automáticamente al crear el ticket (ej. `TE-000013`). No significa "ticket externo" ni identifica áreas: es el mismo para todos los tickets, tengan o no proveedor, con una única numeración continua.
