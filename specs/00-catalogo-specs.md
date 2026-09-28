@@ -418,18 +418,18 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:**
 
 **Q13.** Los catálogos tienen `activo` y `deletedAt`. ¿Qué diferencia hay entre desactivar y eliminar? ¿Se puede eliminar un ítem que usan tickets existentes?
-**Respuesta:**
+**Respuesta:** Desactivar pone activo en falso: el ítem sigue en el ABM, no sale en los selectores y los tickets existentes lo siguen mostrando. Se puede volver a activar, es solo para mostrar si ese item se muestra o no ya activado. Eliminar pone deletedAt y solo se permite si ningún ticket no eliminado lo usa. Si está en uso, se rechaza. Es una eliminacion logica, se debe poder permitir seguir mostrando en el historial y la referencia seleccionadas 
 
 ### SPEC 04: Catálogos
 
 **Q14.** ¿El nombre es único dentro de cada catálogo? ¿La comparación distingue mayúsculas y acentos?
-**Respuesta:**
+**Respuesta:** El nombre es único dentro de cada catálogo, no entre catálogos distintos. La comparación no distingue mayúsculas ni acentos y usa el nombre ya recortado. Cuentan los ítems activos e inactivos. Los eliminados no ocupan el nombre.Área y area no pueden coexistir. Es lo que evita selectores ambiguos y deja recrear un nombre después de eliminarlo.
 
 **Q15.** ¿Los catálogos son globales o alguno es por departamento (por ejemplo, Módulos solo para Desarrollo)?
-**Respuesta:**
+**Respuesta:** Todos los catálogos son globales. Una lista de módulos, una de edificios, una de estados, para todos los departamentos. Es lo que describe el modelo. ver bien
 
 **Q16.** En Proveedor, ¿qué campos son obligatorios? ¿Se valida el formato de correo y URL? ¿El teléfono es texto libre?
-**Respuesta:**
+**Respuesta:** Solo el nombre es obligatorio. Contacto, teléfono, correo y sitio web son opcionales. Si el correo o el sitio web vienen, se valida el formato de email y de URL con http o https. Teléfono con formato estricto (por ejemplo solo dígitos y código de país). Rechaza muchos números reales de proveedores. Un campo en blanco, ya recortado, queda vacío.
 
 **Q17.** ¿Con qué estado nace un ticket? ¿Hay una casilla "inicial" en `EstadoTicket`, se usa el primero por `orden` o lo elige el usuario?
 **Respuesta:**
