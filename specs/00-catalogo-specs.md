@@ -393,7 +393,7 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** Desactivar es el ban del plugin admin, sin vencimiento. Cierra las sesiones al instante y el usuario no puede volver a entrar. Se reactiva con unban. No se agrega deletedAt a las tablas de Better Auth y no hay borrado físico. El usuario desactivado sigue visible para el admin y como autor en el historial.
 
 **Q5.** ¿Los 4 departamentos son fijos (seed) o el admin puede crearlos, renombrarlos o desactivarlos desde la UI?
-**Respuesta:** El admin puede crearlos, renombrarlos o desactivarlos desde la UI. ABM completo, como los catálogos. Amplía SPEC 02 con reglas que el PRD no tiene: qué pasa con los tickets y con los agentes de un departamento desactivado.
+**Respuesta:** El admin puede crear, renombrar, desactivar y eliminar departamentos desde la UI. Desactivar lo oculta de los selectores: no se asignan agentes nuevos, no se crean tickets nuevos y no se puede mover un ticket hacia ese departamento. Los tickets que ya lo tienen lo siguen mostrando y no se mueven solos. Los agentes que ya pertenecen siguen entrando y pueden ver, editar y comentar esos tickets; no pueden crear tickets mientras el departamento esté desactivado. Se puede volver a activar. Eliminar solo se permite si no quedan agentes asignados ni tickets no eliminados; si está en uso, se rechaza y no hay cascada. No se puede desactivar ni eliminar el último departamento activo. Organization no lleva deletedAt: eliminar, cuando está permitido, borra la organización.
 
 **Q6.** ¿El MVP permite que un usuario esté en varios departamentos? Si es así, ¿en cuál crea tickets y cuál es su filtro por defecto?
 **Respuesta:** Un agente pertenece a un solo departamento. El admin se lo asigna en el alta. Solo ve, crea y edita tickets de ese departamento. El esquema sigue pudiendo tener varios miembros en el futuro; el MVP no lo ofrece. Pertenecer a varios queda fuera del MVP.
@@ -430,7 +430,7 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** Todos los catálogos son globales. Una lista de módulos, una de edificios, una de estados, para todos los departamentos. Es lo que describe el modelo.
 
 **Q16.** En Proveedor, ¿qué campos son obligatorios? ¿Se valida el formato de correo y URL? ¿El teléfono es texto libre?
-**Respuesta:** Solo el nombre es obligatorio. Contacto, teléfono, correo y sitio web son opcionales. Si el correo o el sitio web vienen, se valida el formato de email y de URL con http o https. Si se carga el teléfono debe tener un  formato estricto (por ejemplo solo dígitos y código de país). Rechaza muchos números reales de proveedores. Un campo en blanco, ya recortado, queda vacío.
+**Respuesta:** Solo el nombre es obligatorio. Contacto, teléfono, correo y sitio web son opcionales. Si el correo o el sitio web vienen, se valida el formato de email y de URL con http o https. El teléfono es texto libre, ya recortado, de hasta 50 caracteres: se aceptan números locales, código de país, guiones y extensiones. No se exige un formato estricto. Un campo en blanco, ya recortado, queda vacío.
 
 **Q17.** ¿Con qué estado nace un ticket? ¿Hay una casilla "inicial" en `EstadoTicket`, se usa el primero por `orden` o lo elige el usuario?
 **Respuesta:** No hay casilla inicial ni casilla cerrado. El ticket nace en el primer estado activo según el orden del catálogo. El seed deja Pendiente primero. El formulario de alta no pregunta el estado. La solución no es obligatoria. Si el estado elegido es Finalizado o Cancelado, fechaCierre es obligatoria. 
@@ -462,7 +462,7 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** Se puede pasar de cualquier estado activo a cualquier otro. El seed incluye el estado Reabierto. Al elegirlo, fechaReabierto es obligatoria y la carga quien cambia el estado. fechaCierre y la solución se conservan. Al pasar a Finalizado, Cerrado o Cancelado, fechaCierre es obligatoria. Al pasar de uno de esos tres a otro de esos tres, fechaCierre se conserva y quien guarda puede cambiarla. No se recalcula sola.
 
 **Q26.** ¿`fechaCierre` se completa sola con el momento del cambio o el usuario la puede editar (como `fechaRecepcion`)?
-**Respuesta:** Se puede pasar de cualquier estado activo a cualquier otro, el seed incluye Reabierto, al elegirlo fechaReabierto es obligatoria, y fechaCierre y la solución se conservan.
+**Respuesta:** fechaCierre no se completa sola. La carga quien cambia el estado, igual que fechaRecepcion: es una fecha sin hora, el formulario propone el día de hoy y se puede cambiar. Se acepta hoy o un día anterior; una fecha futura se rechaza. Si el ticket ya está en Finalizado, Cerrado o Cancelado y se pasa a otro de esos tres, se conserva la fecha cargada y quien guarda puede cambiarla; no se recalcula. En los demás cambios de estado no se pide y no se borra.
 
 **Q27.** ¿`notificado` es obligatorio para cerrar o solo informativo?
 **Respuesta:** notificado es solo informativo. No es obligatorio para cerrar. Nace en falso y se puede marcar o desmarcar en cualquier momento, también con el ticket en Finalizado, Cerrado o Cancelado. No envía ningún aviso.
