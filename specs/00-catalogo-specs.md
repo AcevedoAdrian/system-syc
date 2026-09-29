@@ -110,12 +110,12 @@
 
 - **MUST:**
   - `AuthGuard`, `PermissionsGuard`, `@RequirePermission()` y `@CurrentUser()` (ARCH).
-  - Agente: ve tickets de todos los departamentos; crea solo en el suyo; edita, cambia estado y comenta solo tickets de su departamento.
+  - Agente: ve, crea, edita, cambia estado y comenta solo tickets de su departamento. No puede abrir ni listar los de otro (decisión del usuario, 2026-09-29).
   - Admin: todo, en todos los departamentos, más usuarios y catálogos.
   - El permiso se evalúa contra `ticket.departamento`, nunca contra `createdBy` (PRD §4.1).
   - La barrera real está en el backend; la UI solo oculta acciones *(propuesta técnica)*.
 - **EDGE CASES:**
-  - Un agente manipula el payload para crear en otro departamento: 403.
+  - Un agente manipula el payload para crear, ver o editar en otro departamento: 403.
   - Un agente muta un ticket ajeno: 403 y nada cambia.
   - Cambio de rol o departamento con la sesión abierta: los permisos se reevalúan en la siguiente request *(propuesta técnica)*.
 - **MUST NOT:** permisos dentro de services; roles adicionales en el MVP.
@@ -194,13 +194,13 @@
 **Feature 3.3:** Estados (`EstadoTicket`)
 
 - **MUST:**
-  - Es un catálogo en la base (P2). El admin crea, renombra, reordena y marca `cerrado` sin deploy (PRD §6.2).
-  - Las reglas dependen de `cerrado`, nunca del nombre (P8).
-  - El seed carga Pendiente, En progreso, En espera, Finalizado (cerrado) y Cancelado (cerrado) (PRD §6.2, §6.1 `fechaCierre`).
-- **EDGE CASES:**
-  - `[NEEDS CLARIFICATION Q17]` Estado inicial de un ticket nuevo.
-  - `[NEEDS CLARIFICATION Q18]` Invariantes del catálogo.
-- **MUST NOT:** un enum de estados en código; categorías fijas; lógica del tipo `if (nombre === "Finalizado")`.
+  - Es un catálogo en la base (P2). El admin crea, renombra y reordena sin deploy (PRD §6.2).
+  - No hay casilla `cerrado` ni casilla `inicial`. El ticket se sigue solo con el estado elegido (decisión del usuario, 2026-09-29).
+  - El seed carga Pendiente, En progreso, En espera, Finalizado, Cerrado y Cancelado (PRD §6.2).
+  - El ticket nace en el primer estado activo según `orden`. Con el seed, es Pendiente. El alta no pregunta el estado (decisión del usuario, 2026-09-29, Q17).
+  - Siempre hay al menos un estado activo. Desactivar o eliminar el último se rechaza (decisión del usuario, 2026-09-29, Q18).
+  - Desactivar un estado en uso sigue Q13. Si era el primero por `orden`, el alta usa el siguiente activo. Renombrar Finalizado o Cancelado no modifica `fechaCierre` ni la solución de los tickets ya cargados (Q18).
+- **MUST NOT:** un enum de estados en código; casilla `cerrado` o `inicial`.
 
 ---
 
@@ -247,16 +247,17 @@
 **Feature 4.4:** Cambio de estado y cierre
 
 - **MUST:**
-  - Pasar a un estado con `cerrado` completa `fechaCierre` y exige `solucionDescripcion` no vacía (PRD §6.2).
+  - Si el estado elegido es Finalizado o Cancelado, `fechaCierre` es obligatoria. La comparación del nombre es la de Q14 (decisión del usuario, 2026-09-29).
+  - `solucionDescripcion` es opcional (decisión del usuario, 2026-09-29).
   - Cada cambio de estado queda auditado con estado anterior, estado nuevo, usuario y fecha.
   - `notificado` es una casilla manual (PRD §6.1).
 - **EDGE CASES:**
-  - Cierre sin `solucionDescripcion`: 400 y el estado no cambia.
+  - Pasar a Finalizado o Cancelado sin `fechaCierre`: 400 y el estado no cambia.
   - `[NEEDS CLARIFICATION Q25]` Transiciones y reapertura.
   - `[NEEDS CLARIFICATION Q26]` `fechaCierre`.
   - `[NEEDS CLARIFICATION Q27]` `notificado`.
   - `[NEEDS CLARIFICATION Q28]` "En espera".
-- **MUST NOT:** lógica que dependa del nombre del estado; notificaciones por correo (descartadas).
+- **MUST NOT:** casilla `cerrado`; exigir `solucionDescripcion` para cerrar; notificaciones por correo (descartadas).
 
 **Feature 4.5:** Proveedor y referencia externa
 
@@ -305,7 +306,7 @@
 
 - **MUST:**
   - Búsqueda y filtros por estado, departamento, área, edificio, tipo, prioridad y texto (PRD §5.1).
-  - El agente la ve filtrada por su departamento por defecto y puede quitar el filtro. El admin la ve sin filtro (PRD §4.2).
+  - El agente solo ve los tickets de su departamento y no puede quitar ese límite. El admin la ve sin filtro.
   - Excluye tickets eliminados.
   - TanStack Table con paginación, filtros y orden resueltos en el servidor; los filtros se combinan con AND *(propuesta técnica)*.
 - **EDGE CASES:**
@@ -321,7 +322,7 @@
 
 - **MUST:**
   - Muestra campos, comentarios e historial.
-  - Las acciones aparecen solo si hay permiso; un agente de otro departamento ve el ticket en solo lectura (PRD §4.2).
+  - Las acciones aparecen solo si hay permiso. Un agente de otro departamento recibe 403 y el ticket no aparece en su bandeja.
   - Ruta `/tickets/$id` (ARCH).
 - **EDGE CASES:** un ticket inexistente o eliminado devuelve 404.
 - **MUST NOT:** que `routes/` llame directamente al cliente oRPC.
@@ -378,7 +379,7 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 ### SPEC 01
 
 **Q1.** SPEC 01 está "Approved" y la etapa 0 "hecha", pero 9 de sus 14 criterios de aceptación siguen sin tildar. ¿Están pendientes de verificar o ya se cumplen y falta marcarlos?
-**Respuesta:**
+**Respuesta:** Esta pendiente en verficar 
 
 ### SPEC 02: Autenticación y acceso
 
@@ -392,10 +393,10 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** Desactivar es el ban del plugin admin, sin vencimiento. Cierra las sesiones al instante y el usuario no puede volver a entrar. Se reactiva con unban. No se agrega deletedAt a las tablas de Better Auth y no hay borrado físico. El usuario desactivado sigue visible para el admin y como autor en el historial.
 
 **Q5.** ¿Los 4 departamentos son fijos (seed) o el admin puede crearlos, renombrarlos o desactivarlos desde la UI?
-**Respuesta:** ABM completo, como los catálogos. Amplía SPEC 02 con reglas que el PRD no tiene: qué pasa con los tickets y con los agentes de un departamento desactivado.
+**Respuesta:** El admin puede crearlos, renombrarlos o desactivarlos desde la UI. ABM completo, como los catálogos. Amplía SPEC 02 con reglas que el PRD no tiene: qué pasa con los tickets y con los agentes de un departamento desactivado.
 
 **Q6.** ¿El MVP permite que un usuario esté en varios departamentos? Si es así, ¿en cuál crea tickets y cuál es su filtro por defecto?
-**Respuesta:** Un solo departamento por agente. El admin se lo asigna en el alta. Crea ahí y la bandeja arranca filtrada por ese. El esquema sigue pudiendo tener varios miembros en el futuro; el MVP no lo ofrece. Pertenecer a varios queda fuera del MVP.
+**Respuesta:** Un agente pertenece a un solo departamento. El admin se lo asigna en el alta. Solo ve, crea y edita tickets de ese departamento. El esquema sigue pudiendo tener varios miembros en el futuro; el MVP no lo ofrece. Pertenecer a varios queda fuera del MVP.
 
 **Q7.** ¿Puede existir un agente sin departamento? Si es así, ¿qué puede hacer?
 **Respuesta:** Un agente no puede existir sin departamento. El alta y la edición exigen exactamente uno. Si el cambio lo dejaría sin departamento, se rechaza.
@@ -412,10 +413,10 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** El payload guarda un diff: por cada campo modificado, el valor anterior y el nuevo. En un alta se guarda la acción create con los valores iniciales. No se auditan logins, logouts ni intentos fallidos. Nunca se guardan contraseñas, hashes ni tokens.
 
 **Q11.** ¿Quién ve el historial? ¿Cualquiera que pueda ver el ticket, incluso de otro departamento? ¿El MVP tiene una pantalla de auditoría global para el admin?
-**Respuesta:** Igual que la anterior, más una pantalla global solo para el admin. Ahí se ve quién desactivó a un usuario o quién editó un catálogo. Amplía el MVP con filtros y paginación que ninguna etapa pide.
+**Respuesta:** El historial del ticket lo ve cualquiera que pueda ver el ticket. El MVP no tiene una pantalla de auditoría global. Los cambios de usuarios y catálogos se registran y no se consultan desde la app en esta etapa.
 
 **Q12.** ¿Se pueden restaurar registros eliminados? ¿El admin puede listar los eliminados?
-**Respuesta:**
+**Respuesta:** No se restauran registros eliminados y el admin no los lista. Dejan de aparecer en las pantallas y siguen en la base. El número de ticket no se reutiliza.
 
 **Q13.** Los catálogos tienen `activo` y `deletedAt`. ¿Qué diferencia hay entre desactivar y eliminar? ¿Se puede eliminar un ítem que usan tickets existentes?
 **Respuesta:** Desactivar pone activo en falso: el ítem sigue en el ABM, no sale en los selectores y los tickets existentes lo siguen mostrando. Se puede volver a activar, es solo para mostrar si ese item se muestra o no ya activado. Eliminar pone deletedAt y solo se permite si ningún ticket no eliminado lo usa. Si está en uso, se rechaza. Es una eliminacion logica, se debe poder permitir seguir mostrando en el historial y la referencia seleccionadas 
@@ -426,84 +427,84 @@ Escribí tu respuesta debajo de cada pregunta, en la línea **Respuesta:**. Si u
 **Respuesta:** El nombre es único dentro de cada catálogo, no entre catálogos distintos. La comparación no distingue mayúsculas ni acentos y usa el nombre ya recortado. Cuentan los ítems activos e inactivos. Los eliminados no ocupan el nombre.Área y area no pueden coexistir. Es lo que evita selectores ambiguos y deja recrear un nombre después de eliminarlo.
 
 **Q15.** ¿Los catálogos son globales o alguno es por departamento (por ejemplo, Módulos solo para Desarrollo)?
-**Respuesta:** Todos los catálogos son globales. Una lista de módulos, una de edificios, una de estados, para todos los departamentos. Es lo que describe el modelo. ver bien
+**Respuesta:** Todos los catálogos son globales. Una lista de módulos, una de edificios, una de estados, para todos los departamentos. Es lo que describe el modelo.
 
 **Q16.** En Proveedor, ¿qué campos son obligatorios? ¿Se valida el formato de correo y URL? ¿El teléfono es texto libre?
-**Respuesta:** Solo el nombre es obligatorio. Contacto, teléfono, correo y sitio web son opcionales. Si el correo o el sitio web vienen, se valida el formato de email y de URL con http o https. Teléfono con formato estricto (por ejemplo solo dígitos y código de país). Rechaza muchos números reales de proveedores. Un campo en blanco, ya recortado, queda vacío.
+**Respuesta:** Solo el nombre es obligatorio. Contacto, teléfono, correo y sitio web son opcionales. Si el correo o el sitio web vienen, se valida el formato de email y de URL con http o https. Si se carga el teléfono debe tener un  formato estricto (por ejemplo solo dígitos y código de país). Rechaza muchos números reales de proveedores. Un campo en blanco, ya recortado, queda vacío.
 
 **Q17.** ¿Con qué estado nace un ticket? ¿Hay una casilla "inicial" en `EstadoTicket`, se usa el primero por `orden` o lo elige el usuario?
-**Respuesta:**
+**Respuesta:** No hay casilla inicial ni casilla cerrado. El ticket nace en el primer estado activo según el orden del catálogo. El seed deja Pendiente primero. El formulario de alta no pregunta el estado. La solución no es obligatoria. Si el estado elegido es Finalizado o Cancelado, fechaCierre es obligatoria. 
 
-**Q18.** ¿Debe existir siempre al menos un estado abierto y uno cerrado? ¿Se puede desactivar un estado en uso? Si se cambia `cerrado` en un estado con tickets, ¿se recalcula algo en esos tickets?
-**Respuesta:**
+**Q18.** ¿Debe existir siempre al menos un estado activo? ¿Se puede desactivar un estado en uso? Si se renombra Finalizado o Cancelado, ¿se recalcula algo en los tickets que ya lo tenían?
+**Respuesta:** Siempre hay al menos un estado activo. Desactivar o eliminar el último estado activo se rechaza. Un estado en uso se puede desactivar: sale del selector, los tickets lo siguen mostrando y se puede volver a activar. Eliminar solo si ningún ticket no eliminado lo usa. Si se desactiva el primero según el orden, el alta usa el siguiente activo. Renombrar Finalizado o Cancelado no recalcula fechaCierre ni la solución de los tickets existentes.
 
 ### SPEC 05: Tickets núcleo
 
 **Q19.** ¿Qué campos son obligatorios al crear? ¿Título, descripción, área, edificio, tipo, módulo, prioridad y fecha de recepción? ¿Qué largo máximo tienen título y descripción?
-**Respuesta:**
+**Respuesta:** Al crear son obligatorios título, departamento, prioridad y fecha de recepción. El agente no elige departamento: usa el suyo. La descripción es opcional, hasta 5000 caracteres. El título se recorta y tiene un máximo de 200; si queda vacío, se rechaza. No se piden en el alta el estado, área, edificio, tipo, módulo,el número interno, la fecha de cierre, la solución ni notificado. El número de ticket del proveedor (`referenciaExterna`) sí se carga en el ticket, es opcional y va junto con el proveedor. La actuación simple también es opcional.
 
 **Q20.** ¿`fechaRecepcion` es fecha o fecha-hora? ¿Puede ser futura? ¿Por defecto es hoy?
-**Respuesta:**
+**Respuesta:** fechaRecepcion es una fecha, sin hora. Por defecto es el día de hoy y el agente puede cambiarla. Se acepta hoy o un día anterior. Una fecha futura se rechaza
 
 **Q21.** ¿"Continuo" exige que no haya huecos (una creación fallida no consume número) o se tolera algún hueco? ¿Qué pasa después de `TE-999999`?
-**Respuesta:**
+**Respuesta:** Se toleran huecos si una creación falla. El número no se reutiliza. Después de TE-999999 sigue TE-1000000, con el mismo prefijo. Hasta 999999 se muestra con seis dígitos.
 
 **Q22.** Si dos agentes editan el mismo ticket a la vez, ¿gana el último o se rechaza la segunda edición (bloqueo optimista)?
-**Respuesta:**
+**Respuesta:** Si dos personas guardan el mismo ticket a la vez, se rechaza la segunda edición. El servidor compara updatedAt con el que tenía el formulario al abrirlo. Si cambió, responde 409 y no guarda nada. La pantalla pide recargar. Vale para editar campos y para cambiar el estado.
 
 **Q23.** ¿Un ticket en estado cerrado se puede editar? ¿Y comentar?
-**Respuesta:**
+**Respuesta:** Un ticket en Finalizado, Cerrado o Cancelado se puede editar y comentar. Lo hacen el admin y los agentes del departamento del ticket. Cambiar el estado también se permite.
 
 **Q24.** ¿El admin puede cambiar el departamento de un ticket existente?
-**Respuesta:**
+**Respuesta:** Solo el admin puede cambiar el departamento de un ticket existente. El agente no. El número, los comentarios y el historial se conservan. El departamento nuevo tiene que estar activo. A partir de ese cambio editan los agentes del departamento nuevo.
 
 **Q25.** ¿Se puede pasar libremente de cualquier estado a cualquier otro? ¿Se permite reabrir un ticket cerrado? En ese caso, ¿se borra `fechaCierre` y se conserva `solucionDescripcion`? Al pasar de un cerrado a otro cerrado, ¿se recalcula `fechaCierre`?
-**Respuesta:**
+**Respuesta:** Se puede pasar de cualquier estado activo a cualquier otro. El seed incluye el estado Reabierto. Al elegirlo, fechaReabierto es obligatoria y la carga quien cambia el estado. fechaCierre y la solución se conservan. Al pasar a Finalizado, Cerrado o Cancelado, fechaCierre es obligatoria. Al pasar de uno de esos tres a otro de esos tres, fechaCierre se conserva y quien guarda puede cambiarla. No se recalcula sola.
 
 **Q26.** ¿`fechaCierre` se completa sola con el momento del cambio o el usuario la puede editar (como `fechaRecepcion`)?
-**Respuesta:**
+**Respuesta:** Se puede pasar de cualquier estado activo a cualquier otro, el seed incluye Reabierto, al elegirlo fechaReabierto es obligatoria, y fechaCierre y la solución se conservan.
 
 **Q27.** ¿`notificado` es obligatorio para cerrar o solo informativo?
-**Respuesta:**
+**Respuesta:** notificado es solo informativo. No es obligatorio para cerrar. Nace en falso y se puede marcar o desmarcar en cualquier momento, también con el ticket en Finalizado, Cerrado o Cancelado. No envía ningún aviso.
 
 **Q28.** Paso 4 del flujo (PRD §6.4): cuando se asocia un proveedor, ¿el ticket pasa solo a "En espera" o el agente lo cambia a mano?
-**Respuesta:**
+**Respuesta:** Al asociar un proveedor el estado no cambia solo. El agente o el admin lo pasa a En espera a mano, si corresponde. Guardar el proveedor y la referencia externa no modifica el estado.
 
 **Q29.** ¿Se puede cargar `referenciaExterna` sin proveedor? Formato exacto: ¿el número lleva solo dígitos? ¿El año tiene 4 dígitos y algún rango válido? ¿`019092/2026` es lo mismo que `19092/2026`?
-**Respuesta:**
+**Respuesta:** No se puede cargar una referencia externa sin proveedor. El formato es número/año: el número solo tiene dígitos y el año tiene cuatro, entre 2000 y 2100. Los ceros a la izquierda no cuentan: 019092/2026 se guarda como 19092/2026. Un número vacío, como 000/2026, se rechaza. La referencia vacía sí se permite, con o sin proveedor.
 
 **Q30.** Si se quita o cambia el proveedor de un ticket, ¿la `referenciaExterna` se borra, se conserva o hay que volver a cargarla?
-**Respuesta:**
+**Respuesta:** Al quitar el proveedor, la referencia externa se borra. Al cambiarlo, la referencia anterior no se conserva: en ese guardado se carga la del proveedor nuevo o queda vacía. El historial guarda el valor anterior. 
 
 **Q31.** La matriz PRD §4.2 no incluye "eliminar". ¿Quién puede eliminar un ticket: un agente de su departamento o solo el admin?
-**Respuesta:**
+**Respuesta:** Solo el admin puede eliminar un ticket. Un agente recibe 403, también si el ticket es de su departamento. La eliminación es lógica: sale de la bandeja, el número no se reutiliza y la referencia externa queda libre. Queda en el historial.
 
 ### SPEC 06: Comentarios, bandeja y detalle
 
 **Q32.** Los comentarios son inmutables (PRD §6.3), pero todo registro de negocio tiene soft delete (PRD §5.1). ¿Un comentario se puede eliminar? ¿Quién puede?
-**Respuesta:**
+**Respuesta:** Un comentario no se edita: el texto, el autor y la fecha quedan fijos. Solo el admin puede eliminarlo, de forma lógica. Un agente no puede, tampoco el autor. Deja de mostrarse en el ticket y la eliminación queda en el historial.
 
 **Q33.** ¿En qué campos busca el texto libre? ¿Título, descripción, número, referencia externa, actuación simple, comentarios?
-**Respuesta:**
+**Respuesta:** El texto libre busca en título, descripción, solución, y comentarios no eliminados. Alcanza con que coincida en uno. Distingue mayúsculas y acentos. No busca en nombres de catálogo ni en el historial de auditoría.
 
 **Q34.** ¿Cuál es el orden por defecto de la bandeja (número, fecha de recepción, última actualización) y cuántos tickets muestra por página?
-**Respuesta:**
+**Respuesta:** La bandeja ordena por fecha de recepción, de la más reciente a la más antigua. Si la fecha coincide, ordena por número de mayor a menor. Muestra 20 tickets por página.
 
 **Q35.** Proveedor, módulo, abiertos/cerrados, rango de fechas y `notificado` no están en la lista de filtros del PRD §5.1. ¿Se agregan o quedan fuera a propósito?
-**Respuesta:**
+**Respuesta:** Se agregan tres filtros: proveedor, módulo y rango de fecha de recepción. Abiertos/cerrados y notificado quedan fuera. El filtro de estado ya cubre cada estado, y notificado sigue siendo solo una casilla del ticket.
 
 ### SPEC 07: Endurecimiento y despliegue
 
 **Q36.** Backups: ¿con qué frecuencia, cuánta retención, a qué destino? ¿Hay que probar la restauración?
-**Respuesta:**
+**Respuesta:** Backup automático todos los días a las 02:00, hora del servidor. Se conservan 30 copias dentro del volumen de Postgres, en el mismo servidor. Antes de producción se restaura una copia en una base vacía y se comprueba que un usuario entra y ve tickets. Se vuelve a probar si cambia el procedimiento. Otro disco u otro equipo queda para más adelante.
 
 **Q37.** Despliegue: ¿HTTPS con certificado interno? ¿Qué dominio o hostname? ¿El deploy es manual en el servidor o lo dispara el CI?
-**Respuesta:**
+**Respuesta:** Se entra por HTTP con la IP del servidor. No hay dominio ni HTTPS en esta etapa. WEB_ORIGIN es esa URL. El deploy es manual en el servidor: git pull de los cambios hechos en local, build de las imágenes y Docker Compose con Postgres, la API, la web y Nginx. El CI no despliega. Todo corre en ese servidor.
 
 ### Entrega
 
 **Q38.** ¿Querés dejar este catálogo como único archivo, o que cada dominio se convierta en su propio SPEC (02 a 07) con la plantilla de SPEC 01? Recomendación: un archivo por SPEC, porque cada uno se implementa y verifica por separado.
-**Respuesta:**
+**Respuesta:** Un archivo por SPEC, del 02 al 07, con la plantilla de SPEC 01. El catálogo queda como índice de las respuestas. Cada SPEC se implementa y se verifica por separado.
 
 ---
 

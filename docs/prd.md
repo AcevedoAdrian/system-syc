@@ -1,8 +1,8 @@
 # PRD — Sistema de Gestión Interna y Seguimiento de Tickets
 
 **Autor:** Adrián Hugo Acevedo
-**Versión:** 3
-**Fecha:** 25 de septiembre de 2026
+**Versión:** 5
+**Fecha:** 29 de septiembre de 2026
 **Estado:** Aprobado
 
 > **Este documento es la fuente de verdad del producto**: qué es el sistema, para quién y en qué orden se desarrolla. La fuente de verdad del stack y la arquitectura es `docs/architecture.md`, que conserva el razonamiento detallado de cada elección tecnológica.
@@ -55,14 +55,14 @@ Un sistema in-house, usado solo por el equipo interno, con base relacional (Post
 
 | Acción                             | Agente (ticket de su departamento)                               | Agente (ticket de otro departamento) | Admin                  |
 | ---------------------------------- | ---------------------------------------------------------------- | ------------------------------------ | ---------------------- |
-| Ver tickets                        | Sí                                                               | Sí, solo lectura                     | Sí                     |
+| Ver tickets                        | Sí                                                               | No                     | Sí                     |
 | Crear ticket                       | Sí, solo en su departamento                                      | No                                   | Sí, en cualquiera      |
 | Editar / cambiar estado / comentar | Sí                                                               | No                                   | Sí                     |
 | Ver la lista                       | Filtrada por su departamento por defecto; puede quitar el filtro |                                      | Sin filtro por defecto |
 | Gestionar usuarios y catálogos     | No                                                               | No                                   | Sí                     |
 
 
-Razón: cada persona se dedica a lo suyo, pero puede ver el trabajo de los demás.
+Razón: cada agente ve y opera solo en su departamento. El admin ve todos.
 
 ## 5. Alcance
 
@@ -107,8 +107,8 @@ Razón: cada persona se dedica a lo suyo, pero puede ver el trabajo de los demá
 | `proveedor`                   | Relación opcional al catálogo de Proveedores.                                                                                                                                                                                                                  |
 | `referenciaExterna`           | Número de ticket que asigna el proveedor, formato `Número/año` (ej. `19092/2026`, el número es solo un ejemplo). Opcional, texto validado con ese formato. Único por proveedor. Vive en el ticket; el catálogo de Proveedores solo guarda datos del proveedor. |
 | `fechaRecepcion`              | Fecha real en que llegó el requerimiento (puede ser anterior a la carga).                                                                                                                                                                                      |
-| `fechaCierre`                 | Se completa al finalizar o cancelar.                                                                                                                                                                                                                           |
-| `solucionDescripcion`         | Se documenta la solución al cerrar.                                                                                                                                                                                                                            |
+| `fechaCierre`                 | Obligatoria cuando el estado es `Finalizado` , `Cerrado` o `Cancelado`. La carga quien cambia el estado. En los demás estados queda vacía.                                                                                                                                 |
+| `solucionDescripcion`         | Opcional. Texto de la solución, si se documenta.                                                                                                                                                                                                               |
 | `notificado`                  | Casilla manual de validación visual: "se notificó al usuario".                                                                                                                                                                                                 |
 | Auditoría                     | `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`.                                                                                                                                                                                               |
 
@@ -117,9 +117,15 @@ Razón: cada persona se dedica a lo suyo, pero puede ver el trabajo de los demá
 
 ### 6.2 Estados
 
-Los estados son un **catálogo editable** (tabla `EstadoTicket`), para poder agregarlos o modificarlos sin deploy. Valores iniciales sugeridos: `Pendiente`, `En progreso`, `En espera` (esperando al proveedor o al usuario), `Finalizado` y `Cancelado`.
+Los estados son un **catálogo editable** (tabla `EstadoTicket`), para poder agregarlos o modificarlos sin deploy. Valores iniciales: `Pendiente`, `En progreso`, `En espera` (esperando al proveedor o al usuario), `Finalizado` y `Cancelado`. Cada uno tiene nombre, orden y estado activo. No hay casilla "cerrado" ni casilla "inicial".
 
-Para que las reglas no dependan del nombre, cada estado tiene una **casilla "cerrado"**. Pasar a un estado marcado como cerrado completa `fechaCierre` y exige `solucionDescripcion`. El admin puede crear, renombrar, reordenar y marcar estados sin deploy.
+Un ticket nuevo nace en el primer estado activo según el orden. Con los valores iniciales, es `Pendiente`. El formulario de alta no pregunta el estado.
+
+El ticket se sigue solo con el estado elegido. Pasar a `Finalizado` o `Cancelado` exige `fechaCierre`. La comparación del nombre no distingue mayúsculas ni acentos. `solucionDescripcion` no es obligatoria. Si se renombra `Finalizado` o `Cancelado`, ese estado deja de exigir la fecha. Ese renombre no cambia la fecha de cierre ni la solución de los tickets que ya estaban en ese estado.
+
+Siempre queda al menos un estado activo. No se puede desactivar ni eliminar el último. Un estado que ya usan tickets se puede desactivar: deja de ofrecerse al cambiar de estado y los tickets lo siguen mostrando. Si se desactiva el primero del orden, los tickets nuevos nacen en el siguiente activo. Eliminar un estado solo es posible si ningún ticket no eliminado lo usa.
+
+El admin puede crear, renombrar y reordenar estados sin deploy.
 
 ### 6.3 Comentarios
 
@@ -129,10 +135,10 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 
 1. El admin carga usuarios y catálogos.
 2. Llega un requerimiento (Actuación Simple, correo o llamada).
-3. Un agente crea el ticket en su departamento y completa área, edificio, tipo, módulo, prioridad y fecha de recepción.
+3. Un agente crea el ticket en su departamento y completa área, edificio, tipo, módulo, prioridad y fecha de recepción. El estado queda en el primero del catálogo.
 4. Si interviene un proveedor, lo asocia y registra la referencia externa. El ticket pasa a `En espera` mientras aguarda respuesta.
 5. El agente avanza los estados y agrega comentarios.
-6. Al cerrar documenta la solución, marca `notificado` y el ticket pasa a `Finalizado`.
+6. Al pasar a `Finalizado`, `Cerrado` o `Cancelado` carga la fecha de cierre. La solución es opcional. `notificado` sigue siendo una casilla manual.
 7. Cada cambio queda auditado automáticamente.
 
 
@@ -186,7 +192,7 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 ### 8.3 Modelo de datos
 
 - **Better Auth (gestionado por la librería):** `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`.
-- **Catálogos:** `Area`, `Edificio`, `Proveedor` (nombre, contacto, teléfono, correo, sitio web), `TipoTicket`, `Prioridad`, `Modulo`, `EstadoTicket` (con casilla `cerrado`). Todos con nombre, orden y estado activo.
+- **Catálogos:** `Area`, `Edificio`, `Proveedor` (nombre, contacto, teléfono, correo, sitio web), `TipoTicket`, `Prioridad`, `Modulo`, `EstadoTicket`. Todos con nombre, orden y estado activo. `EstadoTicket` no tiene casilla `cerrado` ni `inicial`.
 - **Operativo:** `Ticket`, `TicketComentario`.
 - **Transversal:** `AuditLog` (`entityType`, `entityId`, `actorId`, `action`, `payload JSONB`, `createdAt`).
 - **Campos de auditoría base** (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) en las tablas propias del negocio. Las tablas de Better Auth no llevan esas columnas: sus cambios se registran con el módulo `audit`.
