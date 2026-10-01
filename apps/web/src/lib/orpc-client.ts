@@ -5,7 +5,11 @@ import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { contract } from "@syc/contracts";
 import { env } from "./env";
 
-const link = new OpenAPILink(contract, { url: env.VITE_API_URL });
+const link = new OpenAPILink(contract, {
+  url: env.VITE_API_URL,
+  // La sesión viaja en una cookie: la API está en otro origen (CORS con credenciales).
+  fetch: (request, init) => globalThis.fetch(request, { ...init, credentials: "include" }),
+});
 
 export const client: ContractRouterClient<typeof contract> = createORPCClient(link);
 
