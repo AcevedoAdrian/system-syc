@@ -59,4 +59,4 @@ El `.env` es opcional con Docker; `.env.example` lista las variables.
 
 ## Peticiones a la API
 
-Las peticiones HTTP están en [`bruno/`](./bruno/). Bruno lee `VITE_API_URL` del `.env` de la raíz. Si no existe, copiá `.env.example` a `.env`. En Bruno: Open Collection sobre la carpeta `bruno/`. Hoy incluye `GET /health` (`health.check`).
+Las peticiones HTTP están en [`bruno/`](./bruno/). En Bruno: Open Collection sobre la carpeta `bruno/`, activá el entorno `local` (URL en `environments/local.bru`) y cargá el valor secreto `adminPassword`, la contraseña del admin del seed. Incluye `health`, `auth` (login, sesión, cambio de contraseña, logout), `users`, `organizations` y `_probe` (temporal). Corré `auth.signIn` primero.

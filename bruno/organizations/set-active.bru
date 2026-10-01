@@ -1,0 +1,42 @@
+meta {
+  name: organizations.setActive
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}:{{port}}/organizations/:organizationId/active
+  body: json
+  auth: inherit
+}
+
+params:path {
+  organizationId: {{newOrganizationId}}
+}
+
+body:json {
+  {
+    "activo": false
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Activa o desactiva un departamento. Solo admin (permiso `manage`).
+
+  Contrato: `organizations.setActive` en `packages/contracts`.
+  Método: POST
+  Ruta: /organizations/{organizationId}/active
+  Cuerpo: activo (`true` | `false`).
+
+  Usa `newOrganizationId` (lo guarda `organizations.create`).
+  Errores: 404 inexistente; 409 si es el último departamento activo.
+}

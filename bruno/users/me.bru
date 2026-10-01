@@ -1,0 +1,34 @@
+meta {
+  name: users.me
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/users/me
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body.username: isString
+  res.body.role: isString
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Devuelve el usuario con sesión. Cualquier usuario autenticado (admin o agente).
+
+  Contrato: `users.me` en `packages/contracts`.
+  Método: GET
+  Ruta: /users/me
+
+  Respuesta 200: id, username, name, email (null si es el interno), role (`agente` | `admin`),
+  activo, department ({ id, nombre } o null para el admin).
+  Errores: 401 sin sesión.
+}

@@ -12,6 +12,11 @@ docs {
   La fuente de verdad de los contratos es `packages/contracts`.
   Si una ruta cambia, hay que actualizar el archivo de esta colección en el mismo cambio.
 
-  La URL sale de `VITE_API_URL` en el `.env` de la raíz del repo.
-  Bruno lo lee mediante el enlace `bruno/.env`.
+  La URL sale del entorno `local` (`environments/local.bru`): `urlBase` y `port`.
+  Hay que activarlo arriba a la derecha y cargar el valor secreto `adminPassword`
+  (la contraseña del admin del seed).
+
+  Orden de uso: `auth.signIn` primero (la cookie de sesión queda en el cookie jar de Bruno),
+  luego `organizations.list` (guarda `organizationId`) y `users.create` (guarda `userId`).
+  `organizations.create` guarda `newOrganizationId`, que usan rename, setActive y remove.
 }

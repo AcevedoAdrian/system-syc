@@ -1,0 +1,35 @@
+meta {
+  name: organizations.remove
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{urlBase}}:{{port}}/organizations/:organizationId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  organizationId: {{newOrganizationId}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Elimina un departamento. Solo admin (permiso `manage`).
+
+  Contrato: `organizations.remove` en `packages/contracts`.
+  Método: DELETE
+  Ruta: /organizations/{organizationId}
+
+  Usa `newOrganizationId` (lo guarda `organizations.create`). No devuelve cuerpo.
+  Errores: 404 inexistente; 409 si es el último departamento activo o tiene agentes asignados.
+}

@@ -1,0 +1,36 @@
+meta {
+  name: organizations.list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/organizations
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.length) bru.setVar("organizationId", res.body[0].id);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Lista los departamentos. Solo admin (permiso `manage`).
+
+  Contrato: `organizations.list` en `packages/contracts`.
+  Método: GET
+  Ruta: /organizations
+
+  Respuesta 200: arreglo de { id, nombre, activo, agentes }.
+  Guarda el id del primero en `organizationId` (lo usa `users.create`).
+  Errores: 401 sin sesión; 403 si no es admin.
+}

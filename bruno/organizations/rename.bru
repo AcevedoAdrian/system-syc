@@ -1,0 +1,42 @@
+meta {
+  name: organizations.rename
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{urlBase}}:{{port}}/organizations/:organizationId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  organizationId: {{newOrganizationId}}
+}
+
+body:json {
+  {
+    "nombre": "Departamento de Prueba (renombrado)"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Renombra un departamento. Solo admin (permiso `manage`).
+
+  Contrato: `organizations.rename` en `packages/contracts`.
+  Método: PATCH
+  Ruta: /organizations/{organizationId}
+  Cuerpo: nombre (1 a 120 caracteres).
+
+  Usa `newOrganizationId` (lo guarda `organizations.create`).
+  Errores: 400 validación; 404 inexistente; 409 si el nombre ya existe.
+}

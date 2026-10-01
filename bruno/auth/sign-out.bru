@@ -1,0 +1,36 @@
+meta {
+  name: auth.signOut
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}:{{port}}/api/auth/sign-out
+  body: json
+  auth: inherit
+}
+
+headers {
+  Origin: {{origin}}
+}
+
+body:json {
+  {}
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Cierra la sesión actual. Endpoint de Better Auth.
+
+  Método: POST
+  Ruta: /api/auth/sign-out
+  Cuerpo: vacío (`{}`).
+}

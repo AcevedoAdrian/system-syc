@@ -1,0 +1,57 @@
+meta {
+  name: users.create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}:{{port}}/users
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "{{newUsername}}",
+    "name": "{{newUserName}}",
+    "password": "{{newUserPassword}}",
+    "role": "agente",
+    "organizationId": "{{organizationId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("userId", res.body.id);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Crea un usuario. Solo admin (permiso `manage`).
+
+  Contrato: `users.create` en `packages/contracts`.
+  Método: POST
+  Ruta: /users
+
+  Cuerpo:
+  - username: 3 a 30 caracteres, letras, números, `_` y `.`
+  - name: 1 a 120 caracteres
+  - email: opcional; si falta, se usa el interno `<username>@syc.local`
+  - password: 8 a 128 caracteres
+  - role: `agente` | `admin`
+  - organizationId: obligatorio para `agente`, prohibido para `admin`
+
+  Antes corré `organizations.list` para cargar `organizationId` (el primer departamento).
+  Para crear un admin, cambiá `role` a `admin` y sacá `organizationId`.
+
+  Al responder 200 guarda `userId` para `users.update`, `users.setActive` y `users.resetPassword`.
+  Errores: 400 validación, o departamento inexistente o desactivado; 409 usuario o email repetido.
+}

@@ -1,0 +1,44 @@
+meta {
+  name: organizations.create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}:{{port}}/organizations
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "nombre": "{{newDepartmentName}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("newOrganizationId", res.body.id);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Crea un departamento. Solo admin (permiso `manage`).
+
+  Contrato: `organizations.create` en `packages/contracts`.
+  Método: POST
+  Ruta: /organizations
+  Cuerpo: nombre (1 a 120 caracteres).
+
+  Guarda el id en `newOrganizationId`, que usan `rename`, `setActive` y `remove`
+  (así esas peticiones nunca tocan a los departamentos del seed).
+  Errores: 400 validación; 409 si el nombre ya existe.
+}

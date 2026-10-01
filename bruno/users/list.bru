@@ -1,0 +1,31 @@
+meta {
+  name: users.list
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}:{{port}}/users
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Lista todos los usuarios. Solo admin (permiso `manage`).
+
+  Contrato: `users.list` en `packages/contracts`.
+  Método: GET
+  Ruta: /users
+
+  Respuesta 200: arreglo de usuarios (mismo formato que `users.me`).
+  Errores: 401 sin sesión; 403 si no es admin.
+}

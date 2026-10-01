@@ -1,0 +1,44 @@
+meta {
+  name: users.update
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{urlBase}}:{{port}}/users/:userId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  userId: {{userId}}
+}
+
+body:json {
+  {
+    "name": "Agente de Prueba (editado)"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Edita un usuario. Solo admin (permiso `manage`).
+
+  Contrato: `users.update` en `packages/contracts`.
+  Método: PATCH
+  Ruta: /users/{userId}
+
+  `userId` sale de la variable `userId` (la guarda `users.create`; también podés pegar uno de `users.list`).
+  Cuerpo, todos opcionales: username, name, email (`null` vuelve al email interno), role, organizationId.
+  Cambiar `organizationId` mueve al agente de departamento.
+
+  Errores: 400 validación (un agente necesita un departamento, un admin no lleva); 404 usuario inexistente; 409 duplicado, degradarse a uno mismo o degradar al último admin activo.
+}

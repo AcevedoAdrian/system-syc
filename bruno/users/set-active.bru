@@ -1,0 +1,42 @@
+meta {
+  name: users.setActive
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}:{{port}}/users/:userId/active
+  body: json
+  auth: inherit
+}
+
+params:path {
+  userId: {{userId}}
+}
+
+body:json {
+  {
+    "activo": false
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Activa o desactiva un usuario. Solo admin (permiso `manage`).
+
+  Contrato: `users.setActive` en `packages/contracts`.
+  Método: POST
+  Ruta: /users/{userId}/active
+  Cuerpo: activo (`true` | `false`).
+
+  Desactivar cierra todas las sesiones del usuario. Para volver a activarlo, mandá `"activo": true`.
+  Errores: 404 usuario inexistente; 409 si es uno mismo o el último admin activo.
+}

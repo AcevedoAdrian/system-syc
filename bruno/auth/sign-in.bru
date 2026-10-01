@@ -1,0 +1,50 @@
+meta {
+  name: auth.signIn
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{urlBase}}:{{port}}/api/auth/sign-in/username
+  body: json
+  auth: inherit
+}
+
+headers {
+  Origin: {{origin}}
+}
+
+body:json {
+  {
+    "username": "{{adminUsername}}",
+    "password": "{{adminPassword}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Inicia sesión por usuario. Endpoint de Better Auth (no pasa por oRPC).
+
+  Método: POST
+  Ruta: /api/auth/sign-in/username
+  Cuerpo: username, password (`loginInputSchema` en `packages/contracts`).
+
+  La sesión queda en la cookie `better-auth.session_token`. Bruno la guarda en su cookie jar y
+  la manda sola en las demás peticiones: hay que correr esta primero.
+
+  Usa las variables del entorno `local`: `adminUsername` y `adminPassword` (secreta; se carga
+  en Environments > local, es la del seed). Si el entorno no está activo, activá `local` arriba a la derecha.
+
+  Rate limit: 5 intentos por minuto. Pasado el límite responde 429.
+  El header `Origin` debe estar en los orígenes de confianza (`WEB_ORIGIN`).
+
+  Errores: 401 con usuario o contraseña incorrectos; 429 si se pasó el rate limit.
+}

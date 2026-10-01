@@ -1,0 +1,30 @@
+meta {
+  name: auth.getSession
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}:{{port}}/api/auth/get-session
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Devuelve la sesión actual. Endpoint de Better Auth.
+
+  Método: GET
+  Ruta: /api/auth/get-session
+
+  Con sesión devuelve `session` y `user`; sin sesión devuelve `null` (200).
+  Para el usuario en el formato del contrato usá `users.me`.
+}
