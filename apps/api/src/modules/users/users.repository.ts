@@ -106,6 +106,15 @@ export class UsersRepository {
     return row ? toRecord(row) : null;
   }
 
+  async countActiveAdmins(): Promise<number> {
+    return this.db.user.count({
+      where: {
+        role: "admin",
+        OR: [{ banned: null }, { banned: false }, { banExpires: { lt: new Date() } }],
+      },
+    });
+  }
+
   async findIdByUsername(username: string): Promise<string | null> {
     const row = await this.db.user.findUnique({ where: { username }, select: { id: true } });
     return row?.id ?? null;
@@ -147,6 +156,21 @@ export class UsersRepository {
 
   async updateUser(userId: string, changes: UserChanges, headers: Headers): Promise<void> {
     await this.auth.api.adminUpdateUser({ headers, body: { userId, data: changes } });
+  }
+
+  // Ban sin vencimiento: cierra las sesiones activas del usuario y bloquea su login.
+  async banUser(userId: string, headers: Headers): Promise<void> {
+    await this.auth.api.banUser({ headers, body: { userId } });
+  }
+
+  async unbanUser(userId: string, headers: Headers): Promise<void> {
+    await this.auth.api.unbanUser({ headers, body: { userId } });
+  }
+
+  // El admin fija la contraseña sin conocer la anterior; además se cierran las sesiones del usuario.
+  async setPassword(userId: string, password: string, headers: Headers): Promise<void> {
+    await this.auth.api.setUserPassword({ headers, body: { userId, newPassword: password } });
+    await this.auth.api.revokeUserSessions({ headers, body: { userId } });
   }
 
   // Deja al usuario con exactamente un `Member` en `organizationId`, o con ninguno si es `null`.

@@ -1,6 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { CreateUserInput, UpdateUserInput, User } from "@syc/contracts";
+import type {
+  CreateUserInput,
+  ResetPasswordInput,
+  SetUserActiveInput,
+  UpdateUserInput,
+  User,
+} from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { isInternalEmail, toInternalEmail } from "./internal-email";
 import { type UserChanges, type UserRecord, UsersRepository } from "./users.repository";
@@ -60,9 +66,13 @@ export class UsersService {
     return toUser(await this.requireUser(id));
   }
 
-  async update(input: UpdateUserInput, headers: Headers): Promise<User> {
+  async update(input: UpdateUserInput, actor: AuthenticatedUser, headers: Headers): Promise<User> {
     const current = await this.requireUser(input.userId);
     const role = input.role ?? current.role;
+    if (current.role === "admin" && role === "agente") {
+      this.assertNotSelf(current, actor, "No podés degradarte a vos mismo");
+      await this.assertNotLastActiveAdmin(current, "No se puede degradar al último admin activo");
+    }
     const changes: UserChanges = {};
 
     if (input.name !== undefined && input.name !== current.name) changes.name = input.name;
@@ -114,6 +124,38 @@ export class UsersService {
     if (membership === null) await this.repository.setMembership(current.id, null);
 
     return toUser(await this.requireUser(current.id));
+  }
+
+  async setActive(
+    input: SetUserActiveInput,
+    actor: AuthenticatedUser,
+    headers: Headers,
+  ): Promise<User> {
+    const target = await this.requireUser(input.userId);
+    if (input.activo) {
+      await this.repository.unbanUser(target.id, headers);
+    } else {
+      this.assertNotSelf(target, actor, "No podés desactivarte a vos mismo");
+      await this.assertNotLastActiveAdmin(target, "No se puede desactivar al último admin activo");
+      await this.repository.banUser(target.id, headers);
+    }
+    return toUser(await this.requireUser(target.id));
+  }
+
+  async resetPassword(input: ResetPasswordInput, headers: Headers): Promise<void> {
+    const target = await this.requireUser(input.userId);
+    await this.repository.setPassword(target.id, input.password, headers);
+  }
+
+  private assertNotSelf(target: UserRecord, actor: AuthenticatedUser, message: string): void {
+    if (target.id === actor.id) throw new ORPCError("CONFLICT", { message });
+  }
+
+  private async assertNotLastActiveAdmin(target: UserRecord, message: string): Promise<void> {
+    if (target.role !== "admin" || !target.activo) return;
+    if ((await this.repository.countActiveAdmins()) <= 1) {
+      throw new ORPCError("CONFLICT", { message });
+    }
   }
 
   private async requireUser(id: string): Promise<UserRecord> {

@@ -1,6 +1,7 @@
 import { getPrismaClient } from "@syc/db";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { createAuthMiddleware } from "better-auth/api";
 import { admin, organization, username } from "better-auth/plugins";
 import type { Env } from "../../config/env.schema";
 
@@ -8,6 +9,7 @@ const SESSION_EXPIRES_IN = 60 * 60 * 12; // 12 horas
 const SESSION_UPDATE_AGE = 60 * 60; // se renueva con actividad si pasó más de 1 hora
 
 export const LOGIN_PATH = "/sign-in/username";
+const CHANGE_PASSWORD_PATH = "/change-password";
 
 // Raíz de composición de Better Auth: único archivo fuera de un `*.repository.ts` que importa `@syc/db`.
 export function createAuth(env: Env) {
@@ -36,6 +38,13 @@ export function createAuth(env: Env) {
     },
     advanced: {
       useSecureCookies: false, // el despliegue es HTTP por IP, sin HTTPS (SPEC 07, Q37)
+    },
+    hooks: {
+      // Al cambiar la propia contraseña se cierran siempre las otras sesiones, sin depender del cliente.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== CHANGE_PASSWORD_PATH) return;
+        return { context: { ...ctx, body: { ...ctx.body, revokeOtherSessions: true } } };
+      }),
     },
     plugins: [
       username(),
