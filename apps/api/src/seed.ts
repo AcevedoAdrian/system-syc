@@ -2,6 +2,7 @@ import { z } from "zod";
 import { normalizeName, uniqueSlug } from "./common/text";
 import { loadEnv } from "./config/env.schema";
 import { type Auth, createAuth } from "./modules/auth/auth.config";
+import { toInternalEmail } from "./modules/users/internal-email";
 
 const DEFAULT_DEPARTMENTS = ["Administrativo", "Técnico", "Redes", "Desarrollo"];
 
@@ -48,7 +49,7 @@ async function seedAdmin(auth: Auth, seedEnv: SeedEnv): Promise<"creado" | "exis
   const user = await ctx.internalAdapter.createUser(
     {
       name: seedEnv.SEED_ADMIN_NAME,
-      email: `${username}@syc.local`,
+      email: toInternalEmail(username),
       emailVerified: false,
       username,
       role: "admin",

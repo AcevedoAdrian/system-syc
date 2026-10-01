@@ -5,7 +5,7 @@ import { AppModule } from "./app.module";
 import { loadEnv } from "./config/env.schema";
 import type { Auth } from "./modules/auth/auth.config";
 import { mountAuth } from "./modules/auth/auth.handler";
-import { AUTH } from "./modules/auth/auth.module";
+import { AUTH } from "./modules/auth/auth.tokens";
 
 async function bootstrap() {
   const env = loadEnv(process.env);
