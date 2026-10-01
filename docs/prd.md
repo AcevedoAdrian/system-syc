@@ -42,7 +42,7 @@ Un sistema in-house, usado solo por el equipo interno, con base relacional (Post
 
 ### 4.1 Modelo
 
-- **Departamento =** `Organization` **de Better Auth** (Administrativo, Técnico, Redes, Desarrollo). No existe una tabla `Departamento` aparte. El admin los administra desde la UI: crear, renombrar, desactivar/reactivar y eliminar (solo si nunca tuvo agentes ni tickets, ni siquiera eliminados; si no, se desactiva).
+- **Departamento =** `Organization` **de Better Auth** (Administrativo, Técnico, Redes, Desarrollo). No existe una tabla `Departamento` aparte. El admin los administra desde la UI: crear, renombrar, desactivar/reactivar y eliminar (solo si hoy no tiene agentes asignados ni tickets, ni siquiera eliminados; si no, se desactiva).
 - Un **agente pertenece exactamente a un departamento** (`Member` con rol `agente`); no puede quedar sin uno. El modelo permite pertenecer a varios a futuro; el MVP no lo ofrece.
 - **Administrador (jefe):** rol global (plugin `admin` de Better Auth), **sin departamento propio**. Ve y opera sobre todos los departamentos y administra usuarios, departamentos y catálogos. No se puede desactivar ni degradar al último admin activo, ni a uno mismo; degradar a un admin a `agente` exige asignarle un departamento en la misma acción.
 - **Solo dos roles** en el MVP, definidos en el código: `agente` y `admin`. Los guards de NestJS los resuelven; nunca se resuelven dentro del service.
@@ -75,7 +75,7 @@ Razón: cada agente ve y opera solo en su departamento, sin poder quitar ese lí
 ### 5.1 Incluido en el MVP
 
 - **Usuarios y accesos:** alta, edición, desactivación (`ban` sin vencimiento, no `deletedAt`) y reseteo de contraseña por el admin. No hay registro público.
-- **Departamentos administrables desde la pantalla:** crear, renombrar, desactivar/reactivar y eliminar (solo si nunca tuvo historia).
+- **Departamentos administrables desde la pantalla:** crear, renombrar, desactivar/reactivar y eliminar (solo si hoy no tiene agentes ni tickets).
 - **Catálogos administrables desde la pantalla:** Áreas, Edificios, Proveedores, Tipos, Prioridades, Módulos y Estados.
 - **Tickets:** creación y edición colaborativa dentro del departamento.
 - **Comentarios / notas de seguimiento** dentro del ticket, inmutables; solo el admin los elimina.
@@ -200,7 +200,7 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 
 ### 8.3 Modelo de datos
 
-- **Better Auth (gestionado por la librería):** `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`.
+- **Better Auth (gestionado por la librería):** `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`, y las que generan sus plugins aunque el MVP no las use directamente: `Invitation` (plugin `organization`) y `RateLimit` (límite de intentos del login). `Organization` lleva además el campo propio `activo` (departamento desactivado).
 - **Catálogos:** `Area`, `Edificio`, `Proveedor` (nombre, contacto, teléfono, correo, sitio web), `TipoTicket`, `Prioridad`, `Modulo`, `EstadoTicket`. Todos con nombre, orden y estado activo. `EstadoTicket` no tiene casilla `cerrado` ni `inicial`; en su lugar, cuatro estados de sistema (`Finalizado`, `Cerrado`, `Cancelado`, `Reabierto`) llevan una clave interna fija que el admin no edita (ver 6.2).
 - **Operativo:** `Ticket`, `TicketComentario`.
 - **Transversal:** `AuditLog` (`entityType`, `entityId`, `actorId`, `action`, `payload JSONB`, `createdAt`).
@@ -258,7 +258,7 @@ El detalle completo de cada decisión, con sus edge cases y su contrato técnico
 - **P13.** Login por nombre de usuario (plugin `username`), no por email; el email queda opcional y sin uso funcional.
 - **P14.** Desactivar un usuario es el `ban` del plugin `admin`, sin vencimiento; cierra sesiones activas de inmediato; se reactiva con `unban`. No hay borrado físico.
 - **P15.** Un agente pertenece exactamente a un departamento; no puede quedar sin uno. El admin no pertenece a ningún departamento y no se puede desactivar ni degradar al último admin activo, ni a uno mismo.
-- **P16.** El admin administra departamentos desde la UI (crear, renombrar, desactivar/reactivar, eliminar); eliminar solo si el departamento nunca tuvo agentes ni tickets, ni siquiera eliminados.
+- **P16.** El admin administra departamentos desde la UI (crear, renombrar, desactivar/reactivar, eliminar); eliminar solo si el departamento hoy no tiene agentes asignados (activos o desactivados) ni tickets, ni siquiera eliminados.
 - **P17.** Un agente no ve, ni puede llegar por URL directa, a un ticket de otro departamento; el límite no se puede quitar. El admin ve todos, sin filtro por defecto.
 - **P18.** Solo el admin elimina un ticket, elimina un comentario o cambia el departamento de un ticket existente. Los comentarios son inmutables: no se editan.
 - **P19.** El alta de un ticket solo exige título, departamento (implícito para el agente), prioridad y fecha de recepción; área, edificio, tipo y módulo quedan sin asignar hasta una edición posterior. El estado nace en el primero activo del catálogo y no se pregunta en el alta.

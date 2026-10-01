@@ -37,7 +37,7 @@ Toca varias áreas (auth, seed, guards, dos ABM y pantallas). Se mantiene como u
 
 ## Modelo de datos
 
-Better Auth gestiona sus tablas vía su adapter Prisma; el esquema lo genera su CLI (`@better-auth/cli generate`) y no se escribe a mano. La migración incluye `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`, y también `Invitation` y `RateLimit`, que los plugins `organization` y `rateLimit` generan aunque este spec no los use directamente (`Invitation`) o solo los use Better Auth (`RateLimit`).
+Better Auth gestiona sus tablas vía su adapter Prisma; el esquema lo genera su CLI (paquete `auth`, comando `auth generate`; el antiguo `@better-auth/cli` quedó congelado en la 1.4 y arrastra un `better-auth` y un Prisma viejos) y no se escribe a mano. La migración incluye `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`, y también `Invitation` y `RateLimit`, que los plugins `organization` y `rateLimit` generan aunque este spec no los use directamente (`Invitation`) o solo los use Better Auth (`RateLimit`).
 
 `Organization` recibe un campo propio, declarado como `additionalFields` del plugin `organization`. No es una columna de auditoría, así que no contradice P4.
 
@@ -243,7 +243,7 @@ Convenciones:
 
 ## Plan de implementación
 
-1. **Dependencias y variables de entorno.** Agregar `better-auth` y `@better-auth/cli` (versión exacta) a `apps/api`. Sumar `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` a `env.schema.ts`, `.env.example` y `docker-compose.yml` (con un valor de desarrollo en el compose). Verificar: la API arranca con `docker compose up` y aborta con un mensaje que nombra `BETTER_AUTH_SECRET` si se lo quita.
+1. **Dependencias y variables de entorno.** Agregar `better-auth` y `auth` (el CLI de Better Auth; versión exacta) a `apps/api`. Sumar `BETTER_AUTH_SECRET` y `BETTER_AUTH_URL` a `env.schema.ts`, `.env.example` y `docker-compose.yml` (con un valor de desarrollo en el compose). Verificar: la API arranca con `docker compose up` y aborta con un mensaje que nombra `BETTER_AUTH_SECRET` si se lo quita.
 2. **Configuración de Better Auth y migración.** Crear `modules/auth/auth.config.ts` con adapter Prisma, plugins `username`, `organization` (con `additionalFields.activo` y `allowUserToCreateOrganization: false`) y `admin` (rol por defecto `agente`), `rateLimit`, sesión y cookies según el Modelo de datos. Es el único archivo fuera de un `*.repository.ts` autorizado a importar `@syc/db`. Generar el schema con el CLI, correr `prisma migrate dev`. Verificar: la migración aplica limpia sobre una base vacía y `pnpm --filter @syc/db generate` pasa.
 3. **Montar Better Auth en Nest.** Handler en `/api/auth/*` con la allowlist, orden correcto de body parsers, CORS con `credentials` y `trustedOrigins`. Verificar: `GET /api/auth/get-session` sin cookie devuelve sesión nula; `POST /api/auth/admin/create-user` y `POST /api/auth/sign-up/email` devuelven 404; `GET /health` sigue respondiendo `ok`.
 4. **Seed.** `apps/api/src/seed.ts` con su schema Zod y el script `seed` en `apps/api/package.json`. Verificar: corrido dos veces deja un admin raíz y 4 departamentos; sin variables aborta nombrándolas; un `curl` a `/api/auth/sign-in/username` con las credenciales del seed devuelve cookie de sesión.

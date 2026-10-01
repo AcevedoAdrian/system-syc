@@ -94,7 +94,7 @@ Convenciones:
 - [ ] Arrancar la API sin `DATABASE_URL` aborta el proceso con un mensaje que nombra la variable faltante.
 - [ ] Cambiar el campo `status` en `healthStatusSchema` produce un error de `typecheck` en `apps/api` y en `apps/web`.
 - [ ] Editar un archivo de `apps/api/src` o `apps/web/src` con el compose corriendo recarga el servicio sin reiniciar el contenedor.
-- [ ] `apps/api` no importa `@prisma/client` ni `@syc/db` fuera de `*.repository.ts`.
+- [ ] `apps/api` no importa `@prisma/client` ni `@syc/db` fuera de `*.repository.ts`. Excepción acotada (SPEC 02): `modules/auth/auth.config.ts`, la raíz de composición de Better Auth, que arma su adapter Prisma.
 - [ ] Las rutas y componentes de `apps/web` no importan el cliente oRPC; solo lo hacen los hooks de `features/`.
 - [ ] `tsconfig.base.json` tiene `"strict": true` y todos los paquetes lo extienden.
 - [ ] La versión mayor de Prisma está fijada en `package.json` sin `latest` ni `^` sobre otra mayor.
