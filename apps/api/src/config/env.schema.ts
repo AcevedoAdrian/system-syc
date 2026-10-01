@@ -5,6 +5,8 @@ export const envSchema = z.object({
   API_PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.url(),
   WEB_ORIGIN: z.url(),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.url(), // URL pública de la API; baseURL de Better Auth
 });
 
 export type Env = z.infer<typeof envSchema>;

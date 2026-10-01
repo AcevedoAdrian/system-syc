@@ -31,3 +31,12 @@ minimumReleaseAgeExclude:
   - '@orpc/standard-server-node@1.15.4'
   - '@tanstack/react-router@1.170.39'
   - '@orpc/tanstack-query@1.15.4'
+  - '@better-auth/core@1.7.7'
+  - '@better-auth/drizzle-adapter@1.7.7'
+  - '@better-auth/kysely-adapter@1.7.7'
+  - '@better-auth/memory-adapter@1.7.7'
+  - '@better-auth/mongo-adapter@1.7.7'
+  - '@better-auth/prisma-adapter@1.7.7'
+  - '@better-auth/telemetry@1.7.7'
+  - better-auth@1.7.7
+  - auth@1.7.7

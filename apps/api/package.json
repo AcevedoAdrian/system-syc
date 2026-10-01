@@ -20,6 +20,7 @@
     "@orpc/server": "1.15.4",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "better-auth": "1.7.7",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "zod": "4.6.5"
@@ -28,6 +29,7 @@
     "@syc/config": "workspace:*",
     "@syc/contracts": "workspace:*",
     "@syc/db": "workspace:*",
+    "auth": "1.7.7",
     "tsdown": "0.23.0",
     "vitest": "5.0.1"
   }
