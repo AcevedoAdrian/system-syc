@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ChangePasswordDialog } from "@/features/auth/components/ChangePasswordDialog";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 
@@ -13,6 +14,7 @@ export function Topbar() {
         <span className="text-sm text-muted-foreground" data-testid="topbar-user">
           {user?.name}
         </span>
+        <ChangePasswordDialog />
         <Button
           variant="outline"
           size="sm"
