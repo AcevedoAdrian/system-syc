@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsdown --watch --on-success \"node --env-file-if-exists=../../.env dist/main.mjs\"",
     "build": "tsdown",
+    "seed": "tsdown && node --env-file-if-exists=../../.env dist/seed.mjs",
     "start": "node dist/main.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
