@@ -1,6 +1,8 @@
 import { Controller } from "@nestjs/common";
 import { Implement, implement } from "@orpc/nest";
 import { contract } from "@syc/contracts";
+import { RequirePermission } from "../../common/decorators/require-permission.decorator";
+import { PERMISSIONS } from "../../common/permissions";
 import { OrganizationsService } from "./organizations.service";
 
 @Controller()
@@ -8,6 +10,7 @@ export class OrganizationsController {
   constructor(private readonly service: OrganizationsService) {}
 
   // Se implementa el router completo para que el compilador marque cualquier procedimiento faltante.
+  @RequirePermission(PERMISSIONS.MANAGE)
   @Implement(contract.organizations)
   organizations() {
     const c = contract.organizations;

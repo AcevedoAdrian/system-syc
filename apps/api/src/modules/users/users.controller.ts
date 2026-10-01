@@ -4,6 +4,8 @@ import { contract } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { RequestHeaders } from "../../common/decorators/request-headers.decorator";
+import { RequirePermission } from "../../common/decorators/require-permission.decorator";
+import { PERMISSIONS } from "../../common/permissions";
 import { UsersService } from "./users.service";
 
 // Router de gestión de usuarios (solo admin). Se implementa completo para que el compilador marque
@@ -14,6 +16,7 @@ const { me: _me, ...management } = contract.users;
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
+  @RequirePermission(PERMISSIONS.MANAGE)
   @Implement(management)
   users(@CurrentUser() actor: AuthenticatedUser, @RequestHeaders() headers: Headers) {
     return {
