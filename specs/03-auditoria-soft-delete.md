@@ -1,6 +1,6 @@
 # SPEC 03 — Auditoría y eliminación lógica
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 02 (autenticación y acceso)
 > **Date:** 2026-09-29
 > **Objective:** módulo `audit` reutilizable por cualquier módulo, campos de auditoría base y eliminación lógica como convención, aplicados retroactivamente a `users` y `organizations` (SPEC 02) y listos para `catalogs` y `tickets` (SPEC 04 y 05).
