@@ -26,6 +26,7 @@ model User {
   accounts        Account[]
   members         Member[]
   invitations     Invitation[]
+  auditLogs       AuditLog[]
 
   @@unique([email])
   @@unique([username])
@@ -126,6 +127,19 @@ model Invitation {
   @@index([organizationId])
   @@index([email])
   @@map("invitation")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
 }
 
 model RateLimit {
