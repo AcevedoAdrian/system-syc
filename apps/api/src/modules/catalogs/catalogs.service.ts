@@ -92,6 +92,9 @@ export class CatalogsService {
   ): Promise<CatalogItemView> {
     const all = await this.repository.findAll(def);
     const current = this.requireIn(def, all, itemId);
+    if (!activo && def.rules.lastActive && this.isLastActive(all, current)) {
+      throw new ORPCError("CONFLICT", { message: def.rules.lastActive.deactivate });
+    }
     const audit = this.updateEntry(def, current, { ...current, activo }, actor);
     if (!audit) return toItem(def, current);
     return toItem(def, await this.repository.setActive(def, itemId, activo, actor.id, audit));
@@ -129,7 +132,13 @@ export class CatalogsService {
   // En SPEC 05 este mismo método suma el chequeo de tickets (ni siquiera eliminados lógicamente).
   async remove(def: CatalogDefinition, itemId: string, actor: AuthenticatedUser): Promise<void> {
     const all = await this.repository.findAll(def);
-    this.requireIn(def, all, itemId);
+    const current = this.requireIn(def, all, itemId);
+    if (def.rules.keyedNotRemovable && current.clave) {
+      throw new ORPCError("CONFLICT", { message: def.rules.keyedNotRemovable });
+    }
+    if (def.rules.lastActive && this.isLastActive(all, current)) {
+      throw new ORPCError("CONFLICT", { message: def.rules.lastActive.remove });
+    }
     await this.repository.softDelete(def, itemId, actor.id, {
       entityType: def.entityType,
       entityId: itemId,
@@ -168,6 +177,11 @@ export class CatalogsService {
     const found = all.find((row) => row.id === id);
     if (!found) throw new ORPCError("NOT_FOUND", { message: def.messages.notFound });
     return found;
+  }
+
+  // Eliminar o desactivar un ítem inactivo nunca deja a un catálogo sin activos.
+  private isLastActive(all: CatalogRow[], current: CatalogRow): boolean {
+    return current.activo && all.filter((row) => row.activo).length === 1;
   }
 
   // Cuentan activos e inactivos; los eliminados no están en `all` y liberan el nombre (Q14).

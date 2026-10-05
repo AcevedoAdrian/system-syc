@@ -16,6 +16,7 @@ const areas = CATALOG_DEFINITIONS.areas;
 const edificios = CATALOG_DEFINITIONS.edificios;
 const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
+const prioridades = CATALOG_DEFINITIONS.prioridades;
 
 const admin: AuthenticatedUser = {
   id: "admin-1",
@@ -534,5 +535,156 @@ describe("CatalogsService.history", () => {
     await service.history(proveedores, "cualquiera");
 
     expect(history).toHaveBeenCalledWith("Proveedor", "cualquiera");
+  });
+});
+
+// Los 7 estados del seed (Feature 4.5), con la clave de los 4 de sistema.
+const sevenEstados = () => ({
+  estados: [
+    row("e1", "Pendiente", 1, { clave: null }),
+    row("e2", "En progreso", 2, { clave: null }),
+    row("e3", "En espera", 3, { clave: null }),
+    row("e4", "Finalizado", 4, { clave: "FINALIZADO" }),
+    row("e5", "Cerrado", 5, { clave: "CERRADO" }),
+    row("e6", "Cancelado", 6, { clave: "CANCELADO" }),
+    row("e7", "Reabierto", 7, { clave: "REABIERTO" }),
+  ],
+});
+
+describe("Estados: los de sistema (con clave)", () => {
+  it.each(["e4", "e5", "e6", "e7"])("%s no se elimina nunca: 409 y no audita", async (id) => {
+    const { service, audits, actors } = buildService(sevenEstados());
+
+    await expect(service.remove(estados, id, admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: expect.stringContaining("estado de sistema"),
+    });
+
+    expect(audits).toEqual([]);
+    expect(actors).toEqual([]);
+    expect(await service.list(estados)).toHaveLength(7);
+  });
+
+  it("tampoco se elimina si es el único: gana la regla de la clave", async () => {
+    const { service } = buildService({
+      estados: [row("e5", "Cerrado", 1, { clave: "CERRADO" })],
+    });
+
+    await expect(service.remove(estados, "e5", admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: expect.stringContaining("estado de sistema"),
+    });
+  });
+
+  it("se pueden renombrar, desactivar, reactivar y mover, y la clave no cambia", async () => {
+    const { service } = buildService(sevenEstados());
+
+    await service.update(estados, "e4", { nombre: "Resuelto" }, admin);
+    await service.setActive(estados, "e5", false, admin);
+    await service.setActive(estados, "e5", true, admin);
+    await service.move(estados, "e6", "subir", admin);
+
+    const byId = Object.fromEntries((await service.list(estados)).map((i) => [i.id, i]));
+    expect(byId.e4).toMatchObject({ nombre: "Resuelto", clave: "FINALIZADO" });
+    expect(byId.e5).toMatchObject({ activo: true, clave: "CERRADO" });
+    expect(byId.e6).toMatchObject({ orden: 5, clave: "CANCELADO" });
+  });
+
+  it("un estado sin clave sí se elimina", async () => {
+    const { service, audits } = buildService(sevenEstados());
+
+    await service.remove(estados, "e3", admin);
+
+    expect(await service.list(estados)).toHaveLength(6);
+    expect(audits.map((a) => a.action)).toEqual(["delete"]);
+  });
+});
+
+describe("Estados y Prioridades: siempre queda un ítem activo", () => {
+  it("desactivar el primer estado con otros activos funciona", async () => {
+    const { service } = buildService(sevenEstados());
+
+    await expect(service.setActive(estados, "e1", false, admin)).resolves.toMatchObject({
+      activo: false,
+    });
+  });
+
+  it("desactivar el único estado activo da 409 y no audita", async () => {
+    const { service, audits } = buildService({
+      estados: [
+        row("e1", "Pendiente", 1),
+        row("e2", "En progreso", 2, { activo: false }),
+        row("e5", "Cerrado", 3, { clave: "CERRADO", activo: false }),
+      ],
+    });
+
+    await expect(service.setActive(estados, "e1", false, admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "No se puede desactivar el último estado activo",
+    });
+    expect(audits).toEqual([]);
+  });
+
+  it("eliminar el único estado activo da 409", async () => {
+    const { service } = buildService({
+      estados: [row("e1", "Pendiente", 1), row("e2", "En progreso", 2, { activo: false })],
+    });
+
+    await expect(service.remove(estados, "e1", admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "No se puede eliminar el último estado activo",
+    });
+  });
+
+  it("eliminar un estado inactivo cuando queda un solo activo se permite", async () => {
+    const { service } = buildService({
+      estados: [row("e1", "Pendiente", 1), row("e2", "En progreso", 2, { activo: false })],
+    });
+
+    await service.remove(estados, "e2", admin);
+
+    expect((await service.list(estados)).map((i) => i.id)).toEqual(["e1"]);
+  });
+
+  it("desactivar la única prioridad activa da 409", async () => {
+    const { service } = buildService({
+      prioridades: [row("p1", "Baja", 1, { activo: false }), row("p2", "Media", 2)],
+    });
+
+    await expect(service.setActive(prioridades, "p2", false, admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "No se puede desactivar la última prioridad activa",
+    });
+  });
+
+  it("eliminar la única prioridad activa da 409", async () => {
+    const { service } = buildService({ prioridades: [row("p1", "Media", 1)] });
+
+    await expect(service.remove(prioridades, "p1", admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "No se puede eliminar la última prioridad activa",
+    });
+  });
+
+  it("con otra prioridad activa se puede desactivar y eliminar", async () => {
+    const { service } = buildService({
+      prioridades: [row("p1", "Baja", 1), row("p2", "Media", 2)],
+    });
+
+    await service.setActive(prioridades, "p1", false, admin);
+    await expect(service.setActive(prioridades, "p1", true, admin)).resolves.toMatchObject({
+      activo: true,
+    });
+    await service.remove(prioridades, "p1", admin);
+
+    expect((await service.list(prioridades)).map((i) => i.id)).toEqual(["p2"]);
+  });
+
+  it("los otros catálogos no tienen la regla: Edificios elimina su último activo", async () => {
+    const { service } = buildService({ edificios: [row("b1", "Central", 1)] });
+
+    await service.remove(edificios, "b1", admin);
+
+    expect(await service.list(edificios)).toEqual([]);
   });
 });

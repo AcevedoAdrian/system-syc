@@ -11,11 +11,23 @@ export type CatalogModel =
   | "proveedor"
   | "estadoTicket";
 
+// Reglas propias de un catálogo (Feature 4.4). Cada una existe solo si la definición la declara, así
+// que el service genérico no necesita saber qué catálogo es.
+export interface CatalogRules {
+  // Siempre queda al menos un ítem activo: desactivar o eliminar el último activo se rechaza con
+  // 409. Con estos mensajes.
+  lastActive?: { deactivate: string; remove: string };
+  // Un ítem con `clave` (estado de sistema, D1) nunca se elimina, esté o no en uso. Es el mensaje
+  // del 409.
+  keyedNotRemovable?: string;
+}
+
 export interface CatalogDefinition {
   ruta: CatalogRuta;
   entityType: string; // `AuditLog.entityType`
   model: CatalogModel;
   messages: { notFound: string; duplicate: string };
+  rules: CatalogRules;
   // Campos que el cliente puede escribir en el alta y la edición. Todo lo demás (`orden`,
   // `nombreNormalizado`, `clave`, `createdBy`, `updatedBy`) lo decide el servidor.
   inputFields: readonly string[];
@@ -38,6 +50,7 @@ function simple(
     entityType,
     model,
     messages,
+    rules: {},
     inputFields: ["nombre"],
     snapshotFields: BASE_FIELDS,
   };
@@ -56,10 +69,19 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
     notFound: "El tipo de ticket no existe",
     duplicate: "Ya existe un tipo de ticket con ese nombre",
   }),
-  prioridades: simple("prioridades", "Prioridad", "prioridad", {
-    notFound: "La prioridad no existe",
-    duplicate: "Ya existe una prioridad con ese nombre",
-  }),
+  // Siempre queda una prioridad activa: SPEC 05 la exige para crear un ticket.
+  prioridades: {
+    ...simple("prioridades", "Prioridad", "prioridad", {
+      notFound: "La prioridad no existe",
+      duplicate: "Ya existe una prioridad con ese nombre",
+    }),
+    rules: {
+      lastActive: {
+        deactivate: "No se puede desactivar la última prioridad activa",
+        remove: "No se puede eliminar la última prioridad activa",
+      },
+    },
+  },
   modulos: simple("modulos", "Modulo", "modulo", {
     notFound: "El módulo no existe",
     duplicate: "Ya existe un módulo con ese nombre",
@@ -72,6 +94,7 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
       notFound: "El proveedor no existe",
       duplicate: "Ya existe un proveedor con ese nombre",
     },
+    rules: {},
     inputFields: ["nombre", ...PROVEEDOR_FIELDS],
     snapshotFields: [...BASE_FIELDS, ...PROVEEDOR_FIELDS],
   },
@@ -80,6 +103,14 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
       notFound: "El estado no existe",
       duplicate: "Ya existe un estado con ese nombre",
     }),
+    rules: {
+      lastActive: {
+        deactivate: "No se puede desactivar el último estado activo",
+        remove: "No se puede eliminar el último estado activo",
+      },
+      keyedNotRemovable:
+        "Es un estado de sistema: se puede renombrar o desactivar, pero no eliminar",
+    },
     // `clave` se lee y se audita, pero no está en `inputFields`: ninguna entrada la acepta.
     snapshotFields: [...BASE_FIELDS, "clave"],
   },
