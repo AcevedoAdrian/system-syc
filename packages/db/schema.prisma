@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client"
   output   = "./src/generated/prisma"
@@ -9,24 +8,38 @@ datasource db {
 }
 
 model User {
-  id              String       @id
-  name            String
-  email           String
-  emailVerified   Boolean      @default(false)
-  image           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  username        String?
-  displayUsername String?
-  role            String?
-  banned          Boolean?     @default(false)
-  banReason       String?
-  banExpires      DateTime?
-  sessions        Session[]
-  accounts        Account[]
-  members         Member[]
-  invitations     Invitation[]
-  auditLogs       AuditLog[]
+  id                    String         @id
+  name                  String
+  email                 String
+  emailVerified         Boolean        @default(false)
+  image                 String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  username              String?
+  displayUsername       String?
+  role                  String?
+  banned                Boolean?       @default(false)
+  banReason             String?
+  banExpires            DateTime?
+  sessions              Session[]
+  accounts              Account[]
+  members               Member[]
+  invitations           Invitation[]
+  auditLogs             AuditLog[]
+  areasCreadas          Area[]         @relation("AreaCreador")
+  areasEditadas         Area[]         @relation("AreaEditor")
+  edificiosCreadas      Edificio[]     @relation("EdificioCreador")
+  edificiosEditadas     Edificio[]     @relation("EdificioEditor")
+  tiposTicketCreadas    TipoTicket[]   @relation("TipoTicketCreador")
+  tiposTicketEditadas   TipoTicket[]   @relation("TipoTicketEditor")
+  prioridadesCreadas    Prioridad[]    @relation("PrioridadCreador")
+  prioridadesEditadas   Prioridad[]    @relation("PrioridadEditor")
+  modulosCreadas        Modulo[]       @relation("ModuloCreador")
+  modulosEditadas       Modulo[]       @relation("ModuloEditor")
+  proveedoresCreadas    Proveedor[]    @relation("ProveedorCreador")
+  proveedoresEditadas   Proveedor[]    @relation("ProveedorEditor")
+  estadosTicketCreadas  EstadoTicket[] @relation("EstadoTicketCreador")
+  estadosTicketEditadas EstadoTicket[] @relation("EstadoTicketEditor")
 
   @@unique([email])
   @@unique([username])
@@ -151,4 +164,132 @@ model RateLimit {
 
   @@unique([key])
   @@map("rateLimit")
+}
+
+// Catálogos (SPEC 04): un modelo por catálogo, nunca una tabla genérica. El índice único parcial
+// sobre "nombreNormalizado" (WHERE "deletedAt" IS NULL) vive en el SQL de la migración `catalogos`.
+model Area {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("AreaCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("AreaEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+
+  @@map("area")
+}
+
+model Edificio {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("EdificioCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("EdificioEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+
+  @@map("edificio")
+}
+
+model TipoTicket {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("TipoTicketCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("TipoTicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+
+  @@map("tipo_ticket")
+}
+
+model Prioridad {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("PrioridadCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("PrioridadEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+
+  @@map("prioridad")
+}
+
+model Modulo {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("ModuloCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("ModuloEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+
+  @@map("modulo")
+}
+
+model Proveedor {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("ProveedorCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("ProveedorEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+  contacto          String?
+  telefono          String?
+  correo            String?
+  sitioWeb          String?
+
+  @@map("proveedor")
+}
+
+model EstadoTicket {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("EstadoTicketCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("EstadoTicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+  // Clave interna de los estados de sistema (D1): "FINALIZADO" | "CERRADO" | "CANCELADO" | "REABIERTO" | null.
+  clave             String?
+
+  @@unique([clave]) // Postgres no compara los NULL entre sí: solo restringe las 4 claves
+  @@map("estado_ticket")
 }
