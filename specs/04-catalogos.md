@@ -1,6 +1,6 @@
 # SPEC 04 — Catálogos
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica)
 > **Date:** 2026-10-05
 > **Objective:** módulo `catalogs` con el ABM de Área, Edificio, TipoTicket, Prioridad, Modulo, Proveedor y EstadoTicket (auditado, con eliminación lógica y orden por flechas), administrable por el admin desde una pantalla con pestañas y legible por cualquier usuario para los formularios de SPEC 05.
