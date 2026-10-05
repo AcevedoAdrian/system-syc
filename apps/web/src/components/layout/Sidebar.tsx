@@ -20,6 +20,9 @@ export function Sidebar() {
           <Link to="/admin/departamentos" className={linkClassName} activeProps={activeProps}>
             Departamentos
           </Link>
+          <Link to="/admin/catalogos" className={linkClassName} activeProps={activeProps}>
+            Catálogos
+          </Link>
           <Link to="/admin/usuarios" className={linkClassName} activeProps={activeProps}>
             Usuarios
           </Link>

@@ -25,6 +25,10 @@ describe("Sidebar", () => {
       "href",
       "/admin/departamentos",
     );
+    expect(screen.getByRole("link", { name: "Catálogos" })).toHaveAttribute(
+      "href",
+      "/admin/catalogos",
+    );
     expect(screen.getByRole("link", { name: "Usuarios" })).toHaveAttribute(
       "href",
       "/admin/usuarios",
@@ -37,6 +41,7 @@ describe("Sidebar", () => {
 
     expect(screen.queryByText("Administración")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Catálogos" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Inicio" })).toBeInTheDocument();
   });
 });
