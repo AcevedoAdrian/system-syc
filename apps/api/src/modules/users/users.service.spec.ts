@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
+import type { AuditEntry } from "../audit/audit.repository";
+import type { AuditService } from "../audit/audit.service";
 import type { DepartmentStatus, UserRecord, UsersRepository } from "./users.repository";
 import { UsersService } from "./users.service";
 
@@ -33,7 +35,7 @@ const actorOf = (id: string): AuthenticatedUser => ({
 });
 
 // Repository en memoria con las mismas reglas de datos que el real: un `Member` por agente.
-function buildService(initial: UserRecord[]) {
+function buildService(initial: UserRecord[], options: { failAudit?: boolean } = {}) {
   const users = initial.map((u) => ({ ...u, memberships: [...u.memberships] }));
   const departments = [TEC, RED, OFF];
   const calls = { banned: [] as string[], unbanned: [] as string[], passwords: [] as string[][] };
@@ -45,7 +47,11 @@ function buildService(initial: UserRecord[]) {
   const repository = {
     findDepartmentOf: async (id: string) => users.find((u) => u.id === id)?.memberships[0] ?? null,
     findAll: async () => users,
-    findById: async (id: string) => users.find((u) => u.id === id) ?? null,
+    // Como el repository real: cada lectura devuelve una fila nueva, no la que luego se muta.
+    findById: async (id: string) => {
+      const found = users.find((u) => u.id === id);
+      return found ? { ...found, memberships: [...found.memberships] } : null;
+    },
     findIdByUsername: async (name: string) => users.find((u) => u.username === name)?.id ?? null,
     findIdByEmail: async (email: string) => users.find((u) => u.email === email)?.id ?? null,
     findDepartment: async (id: string) => departments.find((d) => d.id === id) ?? null,
@@ -87,7 +93,14 @@ function buildService(initial: UserRecord[]) {
       calls.passwords.push([id, password]);
     },
   } as unknown as UsersRepository;
-  return { service: new UsersService(repository), users, calls, find };
+  const audits: AuditEntry[] = [];
+  const audit = {
+    log: async (entry: AuditEntry) => {
+      if (options.failAudit) throw new Error("falló la auditoría");
+      audits.push(entry);
+    },
+  } as unknown as AuditService;
+  return { service: new UsersService(repository, audit), users, calls, find, audits };
 }
 
 const newAgent = {
@@ -102,7 +115,7 @@ describe("UsersService.create", () => {
   it("da de alta un agente con email interno, que no se muestra", async () => {
     const { service, users } = buildService([admin("root")]);
 
-    const created = await service.create(newAgent, headers);
+    const created = await service.create(newAgent, actorOf("root"), headers);
 
     expect(created).toMatchObject({ username: "ana", email: null, role: "agente", activo: true });
     expect(created.department).toEqual({ id: "tec", nombre: "Técnico" });
@@ -112,7 +125,11 @@ describe("UsersService.create", () => {
   it("guarda y muestra el email real, en minúsculas", async () => {
     const { service } = buildService([admin("root")]);
 
-    const created = await service.create({ ...newAgent, email: "Ana@Corp.com" }, headers);
+    const created = await service.create(
+      { ...newAgent, email: "Ana@Corp.com" },
+      actorOf("root"),
+      headers,
+    );
 
     expect(created.email).toBe("ana@corp.com");
   });
@@ -124,7 +141,9 @@ describe("UsersService.create", () => {
   ])("rechaza con 400 un agente %s", async (_caso, organizationId) => {
     const { service } = buildService([admin("root")]);
 
-    await expect(service.create({ ...newAgent, organizationId }, headers)).rejects.toMatchObject({
+    await expect(
+      service.create({ ...newAgent, organizationId }, actorOf("root"), headers),
+    ).rejects.toMatchObject({
       code: "BAD_REQUEST",
     });
   });
@@ -134,6 +153,7 @@ describe("UsersService.create", () => {
 
     const created = await service.create(
       { ...newAgent, username: "jefe", role: "admin", organizationId: undefined },
+      actorOf("root"),
       headers,
     );
 
@@ -143,7 +163,9 @@ describe("UsersService.create", () => {
   it("rechaza con 409 un username repetido sin distinguir mayúsculas", async () => {
     const { service } = buildService([user("ana")]);
 
-    await expect(service.create({ ...newAgent, username: "ANA" }, headers)).rejects.toMatchObject({
+    await expect(
+      service.create({ ...newAgent, username: "ANA" }, actorOf("root"), headers),
+    ).rejects.toMatchObject({
       code: "CONFLICT",
     });
   });
@@ -152,7 +174,7 @@ describe("UsersService.create", () => {
     const { service } = buildService([user("beto", { email: "beto@corp.com" })]);
 
     await expect(
-      service.create({ ...newAgent, email: "BETO@corp.com" }, headers),
+      service.create({ ...newAgent, email: "BETO@corp.com" }, actorOf("root"), headers),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 });
@@ -403,7 +425,11 @@ describe("UsersService.resetPassword", () => {
   it("fija la contraseña nueva sin pedir la anterior", async () => {
     const { service, calls } = buildService([admin("root"), user("ana")]);
 
-    await service.resetPassword({ userId: "ana", password: "nueva-clave-99" }, headers);
+    await service.resetPassword(
+      { userId: "ana", password: "nueva-clave-99" },
+      actorOf("root"),
+      headers,
+    );
 
     expect(calls.passwords).toEqual([["ana", "nueva-clave-99"]]);
   });
@@ -412,7 +438,11 @@ describe("UsersService.resetPassword", () => {
     const { service, calls } = buildService([admin("root")]);
 
     await expect(
-      service.resetPassword({ userId: "nope", password: "nueva-clave-99" }, headers),
+      service.resetPassword(
+        { userId: "nope", password: "nueva-clave-99" },
+        actorOf("root"),
+        headers,
+      ),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(calls.passwords).toEqual([]);
   });
@@ -441,5 +471,160 @@ describe("UsersService.list y me", () => {
     const me = await service.me(actorOf("ana"));
 
     expect(me).toMatchObject({ id: "ana", activo: true, email: null, department: { id: "tec" } });
+  });
+});
+
+describe("UsersService: auditoría", () => {
+  it("el alta deja un create con la foto inicial, sin contraseña, y el admin como actor", async () => {
+    const { service, audits } = buildService([admin("root")]);
+
+    const created = await service.create(newAgent, actorOf("root"), headers);
+
+    expect(audits).toEqual([
+      {
+        entityType: "User",
+        entityId: created.id,
+        action: "create",
+        actorId: "root",
+        payload: {
+          after: {
+            username: "ana",
+            name: "Ana Pérez",
+            email: null,
+            role: "agente",
+            activo: true,
+            departamento: { id: "tec", nombre: "Técnico" },
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(audits)).not.toContain("clave-1234");
+  });
+
+  it("editar nombre, rol y departamento a la vez deja un solo update con los tres campos", async () => {
+    const { service, audits } = buildService([admin("root"), admin("jefe")]);
+
+    await service.update(
+      { userId: "jefe", name: "Jefe Nuevo", role: "agente", organizationId: RED.id },
+      actorOf("root"),
+      headers,
+    );
+
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      entityType: "User",
+      entityId: "jefe",
+      action: "update",
+      actorId: "root",
+      payload: {
+        before: { name: "JEFE", role: "admin", departamento: null },
+        after: {
+          name: "Jefe Nuevo",
+          role: "agente",
+          departamento: { id: "red", nombre: "Redes" },
+        },
+      },
+    });
+  });
+
+  it("cambiar el departamento deja el diff con { id, nombre } antes y después", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.update({ userId: "ana", organizationId: RED.id }, actorOf("root"), headers);
+
+    expect(audits[0]?.payload).toEqual({
+      before: { departamento: { id: "tec", nombre: "Técnico" } },
+      after: { departamento: { id: "red", nombre: "Redes" } },
+    });
+  });
+
+  it("cambiar el username incluye solo lo visible: el email interno no entra en el diff", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.update({ userId: "ana", username: "ana.g" }, actorOf("root"), headers);
+
+    expect(audits[0]?.payload).toEqual({
+      before: { username: "ana" },
+      after: { username: "ana.g" },
+    });
+  });
+
+  it("una edición sin cambios efectivos no deja registro", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.update(
+      { userId: "ana", name: "ANA", organizationId: TEC.id },
+      actorOf("root"),
+      headers,
+    );
+
+    expect(audits).toEqual([]);
+  });
+
+  it("desactivar y reactivar dejan un update de activo cada uno", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.setActive({ userId: "ana", activo: false }, actorOf("root"), headers);
+    await service.setActive({ userId: "ana", activo: true }, actorOf("root"), headers);
+
+    expect(audits.map((a) => [a.action, a.payload])).toEqual([
+      ["update", { before: { activo: true }, after: { activo: false } }],
+      ["update", { before: { activo: false }, after: { activo: true } }],
+    ]);
+  });
+
+  it("setActive con el estado actual no deja registro", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.setActive({ userId: "ana", activo: true }, actorOf("root"), headers);
+
+    expect(audits).toEqual([]);
+  });
+
+  it("resetear la contraseña deja reset_password con payload vacío y sin la contraseña", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await service.resetPassword(
+      { userId: "ana", password: "nueva-clave-99" },
+      actorOf("root"),
+      headers,
+    );
+
+    expect(audits).toEqual([
+      {
+        entityType: "User",
+        entityId: "ana",
+        action: "reset_password",
+        actorId: "root",
+        payload: {},
+      },
+    ]);
+  });
+
+  it("una operación rechazada no deja registro", async () => {
+    const { service, audits } = buildService([admin("root"), user("ana")]);
+
+    await expect(
+      service.setActive({ userId: "root", activo: false }, actorOf("root"), headers),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      service.resetPassword(
+        { userId: "nope", password: "nueva-clave-99" },
+        actorOf("root"),
+        headers,
+      ),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(audits).toEqual([]);
+  });
+
+  it("si falla la escritura del AuditLog el error sube (500), pero el cambio ya quedó aplicado", async () => {
+    const { service, find } = buildService([admin("root"), user("ana")], { failAudit: true });
+
+    await expect(
+      service.setActive({ userId: "ana", activo: false }, actorOf("root"), headers),
+    ).rejects.toThrow("falló la auditoría");
+
+    expect(find("ana").activo).toBe(false);
   });
 });

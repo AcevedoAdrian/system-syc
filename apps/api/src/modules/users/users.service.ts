@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type {
   CreateUserInput,
@@ -8,6 +8,9 @@ import type {
   User,
 } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
+import type { AuditEntry } from "../audit/audit.repository";
+import { AuditService } from "../audit/audit.service";
+import { type AuditSnapshot, computeDiff } from "../audit/audit-diff";
 import { isInternalEmail, toInternalEmail } from "./internal-email";
 import { type UserChanges, type UserRecord, UsersRepository } from "./users.repository";
 
@@ -23,9 +26,30 @@ function toUser(record: UserRecord): User {
   };
 }
 
+const ENTITY_TYPE = "User";
+
+// Foto auditable (SPEC 03): solo estos campos entran en el payload. Nunca hay contraseñas ni hashes.
+// El email es el visible: `null` si es el interno `<username>@syc.local`, que se deriva del username.
+function snapshotOf(record: UserRecord): AuditSnapshot {
+  const user = toUser(record);
+  return {
+    username: user.username,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    activo: user.activo,
+    departamento: user.department,
+  };
+}
+
 @Injectable()
 export class UsersService {
-  constructor(private readonly repository: UsersRepository) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(
+    private readonly repository: UsersRepository,
+    private readonly audit: AuditService,
+  ) {}
 
   async me(current: AuthenticatedUser): Promise<User> {
     return {
@@ -43,7 +67,7 @@ export class UsersService {
     return (await this.repository.findAll()).map(toUser);
   }
 
-  async create(input: CreateUserInput, headers: Headers): Promise<User> {
+  async create(input: CreateUserInput, actor: AuthenticatedUser, headers: Headers): Promise<User> {
     const username = input.username.toLowerCase();
     const organizationId = input.role === "agente" ? input.organizationId : undefined;
     if (input.role === "agente") await this.requireActiveDepartment(organizationId);
@@ -63,7 +87,15 @@ export class UsersService {
       },
       headers,
     );
-    return toUser(await this.requireUser(id));
+    const created = await this.requireUser(id);
+    await this.writeAudit({
+      entityType: ENTITY_TYPE,
+      entityId: id,
+      action: "create",
+      actorId: actor.id,
+      payload: { after: snapshotOf(created) },
+    });
+    return toUser(created);
   }
 
   async update(input: UpdateUserInput, actor: AuthenticatedUser, headers: Headers): Promise<User> {
@@ -123,7 +155,9 @@ export class UsersService {
     }
     if (membership === null) await this.repository.setMembership(current.id, null);
 
-    return toUser(await this.requireUser(current.id));
+    const updated = await this.requireUser(current.id);
+    await this.writeUpdateAudit(current, updated, actor);
+    return toUser(updated);
   }
 
   async setActive(
@@ -139,12 +173,56 @@ export class UsersService {
       await this.assertNotLastActiveAdmin(target, "No se puede desactivar al último admin activo");
       await this.repository.banUser(target.id, headers);
     }
-    return toUser(await this.requireUser(target.id));
+    const updated = await this.requireUser(target.id);
+    await this.writeUpdateAudit(target, updated, actor);
+    return toUser(updated);
   }
 
-  async resetPassword(input: ResetPasswordInput, headers: Headers): Promise<void> {
+  async resetPassword(
+    input: ResetPasswordInput,
+    actor: AuthenticatedUser,
+    headers: Headers,
+  ): Promise<void> {
     const target = await this.requireUser(input.userId);
     await this.repository.setPassword(target.id, input.password, headers);
+    await this.writeAudit({
+      entityType: ENTITY_TYPE,
+      entityId: target.id,
+      action: "reset_password",
+      actorId: actor.id,
+      payload: {},
+    });
+  }
+
+  // Un solo `update` por operación, con los campos que cambiaron; sin cambios efectivos no hay registro.
+  private async writeUpdateAudit(
+    before: UserRecord,
+    after: UserRecord,
+    actor: AuthenticatedUser,
+  ): Promise<void> {
+    const diff = computeDiff(snapshotOf(before), snapshotOf(after));
+    if (!diff) return;
+    await this.writeAudit({
+      entityType: ENTITY_TYPE,
+      entityId: after.id,
+      action: "update",
+      actorId: actor.id,
+      payload: { ...diff },
+    });
+  }
+
+  // Better Auth ya confirmó el cambio y no comparte transacción con esta escritura (SPEC 03,
+  // Feature 3.1): si falla, se loguea y la request responde 500 aunque el cambio quedó aplicado.
+  private async writeAudit(entry: AuditEntry): Promise<void> {
+    try {
+      await this.audit.log(entry);
+    } catch (error) {
+      this.logger.error(
+        `No se pudo auditar ${entry.action} de ${entry.entityType} ${entry.entityId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
   }
 
   private assertNotSelf(target: UserRecord, actor: AuthenticatedUser, message: string): void {

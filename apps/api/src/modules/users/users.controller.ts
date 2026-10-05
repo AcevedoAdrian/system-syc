@@ -22,7 +22,7 @@ export class UsersController {
     return {
       list: implement(management.list).handler(() => this.service.list()),
       create: implement(management.create).handler(({ input }) =>
-        this.service.create(input, headers),
+        this.service.create(input, actor, headers),
       ),
       update: implement(management.update).handler(({ input }) =>
         this.service.update(input, actor, headers),
@@ -31,7 +31,7 @@ export class UsersController {
         this.service.setActive(input, actor, headers),
       ),
       resetPassword: implement(management.resetPassword).handler(({ input }) =>
-        this.service.resetPassword(input, headers),
+        this.service.resetPassword(input, actor, headers),
       ),
     };
   }
