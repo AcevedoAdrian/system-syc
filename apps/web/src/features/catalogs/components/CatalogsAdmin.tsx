@@ -10,10 +10,7 @@ import { useCatalog } from "../hooks/useCatalog";
 import { useCatalogMutations } from "../hooks/useCatalogMutations";
 import { CatalogItemFormDialog } from "./CatalogItemFormDialog";
 import { CatalogTable } from "./CatalogTable";
-
-// Los campos de contacto de un proveedor no tienen formulario todavía: al editar el nombre se
-// reenvían tal cual, porque `update` reemplaza todos los campos editables.
-const CONTACT_FIELDS = ["contacto", "telefono", "correo", "sitioWeb"] as const;
+import { ProveedorFormDialog } from "./ProveedorFormDialog";
 
 function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
   const kind = CATALOG_KINDS[ruta];
@@ -64,6 +61,7 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
       {isError && <p role="alert">{kind.loadErrorLabel}</p>}
       {items && (
         <CatalogTable
+          ruta={ruta}
           items={items}
           onMove={moveItem}
           onEdit={setEditing}
@@ -72,29 +70,43 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
         />
       )}
 
-      <CatalogItemFormDialog
-        open={creating}
-        onOpenChange={setCreating}
-        title={kind.newLabel}
-        submitLabel="Crear"
-        onSubmit={(values) => create.mutateAsync(values)}
-      />
-      <CatalogItemFormDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
-        title={kind.editLabel}
-        submitLabel="Guardar"
-        initialName={editing?.nombre}
-        onSubmit={(values) => {
-          const contact = Object.fromEntries(
-            CONTACT_FIELDS.filter((field) => editing && field in editing).map((field) => [
-              field,
-              editing?.[field] ?? null,
-            ]),
-          );
-          return update.mutateAsync({ ...contact, ...values, itemId: editing?.id ?? "" });
-        }}
-      />
+      {ruta === "proveedores" ? (
+        <>
+          <ProveedorFormDialog
+            open={creating}
+            onOpenChange={setCreating}
+            title={kind.newLabel}
+            submitLabel="Crear"
+            onSubmit={(values) => create.mutateAsync(values)}
+          />
+          <ProveedorFormDialog
+            open={editing !== null}
+            onOpenChange={(open) => !open && setEditing(null)}
+            title={kind.editLabel}
+            submitLabel="Guardar"
+            initial={editing}
+            onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
+          />
+        </>
+      ) : (
+        <>
+          <CatalogItemFormDialog
+            open={creating}
+            onOpenChange={setCreating}
+            title={kind.newLabel}
+            submitLabel="Crear"
+            onSubmit={(values) => create.mutateAsync(values)}
+          />
+          <CatalogItemFormDialog
+            open={editing !== null}
+            onOpenChange={(open) => !open && setEditing(null)}
+            title={kind.editLabel}
+            submitLabel="Guardar"
+            initialName={editing?.nombre}
+            onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
+          />
+        </>
+      )}
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}

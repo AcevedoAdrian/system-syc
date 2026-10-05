@@ -1,3 +1,4 @@
+import type { CatalogRuta } from "@syc/contracts";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { useMemo } from "react";
@@ -17,6 +18,7 @@ const features = tableFeatures({});
 const column = createColumnHelper<typeof features, CatalogEntry>();
 
 interface CatalogTableProps {
+  ruta: CatalogRuta;
   items: CatalogEntry[];
   onMove: (item: CatalogEntry, direccion: "subir" | "bajar") => void;
   onEdit: (item: CatalogEntry) => void;
@@ -25,7 +27,16 @@ interface CatalogTableProps {
 }
 
 // `items` llega en el orden de `list`: la primera fila no puede subir y la última no puede bajar.
+// Proveedores suma sus datos de contacto; un campo sin cargar se muestra como "—".
+const CONTACT_COLUMNS = [
+  { key: "contacto", header: "Contacto" },
+  { key: "telefono", header: "Teléfono" },
+  { key: "correo", header: "Correo" },
+  { key: "sitioWeb", header: "Sitio web" },
+] as const;
+
 export function CatalogTable({
+  ruta,
   items,
   onMove,
   onEdit,
@@ -35,7 +46,21 @@ export function CatalogTable({
   const columns = useMemo(
     () =>
       column.columns([
-        column.accessor("nombre", { header: "Nombre" }),
+        // Los estados de sistema (los que tienen `clave`) se marcan, pero la clave no se muestra.
+        column.accessor("nombre", {
+          header: "Nombre",
+          cell: ({ row }) => (
+            <span className="flex items-center gap-2">
+              {row.original.nombre}
+              {row.original.clave && <Badge variant="outline">De sistema</Badge>}
+            </span>
+          ),
+        }),
+        ...(ruta === "proveedores"
+          ? CONTACT_COLUMNS.map(({ key, header }) =>
+              column.accessor(key, { header, cell: ({ row }) => row.original[key] || "—" }),
+            )
+          : []),
         column.accessor("activo", {
           header: "Estado",
           cell: ({ row }) =>
@@ -74,14 +99,16 @@ export function CatalogTable({
               <Button variant="ghost" size="sm" onClick={() => onToggleActive(row.original)}>
                 {row.original.activo ? "Desactivar" : "Reactivar"}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => onRemove(row.original)}>
-                Eliminar
-              </Button>
+              {!row.original.clave && (
+                <Button variant="ghost" size="sm" onClick={() => onRemove(row.original)}>
+                  Eliminar
+                </Button>
+              )}
             </div>
           ),
         }),
       ]),
-    [items.length, onMove, onEdit, onToggleActive, onRemove],
+    [ruta, items.length, onMove, onEdit, onToggleActive, onRemove],
   );
   const table = useTable({ features, columns, data: items });
 

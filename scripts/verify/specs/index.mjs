@@ -5,5 +5,6 @@
 import spec01 from "./01-esqueleto.mjs";
 import spec02 from "./02-autenticacion.mjs";
 import spec03 from "./03-auditoria.mjs";
+import spec04 from "./04-catalogos.mjs";
 
-export const SPECS = [spec01, spec02, spec03];
+export const SPECS = [spec01, spec02, spec03, spec04];

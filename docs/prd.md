@@ -76,7 +76,7 @@ Razón: cada agente ve y opera solo en su departamento, sin poder quitar ese lí
 
 - **Usuarios y accesos:** alta, edición, desactivación (`ban` sin vencimiento, no `deletedAt`) y reseteo de contraseña por el admin. No hay registro público.
 - **Departamentos administrables desde la pantalla:** crear, renombrar, desactivar/reactivar y eliminar (solo si hoy no tiene agentes ni tickets).
-- **Catálogos administrables desde la pantalla:** Áreas, Edificios, Proveedores, Tipos, Prioridades, Módulos y Estados.
+- **Catálogos administrables desde la pantalla:** Áreas, Edificios, Proveedores, Tipos, Prioridades, Módulos y Estados. Prioridades, igual que Estados, siempre conserva al menos un ítem activo, y arranca con Baja, Media, Alta y Urgente.
 - **Tickets:** creación y edición colaborativa dentro del departamento.
 - **Comentarios / notas de seguimiento** dentro del ticket, inmutables; solo el admin los elimina.
 - **Bandeja de tickets**, siempre acotada al departamento del agente, con búsqueda y filtros por estado, área, edificio, tipo, prioridad, proveedor, módulo, rango de fecha de recepción y texto.
@@ -201,7 +201,7 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 ### 8.3 Modelo de datos
 
 - **Better Auth (gestionado por la librería):** `User`, `Session`, `Account`, `Verification`, `Organization`, `Member`, y las que generan sus plugins aunque el MVP no las use directamente: `Invitation` (plugin `organization`) y `RateLimit` (límite de intentos del login). `Organization` lleva además el campo propio `activo` (departamento desactivado).
-- **Catálogos:** `Area`, `Edificio`, `Proveedor` (nombre, contacto, teléfono, correo, sitio web), `TipoTicket`, `Prioridad`, `Modulo`, `EstadoTicket`. Todos con nombre, orden y estado activo. `EstadoTicket` no tiene casilla `cerrado` ni `inicial`; en su lugar, cuatro estados de sistema (`Finalizado`, `Cerrado`, `Cancelado`, `Reabierto`) llevan una clave interna fija que el admin no edita (ver 6.2).
+- **Catálogos:** `Area`, `Edificio`, `Proveedor` (nombre, contacto, teléfono, correo, sitio web), `TipoTicket`, `Prioridad`, `Modulo`, `EstadoTicket`. Todos con nombre, orden y estado activo. `EstadoTicket` no tiene casilla `cerrado` ni `inicial`; en su lugar, cuatro estados de sistema (`Finalizado`, `Cerrado`, `Cancelado`, `Reabierto`) llevan una clave interna fija que el admin no edita (ver 6.2). `Prioridad` sigue la misma regla de "siempre queda al menos un ítem activo": no se puede desactivar ni eliminar la última activa. Valores iniciales: `Baja`, `Media`, `Alta` y `Urgente`.
 - **Operativo:** `Ticket`, `TicketComentario`.
 - **Transversal:** `AuditLog` (`entityType`, `entityId`, `actorId`, `action`, `payload JSONB`, `createdAt`).
 - **Campos de auditoría base** (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) en las tablas propias del negocio. Las tablas de Better Auth no llevan esas columnas: sus cambios se registran con el módulo `audit`.
@@ -264,6 +264,7 @@ El detalle completo de cada decisión, con sus edge cases y su contrato técnico
 - **P19.** El alta de un ticket solo exige título, departamento (implícito para el agente), prioridad y fecha de recepción; área, edificio, tipo y módulo quedan sin asignar hasta una edición posterior. El estado nace en el primero activo del catálogo y no se pregunta en el alta.
 - **P20.** Asociar o cambiar un proveedor no cambia el estado del ticket por sí solo. `notificado` es siempre informativa, nunca obligatoria para cerrar.
 - **P21.** Ediciones simultáneas sobre el mismo ticket usan bloqueo optimista por `updatedAt`: la segunda en llegar se rechaza con 409.
+- **P22.** `Prioridad` siempre conserva al menos un ítem activo (igual que Estados), porque el alta de un ticket exige elegir una. Arranca con `Baja`, `Media`, `Alta` y `Urgente`; el resto de los catálogos (Áreas, Edificios, Tipos, Módulos, Proveedores) arranca vacío y lo carga el admin.
 
 ### 11.2 Puntos que quedaron fuera del MVP a propósito
 

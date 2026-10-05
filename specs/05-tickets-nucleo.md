@@ -238,6 +238,7 @@ Convenciones:
 - [ ] Un agente que intenta eliminar un ticket, o cambiarle el departamento, recibe 403 en ambos casos.
 - [ ] Un ticket eliminado no aparece en ningún listado, pero su historial sigue existiendo en `AuditLog`.
 - [ ] Un ticket cuyo ítem de catálogo se elimina después sigue mostrando ese valor en su detalle e historial (SPEC 03 Feature 3.4).
+- [ ] Eliminar un ítem de catálogo (área, edificio, tipo, prioridad, módulo, proveedor o estado) que usa un ticket no eliminado devuelve 409; sigue funcionando para un ítem que ningún ticket usa. El chequeo vive en `CatalogsService.remove` (SPEC 04).
 - [ ] `pnpm turbo lint typecheck test build` termina con código 0.
 
 ## Decisiones

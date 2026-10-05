@@ -1,4 +1,4 @@
-import { isDeepStrictEqual } from "node:util";
+import { adminId, auditCount, auditRows, q, same } from "../lib/audit.mjs";
 import { Client } from "../lib/client.mjs";
 import { ADMIN, AGENT_PASSWORD, cleanEnv } from "../lib/env.mjs";
 import {
@@ -17,36 +17,6 @@ import { assert, assertStatus, run, tail } from "../lib/util.mjs";
 // Contraseñas que usan estos criterios: ninguna debe aparecer en un `payload` (criterio 9).
 const RESET_PASSWORD = "clave-reseteada-verify-3";
 const OWN_NEW_PASSWORD = "clave-propia-nueva-verify-4";
-
-const q = (value) => String(value).replaceAll("'", "''");
-
-// Registros de `AuditLog` de una entidad, del más antiguo al más reciente.
-function auditRows(entityType, entityId) {
-  return sql(
-    `SELECT action, coalesce("actorId", ''), payload::text FROM audit_log
-     WHERE "entityType" = '${q(entityType)}' AND "entityId" = '${q(entityId)}'
-     ORDER BY "createdAt", id`,
-  ).map(([action, actorId, ...payload]) => ({
-    action,
-    actorId,
-    payload: JSON.parse(payload.join("|")),
-  }));
-}
-
-const auditCount = () => Number(scalar(`SELECT count(*) FROM audit_log`));
-
-async function adminId() {
-  const res = await (await admin()).get("/users/me");
-  assertStatus(res, 200, "users.me del admin");
-  return res.body.id;
-}
-
-// Compara por valor e ignora el orden de las claves: `jsonb` de Postgres las reordena.
-const same = (actual, expected, label) =>
-  assert(
-    isDeepStrictEqual(actual, expected),
-    `${label}: se esperaba ${JSON.stringify(expected)} y llegó ${JSON.stringify(actual)}`,
-  );
 
 // Claves de un valor JSON, a cualquier profundidad.
 function keysOf(value) {
@@ -302,9 +272,13 @@ export default defineSpec({
       7,
       "Correr el seed sobre una base vacía deja 5 `create` con `actorId: null` (admin y 4 departamentos); correrlo otra vez no agrega registros",
       async () => {
+        // Solo las entidades de este SPEC: desde SPEC 04 el seed también carga estados y
+        // prioridades, y esos 11 `create` los verifica el criterio 04.12.
         const system = () =>
           sql(
-            `SELECT "entityType", action FROM audit_log WHERE "actorId" IS NULL ORDER BY "entityType"`,
+            `SELECT "entityType", action FROM audit_log
+             WHERE "actorId" IS NULL AND "entityType" IN ('User', 'Organization')
+             ORDER BY "entityType"`,
           );
         same(
           system(),

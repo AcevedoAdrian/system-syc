@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/client";
+import type { CatalogRuta } from "@syc/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,8 +7,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Cliente oRPC en memoria: una lista por catálogo y los mismos procedimientos que el contrato.
 const fake = vi.hoisted(() => {
-  type Item = { id: string; nombre: string; orden: number; activo: boolean };
-  const state = { tables: new Map<string, Item[]>(), nextId: 1, createError: null as Error | null };
+  type Item = { id: string; nombre: string; orden: number; activo: boolean } & Record<
+    string,
+    unknown
+  >;
+  const state = {
+    tables: new Map<string, Item[]>(),
+    nextId: 1,
+    createError: null as Error | null,
+    updates: [] as Record<string, unknown>[],
+  };
   const table = (ruta: string) => {
     if (!state.tables.has(ruta)) state.tables.set(ruta, []);
     return state.tables.get(ruta) as Item[];
@@ -34,9 +43,10 @@ const fake = vi.hoisted(() => {
       table(ruta).push(item);
       return item;
     }),
-    update: procedure(({ itemId, nombre }: { itemId: string; nombre: string }) => {
+    update: procedure(({ itemId, ...fields }: { itemId: string; nombre: string }) => {
+      state.updates.push({ itemId, ...fields });
       const item = table(ruta).find((i) => i.id === itemId) as Item;
-      item.nombre = nombre;
+      Object.assign(item, fields);
       return item;
     }),
     move: procedure(({ itemId, direccion }: { itemId: string; direccion: string }) => {
@@ -68,11 +78,12 @@ vi.mock("@/lib/orpc-client", () => ({
 
 import { CatalogsAdmin } from "./CatalogsAdmin";
 
-function renderAdmin(onRutaChange = vi.fn()) {
+function renderAdmin(ruta: CatalogRuta = "areas") {
+  const onRutaChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <CatalogsAdmin ruta="areas" onRutaChange={onRutaChange} />
+      <CatalogsAdmin ruta={ruta} onRutaChange={onRutaChange} />
     </QueryClientProvider>,
   );
   return { onRutaChange };
@@ -89,6 +100,7 @@ describe("CatalogsAdmin", () => {
     fake.state.tables.clear();
     fake.state.nextId = 1;
     fake.state.createError = null;
+    fake.state.updates = [];
     fake
       .table("areas")
       .push(
@@ -193,5 +205,51 @@ describe("CatalogsAdmin", () => {
     await userEvent.click(screen.getByRole("button", { name: "Crear" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Ya existe un área con ese nombre");
+  });
+
+  it("en Proveedores edita los 5 campos y manda todos en el update", async () => {
+    fake.table("proveedores").push({
+      id: "p1",
+      nombre: "Acme",
+      orden: 1,
+      activo: true,
+      contacto: "Ana",
+      telefono: null,
+      correo: null,
+      sitioWeb: null,
+    });
+    renderAdmin("proveedores");
+    await screen.findByText("Acme");
+
+    await userEvent.click(within(row("Acme")).getByRole("button", { name: "Editar" }));
+    expect(screen.getByLabelText("Contacto")).toHaveValue("Ana");
+    await userEvent.type(screen.getByLabelText("Correo"), "soporte@acme.com");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(fake.state.updates).toHaveLength(1));
+    expect(fake.state.updates[0]).toEqual({
+      itemId: "p1",
+      nombre: "Acme",
+      contacto: "Ana",
+      telefono: null,
+      correo: "soporte@acme.com",
+      sitioWeb: null,
+    });
+    expect(await within(row("Acme")).findByText("soporte@acme.com")).toBeInTheDocument();
+  });
+
+  it("en Estados las filas de sistema no tienen Eliminar", async () => {
+    fake
+      .table("estados")
+      .push(
+        { id: "e1", nombre: "Pendiente", orden: 1, activo: true, clave: null },
+        { id: "e5", nombre: "Cerrado", orden: 2, activo: true, clave: "CERRADO" },
+      );
+    renderAdmin("estados");
+    await screen.findByText("Cerrado");
+
+    expect(within(row("Cerrado")).getByText("De sistema")).toBeInTheDocument();
+    expect(within(row("Cerrado")).queryByRole("button", { name: "Eliminar" })).toBeNull();
+    expect(within(row("Pendiente")).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
   });
 });
