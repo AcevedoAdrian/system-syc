@@ -94,7 +94,7 @@ apps/api/
         <dominio>.service.ts    # lógica de negocio
         <dominio>.repository.ts # acceso a datos vía Prisma (packages/db)
         <dominio>.service.spec.ts
-      audit/                     # servicio inyectable: audit.log(entityType, entityId, action, payload)
+      audit/                     # servicio inyectable: audit.log({ entityType, entityId, action, actorId, payload })
       custom-fields/             # solo si hace falta (ver "Cómo crecen los campos")
   test/                          # e2e (Supertest; Playwright pendiente)
 ```

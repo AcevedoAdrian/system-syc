@@ -18,6 +18,21 @@ Un módulo por dominio de negocio, autocontenido: controla sus propias entidades
 - **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual.
 - Las variables de entorno se validan con Zod al arrancar (`src/config`). Las del seed (`SEED_ADMIN_*`) las valida el propio `src/seed.ts` y **no** son obligatorias para la API.
 
+## Auditoría y eliminación lógica
+
+Convenciones de SPEC 03 (`specs/03-auditoria-soft-delete.md`); el módulo `modules/audit` las implementa y cualquier módulo nuevo las reutiliza sin modificarlo.
+
+- **Toda mutación se audita.** Un módulo nuevo con mutaciones suma un criterio a su `pnpm verify` que lee `AuditLog`: si se olvida auditar, no falla nada más.
+- **`AuditService.log({ entityType, entityId, action, actorId, payload })`**: el `actorId` llega explícito desde el controller (`@CurrentUser()`); los services no tienen contexto de request. `actorId: null` es el sistema (seed).
+- **Dos formas de escribir, según quién muta:**
+  - Con Prisma propio (`Organization`, `Member` y los modelos de negocio): el repository recibe la entrada y llama a `writeAuditEntry(tx, entry)` (exportada por `audit.repository.ts`) **dentro del mismo `$transaction`**. Si falla la auditoría, falla la mutación.
+  - Con `auth.api.*` de Better Auth (usuarios): `AuditService.log` **después** de que Better Auth confirma. Si falla, se loguea y la request responde 500, pero el cambio ya quedó aplicado. Es la única excepción.
+- **Una operación de service = un registro**, aunque toque varias tablas. Acciones: `create`, `update`, `delete`, y `reset_password` / `change_password` en usuarios. Activar, desactivar y cambiar de departamento son `update` con diff.
+- **`payload`**: `create` → `{ after }`; `update` → `{ before, after }` solo con lo que cambió (`computeDiff`, `null` si no cambió nada: entonces no se escribe ni se audita); `delete` y las acciones de contraseña → `{}`. Los campos salen de una lista explícita por entidad (`pickSnapshot`): `User` en `modules/users/user-audit-snapshot.ts`, `Organization` en el service. **Nunca** contraseñas, hashes ni tokens.
+- **Historial**: cada módulo expone su propio `history` con su guard (`users.history`, `organizations.history`, ambos `MANAGE`). No hay un `audit.history` genérico. Un id sin registros devuelve `[]` y no se chequea que la entidad exista (el de un departamento eliminado se sigue leyendo).
+- **`change_password`** lo audita un hook `after` de Better Auth (`createAuth(env, { onPasswordChanged })`, cableado en `AuthModule` con `auth-audit.ts`). Login, logout y las demás tablas de Better Auth no se auditan.
+- **Campos base y eliminación lógica de los modelos de negocio** (SPEC 04 y 05): `createdAt`, `updatedAt`, `createdBy`, `updatedBy` (FK reales a `User`, cargadas desde `@CurrentUser()`, nunca del cliente) y `deletedAt`. Se elimina con `softDeleteData(actorId)` y todo listado y detalle filtra con `notDeleted`, escrito en el `where` de cada repository (`src/common/soft-delete.ts`; no hay extensión de Prisma que filtre sola). Eliminar algo ya eliminado es 404 y un ítem en uso se rechaza con 409. `Organization` no sigue esto: se borra físicamente, solo si no está en uso, y su `activo` es otra cosa.
+
 ## Better Auth
 
 - **Montaje** (`modules/auth/auth.handler.ts`, llamado desde `main.ts`): Nest se crea con `bodyParser: false`, el handler de Better Auth va **antes** de `app.useBodyParser("json")` (lee el cuerpo del stream) y solo deja pasar la allowlist (`POST /sign-in/username`, `POST /sign-out`, `GET /get-session`, `POST /change-password`). El resto responde 404.
@@ -29,4 +44,4 @@ Un módulo por dominio de negocio, autocontenido: controla sus propias entidades
 
 ## Seed
 
-`pnpm --filter @syc/api seed` (`src/seed.ts`) crea el admin raíz (`SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`) y los 4 departamentos. Es manual, nunca corre al arrancar la API, y es idempotente: no duplica ni cambia la contraseña de un admin que ya existe. Como no hay sesión, crea el usuario por `auth.$context` (API interna de Better Auth; puede cambiar entre versiones, por eso la versión está fijada). Corre `tsdown` antes, así que reconstruye `dist/`.
+`pnpm --filter @syc/api seed` (`src/seed.ts`) crea el admin raíz (`SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`) y los 4 departamentos, y deja cada uno como `create` en `AuditLog` con `actorId: null`. Es manual, nunca corre al arrancar la API, y es idempotente: no duplica ni cambia la contraseña de un admin que ya existe. Como no hay sesión, crea el usuario por `auth.$context` (API interna de Better Auth; puede cambiar entre versiones, por eso la versión está fijada). Corre `tsdown` antes, así que reconstruye `dist/`.
