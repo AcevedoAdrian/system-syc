@@ -1,6 +1,6 @@
 # SPEC 01 — Esqueleto del monorepo
 
-> **Status:** Approved 
+> **Status:** Completed 
 > **Depends on:** ninguna
 > **Date:** 2026-09-23
 > **Objective:** Armar un monorepo pnpm + Turborepo ejecutable con `docker compose up`, donde la web muestra el resultado de un procedimiento oRPC `health.check` implementado en NestJS que consulta Postgres vía Prisma.
@@ -91,15 +91,15 @@ Convenciones:
 - [X] `docker compose up` desde cero levanta `postgres`, `api` y `web` sin intervención manual.
 - [X] `http://localhost:5173/` muestra el estado `ok` y la base `up`.
 - [X] Con `docker compose stop postgres`, recargar la web muestra `degraded` y la base `down`, sin error de red.
-- [ ] Arrancar la API sin `DATABASE_URL` aborta el proceso con un mensaje que nombra la variable faltante.
-- [ ] Cambiar el campo `status` en `healthStatusSchema` produce un error de `typecheck` en `apps/api` y en `apps/web`.
-- [ ] Editar un archivo de `apps/api/src` o `apps/web/src` con el compose corriendo recarga el servicio sin reiniciar el contenedor.
-- [ ] `apps/api` no importa `@prisma/client` ni `@syc/db` fuera de `*.repository.ts`. Excepción acotada (SPEC 02): `modules/auth/auth.config.ts`, la raíz de composición de Better Auth, que arma su adapter Prisma.
-- [ ] Las rutas y componentes de `apps/web` no importan el cliente oRPC; solo lo hacen los hooks de `features/`.
-- [ ] `tsconfig.base.json` tiene `"strict": true` y todos los paquetes lo extienden.
-- [ ] La versión mayor de Prisma está fijada en `package.json` sin `latest` ni `^` sobre otra mayor.
-- [ ] `.github/workflows/ci.yml` existe y su sintaxis es YAML válido.
-- [ ] `CLAUDE.md` lista los comandos reales y ninguno de ellos falla al ejecutarse.
+- [X] Arrancar la API sin `DATABASE_URL` aborta el proceso con un mensaje que nombra la variable faltante.
+- [X] Cambiar el campo `status` en `healthStatusSchema` produce un error de `typecheck` en `apps/api` y en `apps/web`.
+- [X] Editar un archivo de `apps/api/src` o `apps/web/src` con el compose corriendo recarga el servicio sin reiniciar el contenedor.
+- [X] `apps/api` no importa `@prisma/client` ni `@syc/db` fuera de `*.repository.ts`. Excepción acotada (SPEC 02): `modules/auth/auth.config.ts`, la raíz de composición de Better Auth, que arma su adapter Prisma.
+- [X] Las rutas y componentes de `apps/web` no importan el cliente oRPC; solo lo hacen los hooks de `features/`.
+- [X] `tsconfig.base.json` tiene `"strict": true` y todos los paquetes lo extienden.
+- [X] La versión mayor de Prisma está fijada en `package.json` sin `latest` ni `^` sobre otra mayor.
+- [X] `.github/workflows/ci.yml` existe y su sintaxis es YAML válido.
+- [X] `CLAUDE.md` lista los comandos reales y ninguno de ellos falla al ejecutarse.
 
 ## Decisiones
 

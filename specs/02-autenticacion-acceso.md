@@ -1,6 +1,6 @@
 # SPEC 02 — Autenticación y acceso
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 01 (esqueleto)
 > **Date:** 2026-10-01
 > **Objective:** Better Auth (plugins `username`, `organization` y `admin`) cableado de punta a punta en la API y la web: login por usuario, sesión, seed del admin raíz y los 4 departamentos, ABM de departamentos y de usuarios por oRPC, y un portero central de permisos que hace cumplir la matriz del PRD §4.2.
@@ -259,29 +259,29 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] Un usuario creado por el admin inicia sesión con `username` + contraseña; uno no creado no puede.
-- [ ] `POST /api/auth/admin/create-user`, `POST /api/auth/organization/create` y `POST /api/auth/sign-up/email` devuelven 404, también con sesión de admin.
-- [ ] El seed corrido dos veces deja exactamente un admin raíz y 4 departamentos; sin `SEED_ADMIN_*` aborta nombrando las variables.
-- [ ] La API arranca sin `SEED_ADMIN_*` definidas.
-- [ ] Un procedimiento de dominio sin sesión devuelve 401; `health.check` responde sin sesión.
-- [ ] Una sesión con más de 1 hora de antigüedad que hace una request recibe un `expiresAt` nuevo (verificado en la tabla `Session`).
-- [ ] El sexto intento de login en un minuto desde la misma IP devuelve 429.
-- [ ] Un agente sin departamento no se puede dar de alta (400); tampoco con un departamento inactivo.
-- [ ] Cambiar el departamento de un agente deja exactamente un `Member`; promoverlo a admin lo deja sin ninguno.
-- [ ] Desactivar al último admin activo, o a uno mismo, devuelve 409; degradarlos también.
-- [ ] Degradar a un admin sin indicar departamento devuelve 400.
-- [ ] Desactivar un usuario cierra sus sesiones activas de inmediato y su siguiente login falla.
-- [ ] Editar el `username` de un usuario con email interno actualiza el email interno; el email interno no aparece en ninguna respuesta de `users.*` ni en la UI.
-- [ ] El admin resetea la contraseña de un agente sin conocer la anterior; el agente cambia la propia solo si conoce la actual.
-- [ ] Crear un departamento llamado "tecnico" cuando existe "Técnico" devuelve 409.
-- [ ] Eliminar un departamento con al menos un agente (activo o desactivado) devuelve 409; desactivarlo funciona.
-- [ ] Desactivar o eliminar el último departamento activo devuelve 409.
-- [ ] Crear un departamento no deja al admin como `Member` de ese departamento.
-- [ ] En el endpoint de prueba, un agente contra un recurso de otro departamento recibe 403; el admin accede a recursos de todos los departamentos.
-- [ ] Un cambio de departamento de un agente se refleja en su siguiente request sin cerrar sesión.
-- [ ] Sin sesión, cualquier ruta `_authenticated/*` redirige a `/login`; un agente que entra por URL a `/admin/*` vuelve a `/`.
-- [ ] El login funciona por HTTP (sin `Secure` en la cookie) con `NODE_ENV=production`.
-- [ ] `pnpm turbo lint typecheck test build` termina con código 0.
+- [X] Un usuario creado por el admin inicia sesión con `username` + contraseña; uno no creado no puede.
+- [X] `POST /api/auth/admin/create-user`, `POST /api/auth/organization/create` y `POST /api/auth/sign-up/email` devuelven 404, también con sesión de admin.
+- [X] El seed corrido dos veces deja exactamente un admin raíz y 4 departamentos; sin `SEED_ADMIN_*` aborta nombrando las variables.
+- [X] La API arranca sin `SEED_ADMIN_*` definidas.
+- [X] Un procedimiento de dominio sin sesión devuelve 401; `health.check` responde sin sesión.
+- [X] Una sesión con más de 1 hora de antigüedad que hace una request recibe un `expiresAt` nuevo (verificado en la tabla `Session`).
+- [X] El sexto intento de login en un minuto desde la misma IP devuelve 429.
+- [X] Un agente sin departamento no se puede dar de alta (400); tampoco con un departamento inactivo.
+- [X] Cambiar el departamento de un agente deja exactamente un `Member`; promoverlo a admin lo deja sin ninguno.
+- [X] Desactivar al último admin activo, o a uno mismo, devuelve 409; degradarlos también.
+- [X] Degradar a un admin sin indicar departamento devuelve 400.
+- [X] Desactivar un usuario cierra sus sesiones activas de inmediato y su siguiente login falla.
+- [X] Editar el `username` de un usuario con email interno actualiza el email interno; el email interno no aparece en ninguna respuesta de `users.*` ni en la UI.
+- [X] El admin resetea la contraseña de un agente sin conocer la anterior; el agente cambia la propia solo si conoce la actual.
+- [X] Crear un departamento llamado "tecnico" cuando existe "Técnico" devuelve 409.
+- [X] Eliminar un departamento con al menos un agente (activo o desactivado) devuelve 409; desactivarlo funciona.
+- [X] Desactivar o eliminar el último departamento activo devuelve 409.
+- [X] Crear un departamento no deja al admin como `Member` de ese departamento.
+- [X] En el endpoint de prueba, un agente contra un recurso de otro departamento recibe 403; el admin accede a recursos de todos los departamentos.
+- [X] Un cambio de departamento de un agente se refleja en su siguiente request sin cerrar sesión.
+- [X] Sin sesión, cualquier ruta `_authenticated/*` redirige a `/login`; un agente que entra por URL a `/admin/*` vuelve a `/`.
+- [X] El login funciona por HTTP (sin `Secure` en la cookie) con `NODE_ENV=production`.
+- [X] `pnpm turbo lint typecheck test build` termina con código 0.
 
 ## Decisiones
 

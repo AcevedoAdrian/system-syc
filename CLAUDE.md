@@ -33,6 +33,7 @@ pnpm typecheck                            # turbo typecheck (tsc --noEmit en cad
 pnpm test                                 # turbo test (Vitest)
 pnpm build                                # turbo build
 pnpm turbo lint typecheck test build      # las cuatro tareas, como en el CI
+pnpm verify                               # verifica los criterios de aceptación de SPEC 01 y 02 (ver abajo)
 
 pnpm --filter @syc/db generate            # prisma generate (turbo ya lo corre antes de typecheck/test/build)
 pnpm --filter @syc/db exec prisma migrate deploy   # aplica las migraciones (necesita DATABASE_URL)
@@ -51,6 +52,8 @@ docker compose exec api pnpm --filter @syc/api seed
 ```
 
 El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
+
+**`pnpm verify`** (`scripts/verify-acceptance.mjs`, solo el CLI; un archivo por SPEC en `scripts/verify/specs/` y piezas compartidas en `scripts/verify/lib/`): recorre los criterios de aceptación (`--spec 02`, `--only 02.7,02.19`, `--skip-turbo`, `--keep-db`). Los de SPEC 02 corren contra una API real en `NODE_ENV=production` y una base temporal creada en el Postgres del compose (se borra al terminar; la de desarrollo no se toca). Necesita Docker. Los criterios de SPEC 01 que dependen del compose (levantar, hot reload, `degraded`) no están cubiertos. **Para un SPEC nuevo**: crear `scripts/verify/specs/NN-nombre.mjs` con `defineSpec` (ver `lib/spec.mjs`; los fixtures de `lib/fixtures.mjs` se reutilizan) y agregarlo a `specs/index.mjs`.
 
 El `.env` es opcional con Docker (las variables de la API y la web tienen default en `docker-compose.yml`; las del seed no); `.env.example` lista las variables. El CI está en `.github/workflows/ci.yml` y filtra con `turbo --filter="...[origin/<base>]"`.
 
