@@ -6,11 +6,21 @@ import type {
   RenameOrganizationInput,
   SetOrganizationActiveInput,
 } from "@syc/contracts";
+import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName, uniqueSlug } from "../../common/text";
+import type { AuditEntry } from "../audit/audit.repository";
+import { computeDiff, pickSnapshot } from "../audit/audit-diff";
 import { type OrganizationRow, OrganizationsRepository } from "./organizations.repository";
 
 function toOrganization(row: OrganizationRow): Organization {
   return { id: row.id, nombre: row.name, activo: row.activo, agentes: row.agentes };
+}
+
+const ENTITY_TYPE = "Organization";
+
+// Foto auditable (SPEC 03): solo estos campos entran en el diff.
+function snapshotOf(row: OrganizationRow) {
+  return pickSnapshot(toOrganization(row), ["nombre", "activo"]);
 }
 
 @Injectable()
@@ -21,22 +31,37 @@ export class OrganizationsService {
     return (await this.repository.findAll()).map(toOrganization);
   }
 
-  async create(input: OrganizationInput): Promise<Organization> {
+  async create(input: OrganizationInput, actor: AuthenticatedUser): Promise<Organization> {
     const all = await this.repository.findAll();
     this.assertNameIsFree(all, input.nombre);
     const slug = uniqueSlug(input.nombre, new Set(all.map((row) => row.slug)));
-    return toOrganization(await this.repository.create({ name: input.nombre, slug }));
+    const created = await this.repository.create(
+      { name: input.nombre, slug },
+      {
+        entityType: ENTITY_TYPE,
+        action: "create",
+        actorId: actor.id,
+        payload: { after: { nombre: input.nombre, activo: true } },
+      },
+    );
+    return toOrganization(created);
   }
 
   // El `slug` no cambia al renombrar: es un identificador que Better Auth usa internamente.
-  async rename(input: RenameOrganizationInput): Promise<Organization> {
+  // Sin cambios efectivos no se escribe nada y no queda registro.
+  async rename(input: RenameOrganizationInput, actor: AuthenticatedUser): Promise<Organization> {
     const all = await this.repository.findAll();
-    this.requireIn(all, input.organizationId);
+    const current = this.requireIn(all, input.organizationId);
     this.assertNameIsFree(all, input.nombre, input.organizationId);
-    return toOrganization(await this.repository.rename(input.organizationId, input.nombre));
+    const audit = this.updateEntry(current, { ...current, name: input.nombre }, actor);
+    if (!audit) return toOrganization(current);
+    return toOrganization(await this.repository.rename(current.id, input.nombre, audit));
   }
 
-  async setActive(input: SetOrganizationActiveInput): Promise<Organization> {
+  async setActive(
+    input: SetOrganizationActiveInput,
+    actor: AuthenticatedUser,
+  ): Promise<Organization> {
     const all = await this.repository.findAll();
     const current = this.requireIn(all, input.organizationId);
     if (!input.activo && this.isLastActive(all, current)) {
@@ -44,11 +69,13 @@ export class OrganizationsService {
         message: "No se puede desactivar el último departamento activo",
       });
     }
-    return toOrganization(await this.repository.setActive(input.organizationId, input.activo));
+    const audit = this.updateEntry(current, { ...current, activo: input.activo }, actor);
+    if (!audit) return toOrganization(current);
+    return toOrganization(await this.repository.setActive(current.id, input.activo, audit));
   }
 
   // En SPEC 05 este mismo método suma el chequeo de tickets (ni siquiera eliminados lógicamente).
-  async remove(organizationId: string): Promise<void> {
+  async remove(organizationId: string, actor: AuthenticatedUser): Promise<void> {
     const all = await this.repository.findAll();
     const current = this.requireIn(all, organizationId);
     if (this.isLastActive(all, current)) {
@@ -61,7 +88,30 @@ export class OrganizationsService {
         message: "El departamento tiene agentes asignados: desactivalo en lugar de eliminarlo",
       });
     }
-    await this.repository.remove(organizationId);
+    await this.repository.remove(organizationId, {
+      entityType: ENTITY_TYPE,
+      entityId: organizationId,
+      action: "delete",
+      actorId: actor.id,
+      payload: {},
+    });
+  }
+
+  // `null` cuando la foto auditable no cambió: no hay nada que escribir ni auditar.
+  private updateEntry(
+    before: OrganizationRow,
+    after: OrganizationRow,
+    actor: AuthenticatedUser,
+  ): AuditEntry | null {
+    const diff = computeDiff(snapshotOf(before), snapshotOf(after));
+    if (!diff) return null;
+    return {
+      entityType: ENTITY_TYPE,
+      entityId: before.id,
+      action: "update",
+      actorId: actor.id,
+      payload: { ...diff },
+    };
   }
 
   private requireIn(all: OrganizationRow[], id: string): OrganizationRow {

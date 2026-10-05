@@ -3,6 +3,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { getPrismaClient } from "@syc/db";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
+import { type AuditEntry, writeAuditEntry } from "../audit/audit.repository";
 
 export interface OrganizationRow {
   id: string;
@@ -53,33 +54,50 @@ export class OrganizationsRepository {
     return row ? toRow(row) : null;
   }
 
-  async create(data: { name: string; slug: string }): Promise<OrganizationRow> {
-    const row = await this.db.organization.create({
-      data: { id: randomUUID(), name: data.name, slug: data.slug, createdAt: new Date() },
-      include: withAgentCount,
+  // Cada mutación escribe su `AuditLog` en la misma transacción: si falla la auditoría, falla la
+  // mutación. En el alta el id lo genera este repository, por eso la entrada no trae `entityId`.
+  async create(
+    data: { name: string; slug: string },
+    audit: Omit<AuditEntry, "entityId">,
+  ): Promise<OrganizationRow> {
+    return this.db.$transaction(async (tx) => {
+      const row = await tx.organization.create({
+        data: { id: randomUUID(), name: data.name, slug: data.slug, createdAt: new Date() },
+        include: withAgentCount,
+      });
+      await writeAuditEntry(tx, { ...audit, entityId: row.id });
+      return toRow(row);
     });
-    return toRow(row);
   }
 
-  async rename(id: string, name: string): Promise<OrganizationRow> {
-    const row = await this.db.organization.update({
-      where: { id },
-      data: { name },
-      include: withAgentCount,
+  async rename(id: string, name: string, audit: AuditEntry): Promise<OrganizationRow> {
+    return this.db.$transaction(async (tx) => {
+      const row = await tx.organization.update({
+        where: { id },
+        data: { name },
+        include: withAgentCount,
+      });
+      await writeAuditEntry(tx, audit);
+      return toRow(row);
     });
-    return toRow(row);
   }
 
-  async setActive(id: string, activo: boolean): Promise<OrganizationRow> {
-    const row = await this.db.organization.update({
-      where: { id },
-      data: { activo },
-      include: withAgentCount,
+  async setActive(id: string, activo: boolean, audit: AuditEntry): Promise<OrganizationRow> {
+    return this.db.$transaction(async (tx) => {
+      const row = await tx.organization.update({
+        where: { id },
+        data: { activo },
+        include: withAgentCount,
+      });
+      await writeAuditEntry(tx, audit);
+      return toRow(row);
     });
-    return toRow(row);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.db.organization.delete({ where: { id } });
+  async remove(id: string, audit: AuditEntry): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      await tx.organization.delete({ where: { id } });
+      await writeAuditEntry(tx, audit);
+    });
   }
 }

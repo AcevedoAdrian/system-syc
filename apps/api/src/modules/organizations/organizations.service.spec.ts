@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { AuthenticatedUser } from "../../common/authenticated-request";
+import type { AuditEntry } from "../audit/audit.repository";
 import type { OrganizationRow, OrganizationsRepository } from "./organizations.repository";
 import { OrganizationsService } from "./organizations.service";
 
@@ -6,24 +8,42 @@ function row(id: string, name: string, extra: Partial<OrganizationRow> = {}): Or
   return { id, name, slug: name.toLowerCase(), activo: true, agentes: 0, ...extra };
 }
 
-// Repository en memoria: el service solo lee la lista y escribe de a una fila.
+const admin: AuthenticatedUser = {
+  id: "admin-1",
+  username: "admin",
+  name: "Admin",
+  email: "admin@example.com",
+  role: "admin",
+};
+
+// Repository en memoria: el service solo lee la lista y escribe de a una fila. Cada mutación
+// recibe la entrada de auditoría (en producción se escribe en la misma transacción) y la anota.
 function buildService(initial: OrganizationRow[]) {
   const rows = initial.map((r) => ({ ...r }));
+  const audits: AuditEntry[] = [];
   const find = (id: string) => rows.find((r) => r.id === id) as OrganizationRow;
   const repository = {
     findAll: async () => rows.map((r) => ({ ...r })),
-    create: async (data: { name: string; slug: string }) => {
+    create: async (data: { name: string; slug: string }, audit: Omit<AuditEntry, "entityId">) => {
       const created = { id: `id-${rows.length + 1}`, activo: true, agentes: 0, ...data };
       rows.push(created);
+      audits.push({ ...audit, entityId: created.id });
       return created;
     },
-    rename: async (id: string, name: string) => Object.assign(find(id), { name }),
-    setActive: async (id: string, activo: boolean) => Object.assign(find(id), { activo }),
-    remove: async (id: string) => {
+    rename: async (id: string, name: string, audit: AuditEntry) => {
+      audits.push(audit);
+      return Object.assign(find(id), { name });
+    },
+    setActive: async (id: string, activo: boolean, audit: AuditEntry) => {
+      audits.push(audit);
+      return Object.assign(find(id), { activo });
+    },
+    remove: async (id: string, audit: AuditEntry) => {
+      audits.push(audit);
       rows.splice(rows.indexOf(find(id)), 1);
     },
   } as unknown as OrganizationsRepository;
-  return { service: new OrganizationsService(repository), rows };
+  return { service: new OrganizationsService(repository), rows, audits };
 }
 
 const seed = () => [
@@ -36,7 +56,7 @@ describe("OrganizationsService.create", () => {
   it("crea el departamento activo y sin agentes, con slug en kebab-case sin acentos", async () => {
     const { service, rows } = buildService(seed());
 
-    const created = await service.create({ nombre: "Atención al Público" });
+    const created = await service.create({ nombre: "Atención al Público" }, admin);
 
     expect(created).toMatchObject({ nombre: "Atención al Público", activo: true, agentes: 0 });
     expect(rows.at(-1)?.slug).toBe("atencion-al-publico");
@@ -45,8 +65,10 @@ describe("OrganizationsService.create", () => {
   it("rechaza con 409 un nombre repetido sin importar mayúsculas, acentos ni espacios", async () => {
     const { service } = buildService(seed());
 
-    await expect(service.create({ nombre: "tecnico" })).rejects.toMatchObject({ code: "CONFLICT" });
-    await expect(service.create({ nombre: "  TÉCNICO " })).rejects.toMatchObject({
+    await expect(service.create({ nombre: "tecnico" }, admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await expect(service.create({ nombre: "  TÉCNICO " }, admin)).rejects.toMatchObject({
       code: "CONFLICT",
     });
   });
@@ -54,7 +76,7 @@ describe("OrganizationsService.create", () => {
   it("suma un sufijo al slug cuando colisiona aunque el nombre sea distinto", async () => {
     const { service, rows } = buildService([row("tec", "Técnico", { slug: "tecnico" })]);
 
-    await service.create({ nombre: "Técnico!" });
+    await service.create({ nombre: "Técnico!" }, admin);
 
     expect(rows.at(-1)?.slug).toBe("tecnico-2");
   });
@@ -64,7 +86,7 @@ describe("OrganizationsService.rename", () => {
   it("permite renombrar a su propio nombre con otra capitalización y no cambia el slug", async () => {
     const { service, rows } = buildService(seed());
 
-    const renamed = await service.rename({ organizationId: "tec", nombre: "TÉCNICO" });
+    const renamed = await service.rename({ organizationId: "tec", nombre: "TÉCNICO" }, admin);
 
     expect(renamed.nombre).toBe("TÉCNICO");
     expect(rows.find((r) => r.id === "tec")?.slug).toBe("técnico");
@@ -73,7 +95,9 @@ describe("OrganizationsService.rename", () => {
   it("rechaza con 409 el nombre de otro departamento", async () => {
     const { service } = buildService(seed());
 
-    await expect(service.rename({ organizationId: "tec", nombre: "redes" })).rejects.toMatchObject({
+    await expect(
+      service.rename({ organizationId: "tec", nombre: "redes" }, admin),
+    ).rejects.toMatchObject({
       code: "CONFLICT",
     });
   });
@@ -81,7 +105,9 @@ describe("OrganizationsService.rename", () => {
   it("responde 404 si el departamento no existe", async () => {
     const { service } = buildService(seed());
 
-    await expect(service.rename({ organizationId: "nope", nombre: "X" })).rejects.toMatchObject({
+    await expect(
+      service.rename({ organizationId: "nope", nombre: "X" }, admin),
+    ).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });
@@ -91,8 +117,12 @@ describe("OrganizationsService.setActive", () => {
   it("desactiva y reactiva", async () => {
     const { service } = buildService(seed());
 
-    expect((await service.setActive({ organizationId: "adm", activo: false })).activo).toBe(false);
-    expect((await service.setActive({ organizationId: "adm", activo: true })).activo).toBe(true);
+    expect((await service.setActive({ organizationId: "adm", activo: false }, admin)).activo).toBe(
+      false,
+    );
+    expect((await service.setActive({ organizationId: "adm", activo: true }, admin)).activo).toBe(
+      true,
+    );
   });
 
   it("no deja desactivar el último departamento activo", async () => {
@@ -101,11 +131,11 @@ describe("OrganizationsService.setActive", () => {
       row("red", "Redes", { activo: false }),
     ]);
 
-    await expect(service.setActive({ organizationId: "tec", activo: false })).rejects.toMatchObject(
-      {
-        code: "CONFLICT",
-      },
-    );
+    await expect(
+      service.setActive({ organizationId: "tec", activo: false }, admin),
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
   });
 });
 
@@ -113,7 +143,7 @@ describe("OrganizationsService.remove", () => {
   it("elimina un departamento sin agentes", async () => {
     const { service, rows } = buildService(seed());
 
-    await service.remove("adm");
+    await service.remove("adm", admin);
 
     expect(rows.map((r) => r.id)).toEqual(["tec", "red"]);
   });
@@ -121,7 +151,7 @@ describe("OrganizationsService.remove", () => {
   it("rechaza con 409 si tiene agentes, activos o desactivados", async () => {
     const { service, rows } = buildService(seed());
 
-    await expect(service.remove("red")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(service.remove("red", admin)).rejects.toMatchObject({ code: "CONFLICT" });
     expect(rows).toHaveLength(3);
   });
 
@@ -131,7 +161,7 @@ describe("OrganizationsService.remove", () => {
       row("red", "Redes", { activo: false }),
     ]);
 
-    await expect(service.remove("tec")).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(service.remove("tec", admin)).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("deja eliminar uno desactivado y vacío aunque quede un solo activo", async () => {
@@ -140,7 +170,7 @@ describe("OrganizationsService.remove", () => {
       row("red", "Redes", { activo: false }),
     ]);
 
-    await service.remove("red");
+    await service.remove("red", admin);
 
     expect(rows.map((r) => r.id)).toEqual(["tec"]);
   });
@@ -148,6 +178,96 @@ describe("OrganizationsService.remove", () => {
   it("responde 404 si no existe", async () => {
     const { service } = buildService(seed());
 
-    await expect(service.remove("nope")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(service.remove("nope", admin)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("OrganizationsService: auditoría", () => {
+  it("el alta deja un create con los valores iniciales y el admin como actor", async () => {
+    const { service, audits } = buildService(seed());
+
+    const created = await service.create({ nombre: "Soporte" }, admin);
+
+    expect(audits).toEqual([
+      {
+        entityType: "Organization",
+        entityId: created.id,
+        action: "create",
+        actorId: "admin-1",
+        payload: { after: { nombre: "Soporte", activo: true } },
+      },
+    ]);
+  });
+
+  it("renombrar deja un update solo con el nombre", async () => {
+    const { service, audits } = buildService([row("sop", "Soporte")]);
+
+    await service.rename({ organizationId: "sop", nombre: "Mesa de ayuda" }, admin);
+
+    expect(audits).toEqual([
+      {
+        entityType: "Organization",
+        entityId: "sop",
+        action: "update",
+        actorId: "admin-1",
+        payload: { before: { nombre: "Soporte" }, after: { nombre: "Mesa de ayuda" } },
+      },
+    ]);
+  });
+
+  it("renombrar al mismo nombre no audita ni escribe", async () => {
+    const { service, audits } = buildService(seed());
+
+    const result = await service.rename({ organizationId: "tec", nombre: "Técnico" }, admin);
+
+    expect(result.nombre).toBe("Técnico");
+    expect(audits).toEqual([]);
+  });
+
+  it("desactivar y reactivar dejan un update de activo cada uno", async () => {
+    const { service, audits } = buildService(seed());
+
+    await service.setActive({ organizationId: "adm", activo: false }, admin);
+    await service.setActive({ organizationId: "adm", activo: true }, admin);
+
+    expect(audits.map((a) => [a.action, a.payload])).toEqual([
+      ["update", { before: { activo: true }, after: { activo: false } }],
+      ["update", { before: { activo: false }, after: { activo: true } }],
+    ]);
+  });
+
+  it("setActive con el estado actual no audita", async () => {
+    const { service, audits } = buildService(seed());
+
+    await service.setActive({ organizationId: "adm", activo: true }, admin);
+
+    expect(audits).toEqual([]);
+  });
+
+  it("eliminar deja un delete con payload vacío", async () => {
+    const { service, audits } = buildService(seed());
+
+    await service.remove("adm", admin);
+
+    expect(audits).toEqual([
+      {
+        entityType: "Organization",
+        entityId: "adm",
+        action: "delete",
+        actorId: "admin-1",
+        payload: {},
+      },
+    ]);
+  });
+
+  it("una operación rechazada no deja registro", async () => {
+    const { service, audits } = buildService(seed());
+
+    await expect(service.remove("red", admin)).rejects.toMatchObject({ code: "CONFLICT" });
+    await expect(
+      service.rename({ organizationId: "tec", nombre: "redes" }, admin),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+
+    expect(audits).toEqual([]);
   });
 });
