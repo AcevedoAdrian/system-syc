@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { normalizeName, uniqueSlug } from "./common/text";
 import { loadEnv } from "./config/env.schema";
+import { AuditRepository } from "./modules/audit/audit.repository";
+import { AuditService } from "./modules/audit/audit.service";
 import { type Auth, createAuth } from "./modules/auth/auth.config";
 import { toInternalEmail } from "./modules/users/internal-email";
+import { userAuditSnapshot } from "./modules/users/user-audit-snapshot";
 
 const DEFAULT_DEPARTMENTS = ["Administrativo", "Técnico", "Redes", "Desarrollo"];
 
@@ -35,7 +38,13 @@ interface OrganizationRow {
   slug: string;
 }
 
-async function seedAdmin(auth: Auth, seedEnv: SeedEnv): Promise<"creado" | "existente"> {
+// Lo que crea el seed queda como `create` con `actorId: null` (null = sistema). Si no crea nada,
+// no deja registros.
+async function seedAdmin(
+  auth: Auth,
+  audit: AuditService,
+  seedEnv: SeedEnv,
+): Promise<"creado" | "existente"> {
   const ctx = await auth.$context;
   const username = seedEnv.SEED_ADMIN_USERNAME.toLowerCase();
 
@@ -62,10 +71,27 @@ async function seedAdmin(auth: Auth, seedEnv: SeedEnv): Promise<"creado" | "exis
     accountId: user.id,
     password: await ctx.password.hash(seedEnv.SEED_ADMIN_PASSWORD),
   });
+  await audit.log({
+    entityType: "User",
+    entityId: user.id,
+    action: "create",
+    actorId: null,
+    payload: {
+      after: userAuditSnapshot({
+        id: user.id,
+        username,
+        name: seedEnv.SEED_ADMIN_NAME,
+        email: null, // el email del seed es el interno
+        role: "admin",
+        activo: true,
+        department: null,
+      }),
+    },
+  });
   return "creado";
 }
 
-async function seedDepartments(auth: Auth): Promise<{ creados: string[] }> {
+async function seedDepartments(auth: Auth, audit: AuditService): Promise<{ creados: string[] }> {
   const ctx = await auth.$context;
   const rows = await ctx.adapter.findMany<OrganizationRow>({ model: "organization" });
   const names = new Set(rows.map((row) => normalizeName(row.name)));
@@ -75,9 +101,16 @@ async function seedDepartments(auth: Auth): Promise<{ creados: string[] }> {
   for (const name of DEFAULT_DEPARTMENTS) {
     if (names.has(normalizeName(name))) continue;
     const slug = uniqueSlug(name, slugs);
-    await ctx.adapter.create({
+    const created = await ctx.adapter.create<{ id: string }>({
       model: "organization",
       data: { name, slug, createdAt: new Date(), activo: true },
+    });
+    await audit.log({
+      entityType: "Organization",
+      entityId: created.id,
+      action: "create",
+      actorId: null,
+      payload: { after: { nombre: name, activo: true } },
     });
     names.add(normalizeName(name));
     slugs.add(slug);
@@ -88,10 +121,12 @@ async function seedDepartments(auth: Auth): Promise<{ creados: string[] }> {
 
 async function main() {
   const seedEnv = loadSeedEnv(process.env);
-  const auth = createAuth(loadEnv(process.env));
+  const env = loadEnv(process.env);
+  const auth = createAuth(env);
+  const audit = new AuditService(new AuditRepository(env));
 
-  const admin = await seedAdmin(auth, seedEnv);
-  const departments = await seedDepartments(auth);
+  const admin = await seedAdmin(auth, audit, seedEnv);
+  const departments = await seedDepartments(auth, audit);
 
   console.log(`Admin raíz "${seedEnv.SEED_ADMIN_USERNAME}": ${admin}.`);
   console.log(

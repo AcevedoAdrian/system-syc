@@ -12,6 +12,7 @@ import type { AuditEntry } from "../audit/audit.repository";
 import { AuditService } from "../audit/audit.service";
 import { type AuditSnapshot, computeDiff } from "../audit/audit-diff";
 import { isInternalEmail, toInternalEmail } from "./internal-email";
+import { userAuditSnapshot } from "./user-audit-snapshot";
 import { type UserChanges, type UserRecord, UsersRepository } from "./users.repository";
 
 function toUser(record: UserRecord): User {
@@ -28,18 +29,8 @@ function toUser(record: UserRecord): User {
 
 const ENTITY_TYPE = "User";
 
-// Foto auditable (SPEC 03): solo estos campos entran en el payload. Nunca hay contraseñas ni hashes.
-// El email es el visible: `null` si es el interno `<username>@syc.local`, que se deriva del username.
 function snapshotOf(record: UserRecord): AuditSnapshot {
-  const user = toUser(record);
-  return {
-    username: user.username,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    activo: user.activo,
-    departamento: user.department,
-  };
+  return userAuditSnapshot(toUser(record));
 }
 
 @Injectable()
