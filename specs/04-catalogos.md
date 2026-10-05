@@ -288,20 +288,20 @@ export const moveCatalogItemInputSchema = z.object({
 
 ## Criterios de aceptación
 
-- [ ] En cada uno de los 7 catálogos, el admin crea, edita, sube, baja, desactiva, reactiva y elimina un ítem por la API. Cada paso deja un `AuditLog` con el `entityType` del catálogo, el admin como actor y el `payload` de la convención. Subir o bajar deja dos `update` con solo `orden`.
-- [ ] Desde `/admin/catalogos`, el admin hace lo mismo en la pestaña Áreas sin deploy, y la pestaña elegida se mantiene al recargar.
-- [ ] Crear "Área Técnica" y luego "area  tecnica" en Áreas devuelve 409. Crear "Área Técnica" en Edificios funciona.
-- [ ] Eliminar un ítem y crear otro con el mismo nombre funciona. El eliminado ya no aparece en `list`.
-- [ ] Editar, mover o eliminar un ítem ya eliminado devuelve 404. Una edición sin cambios no deja `AuditLog`.
-- [ ] Subir el primer ítem o bajar el último no cambia ningún `orden` ni deja `AuditLog`.
-- [ ] Eliminar Finalizado, Cerrado, Cancelado o Reabierto devuelve siempre 409. Renombrarlos o desactivarlos funciona y su `clave` no cambia.
-- [ ] Desactivar o eliminar el único estado activo devuelve 409, y lo mismo con la única prioridad activa. En Áreas, desactivar el último activo funciona.
-- [ ] Un proveedor con solo el nombre se guarda con los otros 4 campos en `null`. Un correo `soporte@` o un sitio `www.x.com` devuelve 400. Editarlo con un campo en blanco lo deja en `null`.
-- [ ] Un agente recibe 403 en `create`, `update`, `move`, `setActive`, `remove` y `history` de cualquier catálogo. Su `list` responde 200 con los inactivos (`activo: false`) y sin los eliminados.
-- [ ] `history` de un ítem devuelve al admin sus registros del más reciente al más antiguo. Un id sin registros devuelve `[]`.
-- [ ] El seed sobre una base vacía deja los 7 estados en orden (4 con su `clave`) y Baja, Media, Alta y Urgente, con 11 `create` de `actorId` null. Correrlo otra vez, después de renombrar "Pendiente", no crea nada ni deshace el renombre.
-- [ ] En la pestaña Estados, las 4 filas de sistema muestran "De sistema" y no tienen el botón Eliminar. El link "Catálogos" no aparece para un agente.
-- [ ] `pnpm verify --spec 04` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] En cada uno de los 7 catálogos, el admin crea, edita, sube, baja, desactiva, reactiva y elimina un ítem por la API. Cada paso deja un `AuditLog` con el `entityType` del catálogo, el admin como actor y el `payload` de la convención. Subir o bajar deja dos `update` con solo `orden`.
+- [X] Desde `/admin/catalogos`, el admin hace lo mismo en la pestaña Áreas sin deploy, y la pestaña elegida se mantiene al recargar.
+- [X] Crear "Área Técnica" y luego "area  tecnica" en Áreas devuelve 409. Crear "Área Técnica" en Edificios funciona.
+- [X] Eliminar un ítem y crear otro con el mismo nombre funciona. El eliminado ya no aparece en `list`.
+- [X] Editar, mover o eliminar un ítem ya eliminado devuelve 404. Una edición sin cambios no deja `AuditLog`.
+- [X] Subir el primer ítem o bajar el último no cambia ningún `orden` ni deja `AuditLog`.
+- [X] Eliminar Finalizado, Cerrado, Cancelado o Reabierto devuelve siempre 409. Renombrarlos o desactivarlos funciona y su `clave` no cambia.
+- [X] Desactivar o eliminar el único estado activo devuelve 409, y lo mismo con la única prioridad activa. En Áreas, desactivar el último activo funciona.
+- [X] Un proveedor con solo el nombre se guarda con los otros 4 campos en `null`. Un correo `soporte@` o un sitio `www.x.com` devuelve 400. Editarlo con un campo en blanco lo deja en `null`.
+- [X] Un agente recibe 403 en `create`, `update`, `move`, `setActive`, `remove` y `history` de cualquier catálogo. Su `list` responde 200 con los inactivos (`activo: false`) y sin los eliminados.
+- [X] `history` de un ítem devuelve al admin sus registros del más reciente al más antiguo. Un id sin registros devuelve `[]`.
+- [X] El seed sobre una base vacía deja los 7 estados en orden (4 con su `clave`) y Baja, Media, Alta y Urgente, con 11 `create` de `actorId` null. Correrlo otra vez, después de renombrar "Pendiente", no crea nada ni deshace el renombre.
+- [X] En la pestaña Estados, las 4 filas de sistema muestran "De sistema" y no tienen el botón Eliminar. El link "Catálogos" no aparece para un agente.
+- [X] `pnpm verify --spec 04` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 El criterio "eliminar un ítem usado por un ticket no eliminado → 409" pasa a SPEC 05, porque antes no existen tickets.
 
