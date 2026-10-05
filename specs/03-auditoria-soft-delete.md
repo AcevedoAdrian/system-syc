@@ -1,6 +1,6 @@
 # SPEC 03 — Auditoría y eliminación lógica
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 02 (autenticación y acceso)
 > **Date:** 2026-10-05
 > **Objective:** módulo `audit` reutilizable (tabla `AuditLog`, diff, historial por entidad) y las convenciones de campos de auditoría y eliminación lógica, aplicados a `users` y `organizations` de SPEC 02 y listos para `catalogs` y `tickets` (SPEC 04 y 05).
