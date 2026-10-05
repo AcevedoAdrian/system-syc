@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type {
+  AuditHistory,
   CreateUserInput,
   ResetPasswordInput,
   SetUserActiveInput,
@@ -56,6 +57,11 @@ export class UsersService {
 
   async list(): Promise<User[]> {
     return (await this.repository.findAll()).map(toUser);
+  }
+
+  // Sin chequear que el usuario exista: un id sin registros devuelve `[]`.
+  async history(userId: string): Promise<AuditHistory> {
+    return this.audit.history(ENTITY_TYPE, userId);
   }
 
   async create(input: CreateUserInput, actor: AuthenticatedUser, headers: Headers): Promise<User> {

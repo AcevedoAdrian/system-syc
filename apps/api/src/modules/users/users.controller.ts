@@ -33,6 +33,9 @@ export class UsersController {
       resetPassword: implement(management.resetPassword).handler(({ input }) =>
         this.service.resetPassword(input, actor, headers),
       ),
+      history: implement(management.history).handler(({ input }) =>
+        this.service.history(input.userId),
+      ),
     };
   }
 }

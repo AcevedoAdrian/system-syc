@@ -23,6 +23,9 @@ export class OrganizationsController {
       setActive: implement(c.setActive).handler(({ input }) =>
         this.service.setActive(input, actor),
       ),
+      history: implement(c.history).handler(({ input }) =>
+        this.service.history(input.organizationId),
+      ),
       remove: implement(c.remove).handler(({ input }) =>
         this.service.remove(input.organizationId, actor),
       ),

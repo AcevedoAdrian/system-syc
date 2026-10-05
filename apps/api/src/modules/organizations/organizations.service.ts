@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type {
+  AuditHistory,
   Organization,
   OrganizationInput,
   RenameOrganizationInput,
@@ -9,6 +10,7 @@ import type {
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName, uniqueSlug } from "../../common/text";
 import type { AuditEntry } from "../audit/audit.repository";
+import { AuditService } from "../audit/audit.service";
 import { computeDiff, pickSnapshot } from "../audit/audit-diff";
 import { type OrganizationRow, OrganizationsRepository } from "./organizations.repository";
 
@@ -25,10 +27,19 @@ function snapshotOf(row: OrganizationRow) {
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private readonly repository: OrganizationsRepository) {}
+  constructor(
+    private readonly repository: OrganizationsRepository,
+    private readonly audit: AuditService,
+  ) {}
 
   async list(): Promise<Organization[]> {
     return (await this.repository.findAll()).map(toOrganization);
+  }
+
+  // Sin chequear que el departamento exista: el de uno ya eliminado se sigue leyendo, y un id sin
+  // registros devuelve `[]`.
+  async history(organizationId: string): Promise<AuditHistory> {
+    return this.audit.history(ENTITY_TYPE, organizationId);
   }
 
   async create(input: OrganizationInput, actor: AuthenticatedUser): Promise<Organization> {

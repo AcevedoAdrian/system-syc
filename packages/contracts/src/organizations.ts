@@ -1,5 +1,6 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { auditHistorySchema } from "./audit.js";
 
 const nombreSchema = z.string().trim().min(1).max(120);
 
@@ -47,4 +48,8 @@ export const organizationsContract = {
     .route({ method: "DELETE", path: "/organizations/{organizationId}" })
     .input(organizationIdInputSchema)
     .output(z.void()),
+  history: oc
+    .route({ method: "GET", path: "/organizations/{organizationId}/history" })
+    .input(organizationIdInputSchema)
+    .output(auditHistorySchema),
 };

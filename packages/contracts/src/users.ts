@@ -1,5 +1,6 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
+import { auditHistorySchema } from "./audit.js";
 
 const usernameSchema = z
   .string()
@@ -54,6 +55,8 @@ export const resetPasswordInputSchema = z.object({
   password: passwordSchema,
 });
 
+export const userIdInputSchema = z.object({ userId: z.string() });
+
 export const userSchema = z.object({
   id: z.string(),
   username: z.string(),
@@ -89,4 +92,8 @@ export const usersContract = {
     .route({ method: "POST", path: "/users/{userId}/reset-password" })
     .input(resetPasswordInputSchema)
     .output(z.void()),
+  history: oc
+    .route({ method: "GET", path: "/users/{userId}/history" })
+    .input(userIdInputSchema)
+    .output(auditHistorySchema),
 };

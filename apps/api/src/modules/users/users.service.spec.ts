@@ -95,6 +95,7 @@ function buildService(initial: UserRecord[], options: { failAudit?: boolean } = 
   } as unknown as UsersRepository;
   const audits: AuditEntry[] = [];
   const audit = {
+    history: async (entityType: string, entityId: string) => [{ entityType, entityId }],
     log: async (entry: AuditEntry) => {
       if (options.failAudit) throw new Error("falló la auditoría");
       audits.push(entry);
@@ -626,5 +627,15 @@ describe("UsersService: auditoría", () => {
     ).rejects.toThrow("falló la auditoría");
 
     expect(find("ana").activo).toBe(false);
+  });
+});
+
+describe("UsersService.history", () => {
+  it("lee el historial de User por id, sin chequear que el usuario exista", async () => {
+    const { service } = buildService([admin("root")]);
+
+    await expect(service.history("nope")).resolves.toEqual([
+      { entityType: "User", entityId: "nope" },
+    ]);
   });
 });

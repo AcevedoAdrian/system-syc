@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
+import type { AuditService } from "../audit/audit.service";
 import type { OrganizationRow, OrganizationsRepository } from "./organizations.repository";
 import { OrganizationsService } from "./organizations.service";
 
@@ -43,7 +44,9 @@ function buildService(initial: OrganizationRow[]) {
       rows.splice(rows.indexOf(find(id)), 1);
     },
   } as unknown as OrganizationsRepository;
-  return { service: new OrganizationsService(repository), rows, audits };
+  const history = vi.fn(async () => []);
+  const audit = { history } as unknown as AuditService;
+  return { service: new OrganizationsService(repository, audit), rows, audits, history };
 }
 
 const seed = () => [
@@ -269,5 +272,15 @@ describe("OrganizationsService: auditoría", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
 
     expect(audits).toEqual([]);
+  });
+});
+
+describe("OrganizationsService.history", () => {
+  it("lee el historial de Organization por id, aunque el departamento ya no exista", async () => {
+    const { service, history } = buildService(seed());
+
+    expect(await service.history("eliminado")).toEqual([]);
+
+    expect(history).toHaveBeenCalledWith("Organization", "eliminado");
   });
 });
