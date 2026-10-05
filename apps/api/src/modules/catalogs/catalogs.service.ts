@@ -12,6 +12,7 @@ import {
   CatalogsRepository,
   type CatalogWrite,
   type OrdenChange,
+  type SeedEntry,
 } from "./catalogs.repository";
 
 // Lo que devuelve cualquiera de los 7 catálogos; cada controller lo ajusta a su esquema de salida.
@@ -146,6 +147,35 @@ export class CatalogsService {
       actorId: actor.id,
       payload: {},
     });
+  }
+
+  // Carga `items` con `orden` 1..N solo si la tabla del catálogo está vacía (Feature 4.5). Lo que
+  // crea queda como `create` con `actorId: null` (null = sistema); `adminId` es solo el
+  // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.
+  async seedIfEmpty(
+    def: CatalogDefinition,
+    items: readonly { nombre: string; clave?: string }[],
+    adminId: string,
+  ): Promise<number> {
+    const entries: SeedEntry[] = items.map((item, index) => {
+      const data: CatalogWrite = {
+        nombre: item.nombre,
+        nombreNormalizado: normalizeName(item.nombre),
+        orden: index + 1,
+        activo: true,
+      };
+      if (item.clave) data.clave = item.clave;
+      return {
+        data,
+        audit: {
+          entityType: def.entityType,
+          action: "create",
+          actorId: null,
+          payload: { after: snapshotOf(def, data) },
+        },
+      };
+    });
+    return this.repository.seedIfEmpty(def, entries, adminId);
   }
 
   // Los campos del cliente según la definición, más `nombreNormalizado`, que nunca llega de afuera.

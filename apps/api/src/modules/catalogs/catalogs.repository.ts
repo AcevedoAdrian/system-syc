@@ -23,6 +23,12 @@ export interface CatalogRow {
 // Campos que el service decide escribir (los de `inputFields` más `nombreNormalizado` y `orden`).
 export type CatalogWrite = Record<string, CatalogValue>;
 
+// Una fila del seed con la auditoría de su alta (el id lo genera la base).
+export interface SeedEntry {
+  data: CatalogWrite;
+  audit: Omit<AuditEntry, "entityId">;
+}
+
 export interface OrdenChange {
   id: string;
   orden: number;
@@ -34,6 +40,7 @@ export interface OrdenChange {
 // armó el service a partir de los campos de la definición.
 interface CatalogDelegate {
   findMany(args: { where: object; orderBy: object[]; select: object }): Promise<CatalogRow[]>;
+  count(args: { where?: object }): Promise<number>;
   create(args: { data: object; select: object }): Promise<CatalogRow>;
   update(args: { where: object; data: object; select: object }): Promise<CatalogRow>;
 }
@@ -173,5 +180,27 @@ export class CatalogsRepository {
     } catch (error) {
       translate(def, error);
     }
+  }
+
+  // Carga las filas solo si la tabla no tiene ninguna, ni siquiera eliminada: así el seed no recrea
+  // un nombre que el admin cambió. El conteo, las altas y su auditoría van en una transacción.
+  // Devuelve cuántas filas creó.
+  async seedIfEmpty(
+    def: CatalogDefinition,
+    entries: SeedEntry[],
+    actorId: string,
+  ): Promise<number> {
+    return this.db.$transaction(async (tx) => {
+      const delegate = this.delegate(def, tx);
+      if ((await delegate.count({})) > 0) return 0;
+      for (const entry of entries) {
+        const row = await delegate.create({
+          data: { ...entry.data, createdBy: actorId, updatedBy: actorId },
+          select: { id: true },
+        });
+        await writeAuditEntry(tx, { ...entry.audit, entityId: row.id });
+      }
+      return entries.length;
+    });
   }
 }

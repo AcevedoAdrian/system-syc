@@ -4,10 +4,31 @@ import { loadEnv } from "./config/env.schema";
 import { AuditRepository } from "./modules/audit/audit.repository";
 import { AuditService } from "./modules/audit/audit.service";
 import { type Auth, createAuth } from "./modules/auth/auth.config";
+import { CATALOG_DEFINITIONS } from "./modules/catalogs/catalog-definitions";
+import { CatalogsRepository } from "./modules/catalogs/catalogs.repository";
+import { CatalogsService } from "./modules/catalogs/catalogs.service";
 import { toInternalEmail } from "./modules/users/internal-email";
 import { userAuditSnapshot } from "./modules/users/user-audit-snapshot";
 
 const DEFAULT_DEPARTMENTS = ["Administrativo", "Técnico", "Redes", "Desarrollo"];
+
+// Catálogos con datos iniciales (SPEC 04, Feature 4.5), en el orden en que se cargan. `clave` es la
+// de los 4 estados de sistema (D1). Los otros 5 catálogos los carga el admin.
+const DEFAULT_ESTADOS = [
+  { nombre: "Pendiente" },
+  { nombre: "En progreso" },
+  { nombre: "En espera" },
+  { nombre: "Finalizado", clave: "FINALIZADO" },
+  { nombre: "Cerrado", clave: "CERRADO" },
+  { nombre: "Cancelado", clave: "CANCELADO" },
+  { nombre: "Reabierto", clave: "REABIERTO" },
+];
+const DEFAULT_PRIORIDADES = [
+  { nombre: "Baja" },
+  { nombre: "Media" },
+  { nombre: "Alta" },
+  { nombre: "Urgente" },
+];
 
 // Variables propias del seed: no son obligatorias para arrancar la API (por eso no están en `env.schema.ts`).
 const seedEnvSchema = z.object({
@@ -119,6 +140,34 @@ async function seedDepartments(auth: Auth, audit: AuditService): Promise<{ cread
   return { creados };
 }
 
+// `createdBy` es una FK obligatoria: las filas del seed quedan a nombre del admin raíz, aunque su
+// `AuditLog` tenga `actorId: null`.
+async function findAdminId(auth: Auth, username: string): Promise<string> {
+  const ctx = await auth.$context;
+  const admin = await ctx.adapter.findOne<{ id: string }>({
+    model: "user",
+    where: [{ field: "username", value: username.toLowerCase() }],
+  });
+  if (!admin) throw new Error(`No encuentro al admin raíz "${username}" para cargar los catálogos`);
+  return admin.id;
+}
+
+// Cada catálogo se carga solo si su tabla no tiene ninguna fila; correrlo otra vez no crea nada y
+// no deshace un renombre del admin.
+async function seedCatalogs(
+  catalogs: CatalogsService,
+  adminId: string,
+): Promise<{ estados: number; prioridades: number }> {
+  return {
+    estados: await catalogs.seedIfEmpty(CATALOG_DEFINITIONS.estados, DEFAULT_ESTADOS, adminId),
+    prioridades: await catalogs.seedIfEmpty(
+      CATALOG_DEFINITIONS.prioridades,
+      DEFAULT_PRIORIDADES,
+      adminId,
+    ),
+  };
+}
+
 async function main() {
   const seedEnv = loadSeedEnv(process.env);
   const env = loadEnv(process.env);
@@ -127,12 +176,26 @@ async function main() {
 
   const admin = await seedAdmin(auth, audit, seedEnv);
   const departments = await seedDepartments(auth, audit);
+  const catalogs = await seedCatalogs(
+    new CatalogsService(new CatalogsRepository(env), audit),
+    await findAdminId(auth, seedEnv.SEED_ADMIN_USERNAME),
+  );
 
   console.log(`Admin raíz "${seedEnv.SEED_ADMIN_USERNAME}": ${admin}.`);
   console.log(
     departments.creados.length > 0
       ? `Departamentos creados: ${departments.creados.join(", ")}.`
       : "Departamentos: ya existían los 4.",
+  );
+  console.log(
+    catalogs.estados > 0
+      ? `Estados creados: ${catalogs.estados}.`
+      : "Estados: la tabla ya tenía datos, no se tocó.",
+  );
+  console.log(
+    catalogs.prioridades > 0
+      ? `Prioridades creadas: ${catalogs.prioridades}.`
+      : "Prioridades: la tabla ya tenía datos, no se tocó.",
   );
   process.exit(0);
 }

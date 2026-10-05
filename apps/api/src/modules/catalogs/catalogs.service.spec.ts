@@ -688,3 +688,78 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
     expect(await service.list(edificios)).toEqual([]);
   });
 });
+
+describe("CatalogsService.seedIfEmpty", () => {
+  function buildSeedService(created: number) {
+    const seedIfEmpty = vi.fn(async () => created);
+    const repository = { seedIfEmpty } as unknown as CatalogsRepository;
+    const service = new CatalogsService(repository, {} as unknown as AuditService);
+    return { service, seedIfEmpty };
+  }
+
+  it("arma las filas con orden 1..N, clave solo en los de sistema y auditoría del sistema", async () => {
+    const { service, seedIfEmpty } = buildSeedService(2);
+
+    const created = await service.seedIfEmpty(
+      estados,
+      [{ nombre: "Pendiente" }, { nombre: "Cerrado", clave: "CERRADO" }],
+      "admin-1",
+    );
+
+    expect(created).toBe(2);
+    expect(seedIfEmpty).toHaveBeenCalledWith(
+      estados,
+      [
+        {
+          data: { nombre: "Pendiente", nombreNormalizado: "pendiente", orden: 1, activo: true },
+          audit: {
+            entityType: "EstadoTicket",
+            action: "create",
+            actorId: null,
+            payload: {
+              after: { nombre: "Pendiente", orden: 1, activo: true, clave: null },
+            },
+          },
+        },
+        {
+          data: {
+            nombre: "Cerrado",
+            nombreNormalizado: "cerrado",
+            orden: 2,
+            activo: true,
+            clave: "CERRADO",
+          },
+          audit: {
+            entityType: "EstadoTicket",
+            action: "create",
+            actorId: null,
+            payload: {
+              after: { nombre: "Cerrado", orden: 2, activo: true, clave: "CERRADO" },
+            },
+          },
+        },
+      ],
+      "admin-1",
+    );
+  });
+
+  it("no manda `clave` a un catálogo que no la tiene", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1");
+
+    const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [unknown, { data: object }[]];
+    expect(Object.keys(entries[0]?.data ?? {}).sort()).toEqual([
+      "activo",
+      "nombre",
+      "nombreNormalizado",
+      "orden",
+    ]);
+  });
+
+  it("devuelve 0 cuando el repository encuentra la tabla con datos", async () => {
+    const { service } = buildSeedService(0);
+
+    expect(await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1")).toBe(0);
+  });
+});
