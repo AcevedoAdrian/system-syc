@@ -23,7 +23,7 @@ const q = (value) => String(value).replaceAll("'", "''");
 // Registros de `AuditLog` de una entidad, del más antiguo al más reciente.
 function auditRows(entityType, entityId) {
   return sql(
-    `SELECT action, coalesce("actorId", ''), payload::text FROM "AuditLog"
+    `SELECT action, coalesce("actorId", ''), payload::text FROM audit_log
      WHERE "entityType" = '${q(entityType)}' AND "entityId" = '${q(entityId)}'
      ORDER BY "createdAt", id`,
   ).map(([action, actorId, ...payload]) => ({
@@ -33,7 +33,7 @@ function auditRows(entityType, entityId) {
   }));
 }
 
-const auditCount = () => Number(scalar(`SELECT count(*) FROM "AuditLog"`));
+const auditCount = () => Number(scalar(`SELECT count(*) FROM audit_log`));
 
 async function adminId() {
   const res = await (await admin()).get("/users/me");
@@ -240,7 +240,7 @@ export default defineSpec({
         sql(`CREATE FUNCTION verify_audit_fail() RETURNS trigger AS $$
              BEGIN RAISE EXCEPTION 'auditoria bloqueada por la verificacion'; END
              $$ LANGUAGE plpgsql;
-             CREATE TRIGGER verify_audit_fail BEFORE INSERT ON "AuditLog"
+             CREATE TRIGGER verify_audit_fail BEFORE INSERT ON audit_log
              FOR EACH ROW EXECUTE FUNCTION verify_audit_fail()`);
         try {
           assertStatus(
@@ -249,7 +249,7 @@ export default defineSpec({
             "renombrar con la auditoría rota",
           );
         } finally {
-          sql(`DROP TRIGGER IF EXISTS verify_audit_fail ON "AuditLog";
+          sql(`DROP TRIGGER IF EXISTS verify_audit_fail ON audit_log;
                DROP FUNCTION IF EXISTS verify_audit_fail()`);
         }
 
@@ -304,7 +304,7 @@ export default defineSpec({
       async () => {
         const system = () =>
           sql(
-            `SELECT "entityType", action FROM "AuditLog" WHERE "actorId" IS NULL ORDER BY "entityType"`,
+            `SELECT "entityType", action FROM audit_log WHERE "actorId" IS NULL ORDER BY "entityType"`,
           );
         same(
           system(),
@@ -407,7 +407,7 @@ export default defineSpec({
       9,
       "Ningún `payload` de la base temporal contiene las claves `password`, `hash` o `token`, ni las contraseñas usadas en los criterios",
       async () => {
-        const payloads = sql(`SELECT payload::text FROM "AuditLog"`).map((row) => row.join("|"));
+        const payloads = sql(`SELECT payload::text FROM audit_log`).map((row) => row.join("|"));
         assert(payloads.length > 0, "no hay registros de auditoría que revisar");
 
         const forbiddenKeys = /password|hash|token/i;

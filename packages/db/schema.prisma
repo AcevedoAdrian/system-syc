@@ -140,6 +140,7 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId, createdAt])
+  @@map("audit_log")
 }
 
 model RateLimit {
