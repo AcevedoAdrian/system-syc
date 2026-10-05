@@ -2,29 +2,33 @@
 
 > **Status:** Approved
 > **Depends on:** SPEC 02 (autenticación y acceso)
-> **Date:** 2026-09-29
-> **Objective:** módulo `audit` reutilizable por cualquier módulo, campos de auditoría base y eliminación lógica como convención, aplicados retroactivamente a `users` y `organizations` (SPEC 02) y listos para `catalogs` y `tickets` (SPEC 04 y 05).
+> **Date:** 2026-10-05
+> **Objective:** módulo `audit` reutilizable (tabla `AuditLog`, diff, historial por entidad) y las convenciones de campos de auditoría y eliminación lógica, aplicados a `users` y `organizations` de SPEC 02 y listos para `catalogs` y `tickets` (SPEC 04 y 05).
 
 ## Por qué existe este spec
 
-El PRD exige trazabilidad (§2, "Falta de trazabilidad") y marca la auditoría como transversal (§1, §8.2). SPEC 02 ya necesita auditar altas y bajas de usuarios y departamentos; sin este spec, esas mutaciones quedan sin registro. Cubre la etapa 2 del PRD §10.
+El PRD exige trazabilidad (§2, "Falta de trazabilidad") y define la auditoría como transversal (§1, §8.2). Las mutaciones de usuarios y departamentos de SPEC 02 todavía no dejan registro (deuda declarada en sus Riesgos). Este spec cubre la etapa 2 del PRD §10.
+
+Esta versión (2026-10-05) lo ajusta al código real de SPEC 02. Los usuarios se mutan con `auth.api.*` de Better Auth, fuera de una transacción propia; no existe la eliminación de usuarios (solo el ban); y el permiso para leer un historial depende de la entidad. Los criterios que dependían de catálogos y tickets pasan a SPEC 04 y 05.
 
 ## Alcance
 
 **Dentro:**
 
-- Módulo `audit` en `apps/api/src/modules/audit`: servicio inyectable `audit.log(entityType, entityId, action, payload)`.
-- Modelo Prisma `AuditLog`.
-- Convención de campos de auditoría base (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) para todo modelo de negocio futuro.
-- Convención de eliminación lógica (helper de repository o mixin de Prisma) que los módulos de SPEC 04 y 05 reutilizan.
-- Endpoint de historial por entidad (`GET` vía oRPC) que lee `AuditLog` filtrado por `entityType` + `entityId`.
-- Retrofit: `users` y `organizations` (SPEC 02) llaman a `audit.log(...)` en cada mutación.
+- Módulo `apps/api/src/modules/audit`: `AuditModule` (exportado), `AuditService` (`log`, `history`), `AuditRepository` (única capa que toca `AuditLog`) y el helper de diff.
+- Modelo Prisma `AuditLog` + migración `auditoria`.
+- Convención de campos de auditoría base (`createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`) y de eliminación lógica (`notDeleted`, `softDeleteData`) para los modelos de negocio de SPEC 04 y 05.
+- Retrofit de SPEC 02: `users` (alta, edición con departamento, activar/desactivar, reseteo de contraseña), `organizations` (alta, renombrar, activar/desactivar, eliminar), cambio de la propia contraseña (hook de Better Auth) y seed.
+- Endpoints `users.history` y `organizations.history` (solo admin, sin UI).
+- `scripts/verify/specs/03-auditoria.mjs` para `pnpm verify`.
 
 **Fuera de alcance (para specs futuros):**
 
-- Pantalla de auditoría global para el admin (Q11: no existe en el MVP).
-- Restaurar registros eliminados o listar eliminados (Q12: no existe en el MVP).
-- Auditoría de logins, logouts o intentos fallidos (Q10: fuera de alcance).
+- Pantalla de auditoría global y UI de historial de usuarios y departamentos (Q11).
+- Restaurar o listar registros eliminados (Q12).
+- Eventos de sesión: login, logout, intentos fallidos y la revocación de sesiones como efecto secundario (Q10).
+- Las tablas internas de Better Auth `session`, `verification` y `rateLimit`, y `account` salvo el cambio de contraseña.
+- Modelos de negocio con `deletedAt` (SPEC 04 y 05) y `tickets.history` (SPEC 05).
 
 ## Modelo de datos
 
@@ -32,132 +36,155 @@ El PRD exige trazabilidad (§2, "Falta de trazabilidad") y marca la auditoría c
 // packages/db/schema.prisma (fragmento)
 model AuditLog {
   id         String   @id @default(cuid())
-  entityType String
-  entityId   String
-  actorId    String?
-  action     String   // "create" | "update" | "delete" | valores propios del módulo
+  entityType String   // nombre del modelo: "User", "Organization", "Ticket", ...
+  entityId   String   // sin FK: es polimórfico y la entidad puede ya no existir (Organization se borra físicamente)
+  actorId    String?  // null = sistema (seed)
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action     String   // "create" | "update" | "delete" | acción propia del módulo
   payload    Json
   createdAt  DateTime @default(now())
 
-  @@index([entityType, entityId])
+  @@index([entityType, entityId, createdAt])
 }
+
+// User suma solo la relación inversa (sin columnas nuevas): auditLogs AuditLog[]
 ```
 
 ```ts
 // packages/contracts/src/audit.ts (fragmento)
 export const auditEntrySchema = z.object({
   id: z.string(),
-  entityType: z.string(),
-  entityId: z.string(),
-  actorId: z.string().nullable(),
   action: z.string(),
-  payload: z.record(z.unknown()),
-  createdAt: z.string().datetime(),
+  actor: z.object({ id: z.string(), name: z.string() }).nullable(), // null = sistema
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.iso.datetime(),
 });
 
-export const auditHistoryInputSchema = z.object({
-  entityType: z.string(),
-  entityId: z.string(),
-});
+export const auditHistorySchema = z.array(auditEntrySchema);
 ```
 
 Convención del `payload` (Q10):
 
 ```ts
-// action = "create"
-{ after: { campo1: valor1, campo2: valor2, ... } }
+// action = "create"  → valores iniciales completos de la foto auditable
+{ after: { nombre: "Soporte", activo: true } }
 
-// action = "update"
-{ before: { campo1: valorAnterior }, after: { campo1: valorNuevo } } // solo campos que cambiaron
+// action = "update"  → solo los campos que cambiaron
+{ before: { nombre: "Soporte" }, after: { nombre: "Mesa de ayuda" } }
 
-// action = "delete"
-{ } // sin datos adicionales; el hecho de la acción alcanza
+// action = "delete" | "reset_password" | "change_password"  → sin datos; el hecho alcanza
+{}
 ```
+
+**Foto auditable** por entidad: es la lista explícita de campos que entran en el diff. Nada que no esté en la lista llega al `payload`.
+
+| `entityType` | Campos |
+|---|---|
+| `User` | `username`, `name`, `email`, `role`, `activo`, `departamento` (`{ id, nombre } \| null`) |
+| `Organization` | `nombre`, `activo` |
 
 ## Contrato
 
 **Feature 3.1: Módulo `audit`**
 
 - **MUST:**
-  - Servicio inyectable `audit.log(entityType, entityId, action, payload)` (ARCH), usado por cualquier módulo que mute datos.
-  - Tabla `AuditLog` con `entityType`, `entityId`, `actorId`, `action`, `payload JSONB`, `createdAt` (PRD §8.3).
-  - Toda mutación de negocio y de las tablas de Better Auth deja registro con usuario y fecha (PRD §5.1, P4).
-  - El `payload` guarda un diff: en `update`, solo los campos que cambiaron con su valor anterior y nuevo; en `create`, los valores iniciales completos (Q10).
-  - El registro se escribe en la misma transacción Prisma que la mutación: si falla la auditoría, falla la mutación completa *(propuesta técnica)*.
-  - Es append-only: el módulo no expone `update` ni `delete` sobre `AuditLog` *(propuesta técnica)*.
-  - No se auditan logins, logouts ni intentos fallidos de login (Q10).
+  - `AuditService.log({ entityType, entityId, action, actorId, payload })` escribe un registro. El `actorId` llega explícito desde el controller (`@CurrentUser()`): los services no tienen contexto de request.
+  - Mutaciones que escribimos con Prisma (`Organization`, `Member` y, desde SPEC 04, los modelos de negocio): el `AuditLog` se escribe **en la misma transacción** que la mutación. Si falla la auditoría, falla la mutación. El repository del módulo recibe la entrada de auditoría y la escribe con la función que exporta `AuditRepository` para escribir dentro de una transacción ajena.
+  - Mutaciones por `auth.api.*` de Better Auth (usuarios): el `AuditLog` se escribe **después** de que Better Auth confirma el cambio. Si esa escritura falla, se loguea el error y la request responde 500, pero el cambio ya quedó aplicado. Es la única excepción a la regla anterior.
+  - Una operación de service deja **un** registro, aunque toque varias tablas. Ejemplo: editar nombre y departamento de un agente es un solo `update` con ambos campos en el diff.
+  - Acciones: `create`, `update` y `delete`. Activar, desactivar, renombrar y cambiar de departamento son `update` con su diff. Además existen `reset_password` (el admin resetea la contraseña) y `change_password` (el usuario cambia la suya, auditado con un hook `after` de Better Auth y con el propio usuario como actor).
+  - El diff se calcula sobre la foto auditable (helper `computeDiff(before, after)`). En `update` incluye solo los campos que cambiaron.
+  - Seed: lo que el seed crea queda como `create` con `actorId: null`. Si vuelve a correr sin crear nada, no deja registros.
+  - Es append-only: el módulo no expone `update` ni `delete` sobre `AuditLog`.
   - Cualquier módulo futuro lo reutiliza sin modificar `audit` (PRD §8.2).
 - **EDGE CASES:**
-  - Una edición que no cambia ningún campo (el service detecta el diff vacío) no genera registro *(propuesta técnica)*.
-  - Acciones del seed o del sistema: `actorId` es `null`, con `action` que identifica el origen (p. ej. `"seed"`) *(propuesta técnica)*.
-- **MUST NOT:** guardar contraseñas, hashes o tokens en el `payload`, bajo ninguna acción; modelo EAV.
+  - Una edición sin cambios efectivos (mismo nombre, mismo estado `activo`, mismo departamento) no genera registro.
+  - Eliminar físicamente un departamento conserva sus registros: `entityId` no tiene FK, y el nombre queda en el `create` y en los `update` anteriores.
+- **MUST NOT:** guardar contraseñas, hashes o tokens en el `payload`, bajo ninguna acción; auditar eventos de sesión; modelo EAV.
 
 **Feature 3.2: Historial por entidad**
 
 - **MUST:**
-  - Un endpoint lee `AuditLog` filtrado por `entityType` + `entityId`, ordenado del más reciente al más antiguo.
-  - El historial de una entidad lo puede ver cualquiera que tenga permiso para ver esa entidad — para tickets, eso ya excluye a un agente de otro departamento por Feature 2.5 (Q11).
-  - No hay pantalla de auditoría global en el MVP: los cambios de usuarios y departamentos quedan auditados pero no se consultan desde la UI en esta etapa (Q11).
-- **EDGE CASES:** una entidad sin historial devuelve lista vacía, no error.
-- **MUST NOT:** una tabla de historial propia por dominio que duplique `AuditLog`.
+  - `AuditService.history(entityType, entityId)` devuelve los registros del más reciente al más antiguo (`createdAt` desc, luego `id` desc), con el actor como `{ id, name }` o `null`.
+  - Cada módulo expone su propio procedimiento de historial, con su guard: en este spec, `users.history` (`GET /users/{userId}/history`) y `organizations.history` (`GET /organizations/{organizationId}/history`), ambos con `PERMISSIONS.MANAGE`. SPEC 05 agrega `tickets.history` con su filtro por departamento (Q11).
+  - No hay UI de historial en este spec (Q11).
+- **EDGE CASES:** un id sin registros devuelve `[]`, no error. El historial de un departamento ya eliminado se sigue leyendo.
+- **MUST NOT:** un `audit.history` genérico con permiso dinámico por `entityType`; una tabla de historial propia por dominio que duplique `AuditLog`.
 
 **Feature 3.3: Campos de auditoría base**
 
 - **MUST:**
-  - `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt` en todo modelo de negocio: catálogos (SPEC 04), `Ticket`, `TicketComentario` (SPEC 05) (PRD §8.3).
-  - Los carga el backend desde `@CurrentUser()`, nunca desde el payload que manda el cliente.
-- **MUST NOT:** agregar estas columnas a las tablas de Better Auth — sus cambios se cubren con `audit`, no con columnas propias (P4). `Organization.activo` (SPEC 02) no es una de estas columnas y no aplica esta regla.
+  - `createdAt`, `updatedAt`, `createdBy`, `updatedBy` y `deletedAt` en todo modelo de negocio: catálogos (SPEC 04), `Ticket` (SPEC 05) y `TicketComentario` (SPEC 06, sin `updated*` porque es inmutable) (PRD §8.3).
+  - `createdBy` y `updatedBy` son FK reales a `User`. Los usuarios nunca se borran físicamente.
+  - El backend los carga desde `@CurrentUser()`, nunca desde el payload del cliente. En el alta, `updatedBy = createdBy`.
+- **MUST NOT:** agregar estas columnas a las tablas de Better Auth: sus cambios se cubren con `audit` (P4). `Organization.activo` no es una de estas columnas.
 
 **Feature 3.4: Eliminación lógica**
 
 - **MUST:**
-  - Eliminar un registro de negocio setea `deletedAt`; nunca hay `DELETE` físico sobre modelos de negocio (PRD §5.1). (`Organization`, gestionada por Better Auth, sigue la regla propia de SPEC 02 Feature 2.3 — puede eliminarse físicamente solo sin historia.)
-  - Toda consulta de listado o detalle excluye `deletedAt IS NOT NULL` por defecto (helper de repository compartido).
-  - La eliminación queda auditada con `action: "delete"`.
-  - Desactivar (`activo = false`) y eliminar (`deletedAt`) son mecanismos distintos: desactivar es reversible y solo oculta de selectores; eliminar es lógico, no reversible desde la UI, y el registro eliminado sigue existiendo para que el historial y las referencias ya cargadas (por ejemplo, un ticket que ya eligió ese ítem de catálogo) lo sigan mostrando (Q13).
-  - Eliminar un ítem que está en uso (un catálogo referenciado por al menos un ticket no eliminado, o un departamento con agentes o tickets según SPEC 02) se rechaza con 409 (Q13).
-- **EDGE CASES:**
-  - Eliminar algo ya eliminado devuelve 404 *(propuesta técnica)*.
-  - Un ticket ya cargado sigue mostrando el nombre de un catálogo eliminado después (no se rompe la referencia ni se oculta el dato histórico).
-- **MUST NOT:** borrado físico de modelos de negocio; cascadas físicas; restaurar o listar eliminados desde la UI (Q12, fuera del MVP).
+  - Eliminar un registro de negocio setea `deletedAt` (y `updatedBy`) con `softDeleteData(actorId)`. Nunca hay `DELETE` físico sobre modelos de negocio (PRD §5.1). `Organization` sigue su propia regla (SPEC 02 Feature 2.3): se borra físicamente, solo si no está en uso.
+  - Todo listado y todo detalle filtra con la constante `notDeleted` (`{ deletedAt: null }`), escrita en el `where` de cada repository. Los `include` de una referencia ya cargada no filtran: un ticket sigue mostrando el ítem de catálogo eliminado.
+  - La eliminación se audita con `action: "delete"` en la misma transacción.
+  - Desactivar (`activo = false`) y eliminar (`deletedAt`) son mecanismos distintos (Q13). Desactivar es reversible y solo oculta el ítem de los selectores. Eliminar no se revierte desde la UI, y el registro sigue existiendo para el historial y las referencias.
+  - Eliminar un ítem en uso se rechaza con 409 (Q13). La regla concreta la aplica cada spec: SPEC 04 para catálogos, SPEC 02/05 para departamentos.
+- **EDGE CASES:** eliminar algo ya eliminado devuelve 404.
+- **MUST NOT:** borrado físico de modelos de negocio; cascadas físicas; una extensión de Prisma que filtre `deletedAt` sin que se vea; restaurar o listar eliminados (Q12).
 
 ## Plan de implementación
 
-1. Modelo `AuditLog` en `schema.prisma` + migración. Verificar: `prisma migrate dev` aplica limpio.
-2. `AuditModule` con `AuditService.log(...)` en `apps/api/src/modules/audit`. Verificar: un test unitario llama a `log` y lee el registro creado.
-3. Helper de repository para el diff en `update` (compara el objeto antes/después y arma el `payload`) y para el filtro `deletedAt: null` en listados. Verificar: un test unitario con dos objetos produce el diff esperado; un tercero sin cambios no genera diff.
-4. `packages/contracts/src/audit.ts` con los esquemas de la sección Modelo de datos. Verificar: `pnpm --filter @syc/contracts typecheck` pasa.
-5. Endpoint de historial (`audit.history`) vía oRPC, con el guard de permisos de la entidad consultada. Verificar: un agente de otro departamento pidiendo el historial de un ticket ajeno recibe 403 (una vez que exista `tickets` en SPEC 05; hasta entonces, probarlo contra `users`/`organizations`).
-6. Retrofit de SPEC 02: `users.service.ts` y `organizations.service.ts` llaman a `audit.log(...)` en cada alta, edición, ban/unban, reseteo y eliminación. Verificar: dar de alta un usuario deja un `AuditLog` con `action: "create"`.
-7. Tests Vitest: `audit.service.spec.ts` (transacción, payload, `actorId` nulo del seed). Verificar: `pnpm --filter @syc/api test` pasa.
+1. `AuditLog` y la relación inversa en `User` dentro de `schema.prisma`, más la migración `auditoria`. Verificar: `prisma migrate dev` aplica limpio y `pnpm --filter @syc/db generate` pasa.
+2. Módulo `modules/audit`: `audit.module.ts`, `audit.service.ts` (`log`, `history`), `audit.repository.ts` (escritura propia, escritura dentro de una transacción ajena, lectura del historial con el actor) y `audit-diff.ts` (`computeDiff`). Verificar: `audit-diff.spec.ts` (un cambio da el diff esperado; sin cambios da `null`; un campo fuera de la foto no aparece) y `audit.service.spec.ts` pasan.
+3. `src/common/soft-delete.ts` con `notDeleted` y `softDeleteData`. Verificar: un test unitario pasa.
+4. Retrofit de `organizations`: los métodos de mutación del repository reciben la entrada de auditoría y la escriben en el mismo `$transaction`; el service arma la foto, el diff y omite lo que no cambia; el controller pasa el actor. Verificar: `organizations.service.spec.ts` actualizado (renombrar al mismo nombre no audita) pasa.
+5. Retrofit de `users`: el service arma la foto antes y después, y llama a `AuditService.log` cuando `auth.api.*` y `setMembership` terminan bien (`create`, un solo `update` por edición, `update` de `activo`, `reset_password`). Verificar: `users.service.spec.ts` actualizado pasa.
+6. `change_password`: `createAuth(env, { onPasswordChanged })` registra un hook `after` sobre `/change-password` que audita cuando la respuesta es exitosa; `AuthModule` lo cablea a `AuditService`. Verificar: test del hook pasa.
+7. Seed: audita como `create` (actor `null`) el admin y cada departamento que efectivamente crea. Verificar: correrlo dos veces sobre una base vacía deja 5 registros, no 10.
+8. Contratos: `packages/contracts/src/audit.ts`, más `history` en `usersContract` y `organizationsContract`, implementados en sus controllers. Verificar: `pnpm typecheck` pasa (el `@Implement` completo marca lo que falta).
+9. `scripts/verify/specs/03-auditoria.mjs` (agregado a `specs/index.mjs`). Actualizar `CLAUDE.md` (estado del repo), `apps/api/CLAUDE.md` (reglas de auditoría y soft delete) y la firma de `audit.log` en `docs/architecture.md`. Verificar: `pnpm verify --spec 03` pasa.
 
 ## Criterios de aceptación
 
-- [ ] Crear, editar y eliminar un usuario o un departamento (SPEC 02) deja un `AuditLog` correspondiente.
-- [ ] El `payload` de una edición contiene solo los campos que cambiaron, con valor anterior y nuevo.
-- [ ] Una edición sin cambios efectivos no genera un nuevo `AuditLog`.
-- [ ] Eliminar un ítem de catálogo en uso (una vez que exista SPEC 04) devuelve 409.
-- [ ] Un ticket con un catálogo eliminado después sigue mostrando ese valor en su detalle e historial (una vez que exista SPEC 05).
-- [ ] Ningún `payload` en la tabla contiene una contraseña, hash o token, verificado por inspección manual tras correr los tests de SPEC 02.
+- [ ] Crear, renombrar, desactivar, reactivar y eliminar un departamento deja, en cada paso, un `AuditLog` con `entityType: "Organization"`, el admin como actor y la acción y el `payload` de la convención.
+- [ ] Crear un usuario, editarlo (nombre, rol y departamento a la vez), desactivarlo, reactivarlo y resetearle la contraseña deja, respectivamente, `create`, **un** `update`, `update`, `update` y `reset_password`.
+- [ ] Renombrar "Soporte" a "Mesa de ayuda" deja exactamente `{ before: { nombre: "Soporte" }, after: { nombre: "Mesa de ayuda" } }`.
+- [ ] Una edición sin cambios efectivos (mismo nombre o mismo estado `activo`) no genera `AuditLog`.
+- [ ] Con un trigger temporal que hace fallar el `INSERT` en `AuditLog`, renombrar un departamento devuelve 500 y el nombre no cambia.
+- [ ] Cambiar la propia contraseña deja `change_password` con el propio usuario como actor; login y logout no dejan registro.
+- [ ] Correr el seed sobre una base vacía deja 5 `create` con `actorId: null` (admin y 4 departamentos); correrlo otra vez no agrega registros.
+- [ ] `users.history` y `organizations.history` devuelven al admin los registros del más reciente al más antiguo, con el actor `{ id, name }`; un agente recibe 403; un id sin registros devuelve `[]`.
+- [ ] Ningún `payload` de la base temporal contiene las claves `password`, `hash` o `token`, ni las contraseñas usadas en los criterios.
 - [ ] `pnpm turbo lint typecheck test build` termina con código 0.
+
+Los criterios que necesitan catálogos y tickets están en SPEC 04 (ítem en uso → 409) y SPEC 05 (un ticket sigue mostrando un catálogo eliminado).
 
 ## Decisiones
 
-- **Sí:** `payload` como diff, no snapshot completo. Es más liviano y más legible en el historial (Q10).
-- **Sí:** sin pantalla de auditoría global ni auditoría de sesión en el MVP (Q11, Q10). Se puede agregar en una fase futura sin romper el modelo actual.
-- **Sí:** sin restaurar ni listar eliminados (Q12). El dato queda en la base por trazabilidad, no por recuperación operativa.
-- **No:** EAV para el `payload`. Es JSONB libre por registro, no una tabla de valores.
+- **Sí:** `payload` como diff y no como snapshot completo: es más liviano y más legible (Q10).
+- **Sí:** atomicidad mixta. Las mutaciones por Prisma propio auditan en la misma transacción; las de Better Auth auditan después, con 500 si falla. Descartado: reescribir el ABM de usuarios con Prisma (reabre SPEC 02 y obliga a hashear contraseñas y cerrar sesiones a mano). Descartado: los `databaseHooks` de Better Auth (tampoco comparten transacción y el actor sale de un contexto implícito).
+- **Sí:** acciones genéricas (`create`/`update`/`delete`) más `reset_password` y `change_password`. Activar, desactivar y cambiar de departamento son `update` con diff. Descartado: una acción por operación (más vocabulario, y SPEC 05 tendría que seguirlo).
+- **Sí:** auditar `change_password`. Es un cambio de credencial, no un evento de sesión.
+- **Sí:** lo que crea el seed es `create` con `actorId: null` (null = sistema). Descartado: `action: "seed"`, que mezclaba el origen con la acción.
+- **Sí:** un endpoint de historial por módulo, cada uno con su guard. Descartado: `audit.history` genérico con un registro de permisos por `entityType` (guard dinámico, se aparta de `@RequirePermission`).
+- **Sí:** `notDeleted` explícito en cada `where`. Descartado: una extensión de Prisma que filtre sola (oculta el caso del catálogo eliminado que hay que seguir mostrando).
+- **Sí:** `actorId`, `createdBy` y `updatedBy` como FK reales a `User`; `entityId` sin FK porque es polimórfico.
+- **Sí:** `AuditService.log` recibe `actorId` explícito. Difiere de la firma de `docs/architecture.md`, que no lo incluía; se descarta un contexto de request implícito (CLS).
+- **Sí:** foto auditable con lista explícita de campos por entidad: un campo sensible no puede colarse en el `payload` por accidente.
+- **Sí:** el departamento entra al diff como `{ id, nombre }`, porque el nombre puede cambiar o el departamento borrarse.
+- **Sí:** sin pantalla global, sin auditoría de sesión y sin restaurar eliminados (Q10, Q11, Q12).
+- **No:** EAV para el `payload`. Es JSONB libre por registro.
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
-| Si un módulo de negocio olvida llamar a `audit.log(...)`, la mutación queda sin trazar sin que falle nada. | El helper de repository compartido (paso 3) envuelve `create`/`update`/`delete` y llama a `audit` automáticamente, para que no dependa de que cada módulo lo recuerde. |
-| El `payload` como diff puede crecer si un campo es un objeto grande (poco probable en este dominio). | No aplica en el MVP: los modelos de negocio tienen campos escalares. Revisar si se agrega un campo JSONB de negocio más adelante. |
+| Un módulo nuevo olvida auditar una mutación y no falla nada. | La regla queda en `apps/api/CLAUDE.md` y cada spec con mutaciones incluye en su `pnpm verify` un criterio que lee `AuditLog`. |
+| En un usuario, el cambio de Better Auth se aplica y la escritura del `AuditLog` falla: el cambio queda sin rastro. | La request responde 500 y el error queda logueado. Es poco probable, porque es la misma base y la misma conexión. Excepción declarada en Feature 3.1. |
+| El hook `after` de Better Auth (`change_password`) depende de su API interna. | La versión está fijada (1.7.7) y hay un test del hook. |
+| El `payload` como diff puede crecer si un campo es un objeto grande. | No aplica en el MVP (campos escalares). Revisarlo si aparece un campo JSONB de negocio. |
 
 ## Qué **no** está en este spec
 
-- Pantalla de auditoría global (Q11).
+- Pantalla de auditoría global ni UI de historial de usuarios y departamentos (Q11).
 - Restaurar o listar eliminados (Q12).
 - Auditoría de eventos de sesión (Q10).
-- Catálogos y tickets en sí (SPEC 04 y 05); aquí solo se deja la convención que usan.
+- Catálogos y tickets en sí, y `tickets.history` (SPEC 04 y 05). Aquí solo queda la convención que usan.

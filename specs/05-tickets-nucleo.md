@@ -71,6 +71,8 @@ model TicketSequence {
 }
 ```
 
+Nota: `createdBy` y `updatedBy` son FK reales a `User` (SPEC 03 Feature 3.3), no `String` sueltos; el fragmento de arriba los muestra simplificados.
+
 Nota: `TicketSequence` es una fila única con lock (`SELECT ... FOR UPDATE`) o, alternativamente, una secuencia nativa de Postgres (`CREATE SEQUENCE`); la elección exacta se resuelve en el paso de implementación, ambas cumplen "atómica, sin repetición, con huecos tolerados" (Q21).
 
 ```ts
@@ -235,6 +237,7 @@ Convenciones:
 - [ ] Dos ediciones simultáneas sobre el mismo ticket: la segunda devuelve 409 por `updatedAt` desactualizado.
 - [ ] Un agente que intenta eliminar un ticket, o cambiarle el departamento, recibe 403 en ambos casos.
 - [ ] Un ticket eliminado no aparece en ningún listado, pero su historial sigue existiendo en `AuditLog`.
+- [ ] Un ticket cuyo ítem de catálogo se elimina después sigue mostrando ese valor en su detalle e historial (SPEC 03 Feature 3.4).
 - [ ] `pnpm turbo lint typecheck test build` termina con código 0.
 
 ## Decisiones

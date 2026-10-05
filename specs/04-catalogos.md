@@ -77,6 +77,8 @@ model EstadoTicket {
 }
 ```
 
+Nota: `createdBy` y `updatedBy` son FK reales a `User` (SPEC 03 Feature 3.3), no `String` sueltos; el fragmento de arriba los muestra simplificados.
+
 Nota de implementación: el `@@unique` de Prisma no soporta nativamente "único solo entre los no eliminados" — se implementa como índice único parcial en la migración SQL (`CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`), tal como ya prevé PRD §8.3 para `referenciaExterna`.
 
 ```ts
@@ -170,6 +172,7 @@ export const estadoTicketInputSchema = z.object({
 - [ ] El admin crea, edita, reordena, desactiva, reactiva y elimina un ítem en cada uno de los 7 catálogos desde la UI, sin deploy.
 - [ ] Crear "Área" y "área" en el mismo catálogo: el segundo devuelve 409.
 - [ ] Eliminar un ítem y volver a crear uno con el mismo nombre: funciona.
+- [ ] Eliminar un ítem de catálogo usado por al menos un ticket no eliminado devuelve 409 (se verifica cuando exista SPEC 05; antes, sin tickets, la eliminación siempre procede) (SPEC 03 Feature 3.4).
 - [ ] Intentar eliminar "Finalizado", "Cerrado", "Cancelado" o "Reabierto": siempre 409, esté o no en uso.
 - [ ] Desactivar o eliminar el único estado activo restante: 409.
 - [ ] Un Proveedor con solo el nombre cargado se guarda correctamente; con un correo o sitio web mal formados, se rechaza.
