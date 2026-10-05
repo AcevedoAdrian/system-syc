@@ -1,0 +1,34 @@
+meta {
+  name: catalogs.list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Lista los ítems de un catálogo, activos e inactivos, sin los eliminados, ordenados por `orden`.
+  Cualquier usuario con sesión (admin o agente): los formularios y filtros la necesitan.
+
+  Contrato: `catalogs.<catálogo>.list` en `packages/contracts`.
+  Método: GET
+  Ruta: /catalogs/{catálogo}
+
+  Respuesta 200: arreglo de { id, nombre, orden, activo }. Proveedores suma contacto, telefono,
+  correo y sitioWeb; Estados suma clave (`FINALIZADO` | `CERRADO` | `CANCELADO` | `REABIERTO` | null).
+  Errores: 401 sin sesión.
+}

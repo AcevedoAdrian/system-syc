@@ -1,0 +1,42 @@
+meta {
+  name: catalogs.move
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}/:itemId/move
+  body: json
+  auth: inherit
+}
+
+params:path {
+  itemId: {{catalogItemId}}
+}
+
+body:json {
+  {
+    "direccion": "subir"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Sube o baja un ítem una posición, intercambiándolo con su vecino. Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.move` en `packages/contracts`.
+  Método: POST
+  Ruta: /catalogs/{catálogo}/{itemId}/move
+  Cuerpo: direccion (`subir` | `bajar`).
+
+  Usa `catalogItemId`. En un extremo responde 200 sin cambios. No devuelve cuerpo.
+  Errores: 403 si no es admin; 404 inexistente o eliminado.
+}

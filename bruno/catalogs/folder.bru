@@ -1,0 +1,16 @@
+meta {
+  name: catalogs
+  seq: 6
+}
+
+docs {
+  Los 7 catálogos (areas, edificios, tipos, prioridades, modulos, proveedores, estados) tienen los
+  mismos procedimientos. Para cambiar de catálogo se edita la variable `catalog` del entorno `local`.
+
+  `catalogs.create` guarda el id en `catalogItemId`, que usan las demás peticiones.
+  Los cuerpos de ejemplo son los de un catálogo simple (solo `nombre`); en `proveedores` se suman
+  `contacto`, `telefono`, `correo` y `sitioWeb`.
+
+  Para ver el 403 de un agente: iniciar sesión con un agente (`auth.signIn` con sus datos) y repetir
+  `catalogs.create` (403) y `catalogs.list` (200).
+}

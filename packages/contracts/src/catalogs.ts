@@ -85,9 +85,9 @@ export type SetCatalogItemActiveInput = z.infer<typeof setCatalogItemActiveInput
 
 // Los 7 procedimientos de un catálogo. Cada catálogo valida con su propio esquema: Áreas nunca
 // acepta los campos de Proveedor.
-const catalogContract = <TInput extends z.ZodObject, TItem extends z.ZodType>(
+const catalogContract = <TShape extends z.ZodRawShape, TItem extends z.ZodType>(
   ruta: CatalogRuta,
-  inputSchema: TInput,
+  inputSchema: z.ZodObject<TShape>,
   itemSchema: TItem,
 ) => ({
   list: oc.route({ method: "GET", path: `/catalogs/${ruta}` }).output(z.array(itemSchema)),

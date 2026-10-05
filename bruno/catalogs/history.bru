@@ -1,0 +1,37 @@
+meta {
+  name: catalogs.history
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}/:itemId/history
+  body: none
+  auth: inherit
+}
+
+params:path {
+  itemId: {{catalogItemId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Historial de auditoría de un ítem, del más reciente al más antiguo. Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.history` en `packages/contracts`.
+  Método: GET
+  Ruta: /catalogs/{catálogo}/{itemId}/history
+
+  Usa `catalogItemId`. Un id sin registros devuelve []; el de un ítem eliminado se sigue leyendo.
+  Respuesta 200: arreglo de { id, action, actor, payload, createdAt }.
+  Errores: 403 si no es admin.
+}

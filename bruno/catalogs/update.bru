@@ -1,0 +1,42 @@
+meta {
+  name: catalogs.update
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}/:itemId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  itemId: {{catalogItemId}}
+}
+
+body:json {
+  {
+    "nombre": "Ítem de prueba (renombrado)"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Edita un ítem: reemplaza todos los campos editables. Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.update` en `packages/contracts`.
+  Método: PATCH
+  Ruta: /catalogs/{catálogo}/{itemId}
+  Cuerpo: nombre. Proveedores suma contacto, telefono, correo y sitioWeb: lo que va en blanco se borra.
+
+  Usa `catalogItemId` (lo guarda `catalogs.create`). Sin cambios efectivos responde 200 y no audita.
+  Errores: 400 validación; 403 si no es admin; 404 inexistente o eliminado; 409 si el nombre ya existe.
+}

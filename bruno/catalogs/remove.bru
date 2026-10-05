@@ -1,0 +1,36 @@
+meta {
+  name: catalogs.remove
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}/:itemId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  itemId: {{catalogItemId}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Elimina un ítem (eliminación lógica). Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.remove` en `packages/contracts`.
+  Método: DELETE
+  Ruta: /catalogs/{catálogo}/{itemId}
+
+  Usa `catalogItemId`. No devuelve cuerpo. El nombre queda libre para otro ítem.
+  Errores: 403 si no es admin; 404 inexistente o ya eliminado; 409 si es un estado de sistema (con
+  clave) o el último estado o la última prioridad activa.
+}

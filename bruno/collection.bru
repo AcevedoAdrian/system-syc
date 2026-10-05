@@ -19,4 +19,7 @@ docs {
   Orden de uso: `auth.signIn` primero (la cookie de sesión queda en el cookie jar de Bruno),
   luego `organizations.list` (guarda `organizationId`) y `users.create` (guarda `userId`).
   `organizations.create` guarda `newOrganizationId`, que usan rename, setActive y remove.
+
+  Catálogos: `catalogs.create` guarda `catalogItemId` para las demás peticiones de `catalogs`; el
+  catálogo se elige con la variable `catalog` del entorno `local` (por defecto `areas`).
 }

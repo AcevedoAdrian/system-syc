@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import type { AnyContractRouter, InferContractRouterInputs } from "@orpc/contract";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   catalogItemInputSchema,
   catalogRutas,
@@ -93,5 +94,20 @@ describe("catalogItemInputSchema", () => {
 describe("catalogsContract", () => {
   it("tiene un contrato por cada ruta, en el orden de las pestañas", () => {
     expect(Object.keys(catalogsContract)).toEqual([...catalogRutas]);
+  });
+});
+
+describe("tipos del contrato", () => {
+  // `tsc` es quien verifica estas aserciones: si el genérico de `catalogContract` pierde la forma
+  // de la entrada, `update` queda como `Record<string, unknown>` y el controller no compila.
+  it("la entrada de update conserva los campos de cada catálogo", () => {
+    type Inputs<T extends AnyContractRouter> = InferContractRouterInputs<T>;
+
+    expectTypeOf<Inputs<typeof catalogsContract.areas.update>>().toEqualTypeOf<{
+      nombre: string;
+      itemId: string;
+    }>();
+    expectTypeOf<Inputs<typeof catalogsContract.proveedores.update>>().toHaveProperty("itemId");
+    expectTypeOf<Inputs<typeof catalogsContract.proveedores.update>>().toHaveProperty("correo");
   });
 });

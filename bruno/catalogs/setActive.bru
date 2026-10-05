@@ -1,0 +1,43 @@
+meta {
+  name: catalogs.setActive
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}/:itemId/active
+  body: json
+  auth: inherit
+}
+
+params:path {
+  itemId: {{catalogItemId}}
+}
+
+body:json {
+  {
+    "activo": false
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Activa o desactiva un ítem. Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.setActive` en `packages/contracts`.
+  Método: POST
+  Ruta: /catalogs/{catálogo}/{itemId}/active
+  Cuerpo: activo (`true` | `false`).
+
+  Usa `catalogItemId`. Un ítem desactivado sigue en `list` (con activo: false) pero sale de los selectores.
+  Errores: 403 si no es admin; 404 inexistente o eliminado; 409 si es el último estado o la última
+  prioridad activa.
+}

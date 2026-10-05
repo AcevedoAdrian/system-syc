@@ -1,0 +1,44 @@
+meta {
+  name: catalogs.create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}:{{port}}/catalogs/{{catalog}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "nombre": "Ítem de prueba"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("catalogItemId", res.body.id);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Crea un ítem. Solo admin (permiso `manage`).
+
+  Contrato: `catalogs.<catálogo>.create` en `packages/contracts`.
+  Método: POST
+  Ruta: /catalogs/{catálogo}
+  Cuerpo: nombre (1 a 120 caracteres). Proveedores suma contacto, telefono, correo y sitioWeb,
+  todos opcionales; en blanco se guardan como null.
+
+  El ítem nace activo y al final del orden. Guarda el id en `catalogItemId`.
+  Errores: 400 validación; 403 si no es admin; 409 si el nombre ya existe en ese catálogo.
+}
