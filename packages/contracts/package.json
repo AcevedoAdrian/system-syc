@@ -8,13 +8,15 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@orpc/contract": "1.15.4",
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@syc/config": "workspace:*"
+    "@syc/config": "workspace:*",
+    "vitest": "5.0.1"
   }
 }
