@@ -5,21 +5,10 @@ import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { RequirePermission } from "../../common/decorators/require-permission.decorator";
 import { PERMISSIONS } from "../../common/permissions";
-import {
-  TicketCreateDepartmentResolver,
-  TicketDepartmentResolver,
-} from "./ticket-department.resolver";
+import { ownTicket, TicketCreateDepartmentResolver } from "./ticket-department.resolver";
 import { TicketsService } from "./tickets.service";
 
 const c = contract.tickets;
-
-// Un ticket de otro departamento y uno que no existe son indistinguibles para un agente: 404 en los dos
-// casos (Feature 5.8). El admin no pasa por el resolver; su 404 lo da el service.
-const ownTicket = {
-  departmentFrom: TicketDepartmentResolver,
-  outOfScope: "not-found",
-  notFoundMessage: "El ticket no existe",
-} as const;
 
 // Un método por procedimiento, porque cada uno declara su propio permiso en el guard. El
 // `ticketsProcedures` de abajo hace que el compilador marque un procedimiento del contrato sin método.

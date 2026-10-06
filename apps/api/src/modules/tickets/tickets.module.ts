@@ -1,6 +1,9 @@
 import { Global, Module } from "@nestjs/common";
 import { TICKET_USAGE_READER } from "../../common/ticket-usage-reader";
 import { AuditModule } from "../audit/audit.module";
+import { CommentsController } from "./comments.controller";
+import { CommentsRepository } from "./comments.repository";
+import { CommentsService } from "./comments.service";
 import {
   TicketCreateDepartmentResolver,
   TicketDepartmentResolver,
@@ -15,10 +18,12 @@ import { TicketsService } from "./tickets.service";
 @Global()
 @Module({
   imports: [AuditModule],
-  controllers: [TicketsController],
+  controllers: [TicketsController, CommentsController],
   providers: [
     TicketsService,
     TicketsRepository,
+    CommentsService,
+    CommentsRepository,
     TicketDepartmentResolver,
     TicketCreateDepartmentResolver,
     { provide: TICKET_USAGE_READER, useExisting: TicketsRepository },

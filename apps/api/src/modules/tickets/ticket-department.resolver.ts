@@ -15,6 +15,15 @@ export class TicketDepartmentResolver implements DepartmentResolver {
   }
 }
 
+// Un ticket de otro departamento y uno que no existe son indistinguibles para un agente: 404 en los dos
+// casos (SPEC 05, Feature 5.8). El admin no pasa por el resolver; su 404 lo da el service. Lo usan los
+// endpoints de un ticket existente: `tickets.*` y `comments.*`.
+export const ownTicket = {
+  departmentFrom: TicketDepartmentResolver,
+  outOfScope: "not-found",
+  notFoundMessage: "El ticket no existe",
+} as const;
+
 // Departamento del ticket que se va a crear: el que viene en el cuerpo. Un agente solo puede crear en
 // el suyo; si manda otro, o ninguno, el guard responde 403 (un payload manipulado no revela nada).
 @Injectable()
