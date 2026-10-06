@@ -52,6 +52,30 @@ export interface TicketCreateData {
   fechaRecepcion: string;
 }
 
+// Lo que el service decide escribir en la edición: reemplaza todos los campos editables (las fechas
+// como "YYYY-MM-DD" o `null`). No incluye estado ni departamento: tienen su propio procedimiento.
+export interface TicketUpdateData {
+  titulo: string;
+  descripcion: string | null;
+  actuacionSimple: string | null;
+  prioridadId: string;
+  areaId: string | null;
+  edificioId: string | null;
+  tipoId: string | null;
+  moduloId: string | null;
+  proveedorId: string | null;
+  referenciaExterna: string | null;
+  fechaRecepcion: string;
+  fechaCierre: string | null;
+  fechaReabierto: string | null;
+  solucionDescripcion: string | null;
+  notificado: boolean;
+}
+
+// Bloqueo optimista (Q22): la versión que el cliente leyó ya no es la de la base.
+export const STALE_TICKET_MESSAGE =
+  "Otro usuario modificó este ticket. Recargá para ver los cambios.";
+
 const ref = { select: { id: true, nombre: true } } as const;
 const user = { select: { id: true, name: true } } as const;
 
@@ -294,6 +318,43 @@ export class TicketsRepository {
         const row = toRow(created);
         await writeAuditEntry(tx, { ...auditOf(row), entityId: row.id });
         return row;
+      });
+    } catch (error) {
+      return translate(error);
+    }
+  }
+
+  // Bloqueo optimista: la escritura exige que `updatedAt` siga siendo el que el cliente leyó. Si no
+  // actualiza ninguna fila, o lo modificó otro (409) o ya no existe (404), y no se guarda nada. La
+  // edición y su `AuditLog` van en la misma transacción.
+  async update(
+    id: string,
+    expectedUpdatedAt: string,
+    data: TicketUpdateData,
+    actorId: string,
+    audit: AuditEntry,
+  ): Promise<TicketRow> {
+    try {
+      return await this.db.$transaction(async (tx) => {
+        const { count } = await tx.ticket.updateMany({
+          where: { id, updatedAt: new Date(expectedUpdatedAt), ...notDeleted },
+          data: {
+            ...data,
+            fechaRecepcion: toDate(data.fechaRecepcion),
+            fechaCierre: data.fechaCierre && toDate(data.fechaCierre),
+            fechaReabierto: data.fechaReabierto && toDate(data.fechaReabierto),
+            updatedBy: actorId,
+          },
+        });
+        if (count === 0) {
+          const exists = (await tx.ticket.count({ where: { id, ...notDeleted } })) > 0;
+          throw exists
+            ? new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE })
+            : new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
+        }
+        const row = await tx.ticket.findFirstOrThrow({ where: { id }, select: detailSelect });
+        await writeAuditEntry(tx, audit);
+        return toRow(row);
       });
     } catch (error) {
       return translate(error);
