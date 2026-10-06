@@ -1,0 +1,51 @@
+meta {
+  name: comments.create
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/comments
+  body: json
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+body:json {
+  {
+    "texto": "Llamé al proveedor y quedó en responder hoy."
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("commentId", res.body.id);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Agrega un comentario al ticket. El autor es el usuario de la sesión.
+
+  Contrato: `comments.create` en `packages/contracts`.
+  Método: POST
+  Ruta: /tickets/{ticketId}/comments
+  Cuerpo: texto (obligatorio; se recorta y debe tener entre 1 y 2000 caracteres).
+
+  Se puede comentar también con el ticket en un estado de cierre. No modifica el ticket: su
+  `updatedAt` y su `updatedBy` quedan como estaban. Deja un `comment_create` en el historial del
+  ticket, sin el texto.
+  Guarda `commentId`.
+  Errores: 400 si el texto queda vacío o pasa de 2000 caracteres; 401 sin sesión; 404 para un agente
+  si el ticket es de otro departamento, no existe o fue eliminado; 404 para el admin si no existe.
+}

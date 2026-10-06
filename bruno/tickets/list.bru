@@ -10,9 +10,25 @@ get {
   auth: inherit
 }
 
+params:query {
+  ~q: impresora
+  ~page: 2
+  ~estadoId: {{listedItemId}}
+  ~areaId:
+  ~edificioId:
+  ~tipoId:
+  ~prioridadId:
+  ~proveedorId:
+  ~moduloId:
+  ~departamentoId: {{organizationId}}
+  ~fechaRecepcionDesde: 2026-10-01
+  ~fechaRecepcionHasta: 2026-10-31
+}
+
 assert {
   res.status: eq 200
-  res.body: isArray
+  res.body.items: isArray
+  res.body.pageSize: eq 20
 }
 
 settings {
@@ -21,13 +37,30 @@ settings {
 }
 
 docs {
-  Lista mínima: los 50 tickets más recientes por número, sin filtros ni paginación (la bandeja
-  completa es de SPEC 06). Un agente ve solo los de su departamento; el admin, los de todos.
+  La bandeja: una página de 20 tickets con búsqueda y filtros. Sin parámetros, la página 1 de todos
+  los tickets del alcance del usuario. Los parámetros de la petición están desactivados (`~`);
+  activá los que quieras probar.
 
   Contrato: `tickets.list` en `packages/contracts`.
   Método: GET
   Ruta: /tickets
 
-  Respuesta 200: arreglo de { id, numero, titulo, departamento, estado, prioridad, fechaRecepcion }.
-  Errores: 401 sin sesión.
+  Parámetros (todos opcionales, en la query string; se combinan con AND):
+  - `q`: texto libre, sin distinguir mayúsculas ni acentos ("tecnico" encuentra "Técnico"). Es
+    "contiene" sobre título, descripción, solución y comentarios del ticket (no sobre catálogos, número
+    ni historial). Hasta 200 caracteres; en blanco equivale a no buscar.
+  - `estadoId`, `areaId`, `edificioId`, `tipoId`, `prioridadId`, `proveedorId`, `moduloId`: igualdad.
+    Un ítem de catálogo inactivo o eliminado se puede filtrar; un id que no existe da una página vacía.
+  - `departamentoId`: igualdad, pero solo la aplica el admin. Un agente que lo manda lo ve ignorado:
+    su departamento siempre gana.
+  - `fechaRecepcionDesde`, `fechaRecepcionHasta`: `YYYY-MM-DD`, los dos inclusive.
+  - `page`: número entero desde 1 (default 1).
+
+  Orden fijo: fecha de recepción descendente y, si empata, número descendente.
+
+  Respuesta 200: { items, total, page, pageSize }. `items` es un arreglo de { id, numero, titulo,
+  departamento, estado, prioridad, area, fechaRecepcion }; `total` cuenta todos los que cumplen los
+  filtros, no solo los de la página. Una página posterior a la última devuelve `items: []`.
+  Errores: 400 si `fechaRecepcionDesde` es posterior a `fechaRecepcionHasta`, o `page` no es un
+  entero mayor o igual a 1; 401 sin sesión.
 }

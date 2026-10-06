@@ -26,7 +26,7 @@ Cuatro respuestas del catálogo, tomadas juntas, se contradecían entre sí o co
 |---|---|---|---|
 | D1 | Sin casilla `cerrado`, las reglas de `fechaCierre`/`fechaReabierto` dependerían del *nombre* del estado, pero el admin puede renombrar estados (Q18). | Los 4 estados de sistema (Finalizado, Cerrado, Cancelado, Reabierto) llevan una `clave` interna fija, invisible para el admin. Las reglas usan la `clave`, no el nombre. Esos estados no se pueden eliminar. | SPEC 04 Feature 4.3, SPEC 05 Feature 5.4 |
 | D2 | Eliminar un departamento borra físicamente `Organization` (Q5), pero un ticket eliminado lógicamente (Q12) puede seguir apuntando a él por FK. | Un departamento solo se elimina si nunca tuvo tickets (ni eliminados) ni agentes. Si tiene historia, solo se desactiva. | SPEC 02 Feature 2.3 |
-| D3 | Q33 decía que la búsqueda de texto distingue mayúsculas y acentos, al revés de la unicidad de catálogos (Q14). | La búsqueda de texto **no** distingue mayúsculas ni acentos, igual que Q14. | SPEC 06 Feature 6.2 |
+| D3 | Q33 decía que la búsqueda de texto distingue mayúsculas y acentos, al revés de la unicidad de catálogos (Q14). | La búsqueda de texto **no** distingue mayúsculas ni acentos, igual que Q14. Se resolvió con la extensión `unaccent` de Postgres (`lower(unaccent(texto))`), sin columnas normalizadas: no guarda datos derivados. | SPEC 06 Feature 6.2 |
 | D4 | El login es por usuario (Q2), pero `User` de Better Auth exige email único. | El email es opcional en el alta; si falta, se guarda `<usuario>@syc.local`, sin uso funcional. | SPEC 02, modelo de datos |
 
 ## Cambios pendientes en `docs/prd.md`

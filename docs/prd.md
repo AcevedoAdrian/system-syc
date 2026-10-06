@@ -139,7 +139,7 @@ El admin puede crear, renombrar y reordenar estados sin deploy. La comparación 
 
 ### 6.3 Comentarios
 
-Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y quedan en el historial.
+Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables. El historial del ticket muestra que hubo un comentario (quién y cuándo, agregado o eliminado), sin su texto: si el admin lo elimina, el texto no reaparece.
 
 ### 6.4 Flujo operativo
 
@@ -152,7 +152,7 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 7. Solo el admin elimina un ticket o le cambia el departamento; solo el admin elimina un comentario.
 8. Cada cambio queda auditado automáticamente.
 
-Hasta que exista la bandeja (etapa 5), `/tickets` es una lista mínima: los 50 tickets más recientes del alcance del usuario, sin búsqueda ni filtros. Cambiar el estado o el departamento se hace desde diálogos aparte; el formulario de edición no los incluye, y no se puede cambiar el estado mientras haya cambios sin guardar en él.
+Cambiar el estado o el departamento se hace desde diálogos aparte; el formulario de edición no los incluye, y no se puede cambiar el estado mientras haya cambios sin guardar en él.
 
 
 

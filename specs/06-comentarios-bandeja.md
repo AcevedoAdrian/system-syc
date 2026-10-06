@@ -1,6 +1,6 @@
 # SPEC 06 — Comentarios, bandeja y detalle
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo)
 > **Date:** 2026-10-06
 > **Objective:** comentarios inmutables en la pantalla del ticket (solo el admin los elimina) y una bandeja en `/tickets` con búsqueda sin mayúsculas ni acentos, filtros y 20 tickets por página, siempre acotada al departamento del agente.

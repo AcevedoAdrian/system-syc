@@ -14,7 +14,7 @@ import {
 import { sql } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
-import { assert, assertStatus, ROOT, run, tail } from "../lib/util.mjs";
+import { assert, assertStatus, ROOT, vitest } from "../lib/util.mjs";
 
 // --- Fechas en hora de Argentina (la misma regla que el contrato) -----------------------------
 
@@ -101,12 +101,6 @@ const changeDepartment = (client, t, departamentoId) =>
 const referencia = () => `${10 + Math.floor(Math.random() * 90000)}/2026`;
 
 const auditActions = (ticketId) => auditRows("Ticket", ticketId).map((r) => r.action);
-
-// Corre los tests de Vitest de un paquete; no necesita la API.
-function vitest(filter, label, ...files) {
-  const result = run("pnpm", ["--filter", filter, "exec", "vitest", "run", ...files]);
-  assert(result.status === 0, `${label} falla:\n${tail(result.output, 40)}`);
-}
 
 // SPEC 05 — tickets núcleo.
 export default defineSpec({
@@ -562,18 +556,28 @@ export default defineSpec({
           same(res.body, ref.body, `${label}: ajeno e inexistente dan el mismo cuerpo`);
         }
 
+        // `tickets.list` es una página de 20: los tickets de este criterio se buscan por su título único.
+        const buscar = async (who, ticket) => {
+          const res = await who.get(`/tickets?q=${encodeURIComponent(ticket.titulo)}`);
+          assertStatus(res, 200, "list con búsqueda");
+          return res.body.items;
+        };
         const lista = await client.get("/tickets");
         assertStatus(lista, 200, "list del agente");
         assert(
-          lista.body.every((t) => t.departamento.id === tecnico.id),
+          lista.body.items.every((t) => t.departamento.id === tecnico.id),
           "la lista del agente trae tickets de otro departamento",
         );
         assert(
-          lista.body.some((t) => t.id === propio.id) && !lista.body.some((t) => t.id === ajeno.id),
-          "la lista del agente no coincide con su departamento",
+          (await buscar(client, propio)).some((t) => t.id === propio.id),
+          "la lista del agente no trae el de su departamento",
         );
         assert(
-          (await a.get("/tickets")).body.some((t) => t.id === ajeno.id),
+          !(await buscar(client, ajeno)).some((t) => t.id === ajeno.id),
+          "la lista del agente trae el de otro departamento",
+        );
+        assert(
+          (await buscar(a, ajeno)).some((t) => t.id === ajeno.id),
           "el admin no ve todos",
         );
       },
@@ -665,12 +669,14 @@ export default defineSpec({
 
         assertStatus(await a.delete(`/tickets/${t.id}`), 200, "eliminar");
 
+        // La lista es una página de 20: se busca por el título único del ticket.
+        const q = encodeURIComponent(t.titulo);
         assert(
-          !(await a.get("/tickets")).body.some((x) => x.id === t.id),
+          !(await a.get(`/tickets?q=${q}`)).body.items.some((x) => x.id === t.id),
           "sigue en la lista del admin",
         );
         assert(
-          !(await client.get("/tickets")).body.some((x) => x.id === t.id),
+          !(await client.get(`/tickets?q=${q}`)).body.items.some((x) => x.id === t.id),
           "sigue en la del agente",
         );
         assertStatus(await a.get(`/tickets/${t.id}`), 404, "get del eliminado, admin");

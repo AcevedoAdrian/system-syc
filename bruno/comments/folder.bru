@@ -1,0 +1,18 @@
+meta {
+  name: comments
+  seq: 8
+}
+
+docs {
+  Comentarios de un ticket (SPEC 06). Son inmutables: no hay edición. Comentan el admin y los agentes
+  del departamento del ticket, también con el ticket en un estado de cierre; solo el admin los elimina.
+  Comentar no modifica el ticket (su `updatedAt` no cambia). Iniciar sesión primero (`auth.signIn`).
+
+  Variables que usan las peticiones:
+  - `ticketId`: lo guarda `tickets.create`.
+  - `commentId`: lo guarda `comments.create`; es el comentario que `comments.remove` elimina.
+
+  Para ver el 404 de un agente: iniciar sesión con un agente y pedir los comentarios de un ticket de
+  otro departamento (404, igual que uno inexistente). `comments.remove` da 403 a un agente, también
+  sobre su propio comentario.
+}

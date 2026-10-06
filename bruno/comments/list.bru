@@ -1,0 +1,38 @@
+meta {
+  name: comments.list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/comments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Lista los comentarios no eliminados de un ticket, del más antiguo al más reciente, sin paginar.
+
+  Contrato: `comments.list` en `packages/contracts`.
+  Método: GET
+  Ruta: /tickets/{ticketId}/comments
+
+  Respuesta 200: arreglo de { id, texto, autor: { id, nombre }, createdAt }.
+  Lo ve quien ve el ticket.
+  Errores: 401 sin sesión; 404 para un agente si el ticket es de otro departamento, no existe o fue
+  eliminado (el mismo cuerpo en los tres casos); 404 para el admin si no existe o fue eliminado.
+}

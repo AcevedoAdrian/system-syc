@@ -51,6 +51,13 @@ export function run(command, args, { env, cwd = ROOT, input } = {}) {
   };
 }
 
+// Corre los tests de Vitest de un paquete (sin la API): los criterios que describen la web, que no se
+// prueba con un navegador, verifican los tests de los componentes de cada paso del recorrido.
+export function vitest(filter, label, ...files) {
+  const result = run("pnpm", ["--filter", filter, "exec", "vitest", "run", ...files]);
+  assert(result.status === 0, `${label} falla:\n${tail(result.output, 40)}`);
+}
+
 export function tail(text, lines = 25) {
   return text.trim().split("\n").slice(-lines).join("\n");
 }

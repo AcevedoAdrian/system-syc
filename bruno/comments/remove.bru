@@ -1,0 +1,38 @@
+meta {
+  name: comments.remove
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/comments/:commentId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+  commentId: {{commentId}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Elimina un comentario (borrado lógico). Solo admin (permiso `comment:delete`).
+
+  Contrato: `comments.remove` en `packages/contracts`.
+  Método: DELETE
+  Ruta: /tickets/{ticketId}/comments/{comentarioId}
+
+  Deja de salir en `comments.list` y de contar en la búsqueda de la bandeja. Deja un `comment_delete`
+  en el historial del ticket, sin el texto.
+  Errores: 401 sin sesión; 403 si no es admin (también sobre su propio comentario); 404 si el
+  comentario no existe, ya está eliminado, es de otro ticket o el ticket está eliminado.
+}
