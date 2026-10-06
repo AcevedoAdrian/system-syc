@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "./generated/prisma/client.js";
+import { Prisma, PrismaClient } from "./generated/prisma/client.js";
 
 let client: PrismaClient | undefined;
 
@@ -8,4 +8,4 @@ export function getPrismaClient(databaseUrl: string): PrismaClient {
   return client;
 }
 
-export { PrismaClient };
+export { Prisma, PrismaClient };

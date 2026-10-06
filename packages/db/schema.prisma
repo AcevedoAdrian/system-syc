@@ -8,17 +8,17 @@ datasource db {
 }
 
 model User {
-  id                    String         @id
+  id                    String             @id
   name                  String
   email                 String
-  emailVerified         Boolean        @default(false)
+  emailVerified         Boolean            @default(false)
   image                 String?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   username              String?
   displayUsername       String?
   role                  String?
-  banned                Boolean?       @default(false)
+  banned                Boolean?           @default(false)
   banReason             String?
   banExpires            DateTime?
   sessions              Session[]
@@ -26,22 +26,24 @@ model User {
   members               Member[]
   invitations           Invitation[]
   auditLogs             AuditLog[]
-  areasCreadas          Area[]         @relation("AreaCreador")
-  areasEditadas         Area[]         @relation("AreaEditor")
-  edificiosCreadas      Edificio[]     @relation("EdificioCreador")
-  edificiosEditadas     Edificio[]     @relation("EdificioEditor")
-  tiposTicketCreadas    TipoTicket[]   @relation("TipoTicketCreador")
-  tiposTicketEditadas   TipoTicket[]   @relation("TipoTicketEditor")
-  prioridadesCreadas    Prioridad[]    @relation("PrioridadCreador")
-  prioridadesEditadas   Prioridad[]    @relation("PrioridadEditor")
-  modulosCreadas        Modulo[]       @relation("ModuloCreador")
-  modulosEditadas       Modulo[]       @relation("ModuloEditor")
-  proveedoresCreadas    Proveedor[]    @relation("ProveedorCreador")
-  proveedoresEditadas   Proveedor[]    @relation("ProveedorEditor")
-  estadosTicketCreadas  EstadoTicket[] @relation("EstadoTicketCreador")
-  estadosTicketEditadas EstadoTicket[] @relation("EstadoTicketEditor")
-  ticketsCreados        Ticket[]       @relation("TicketCreador")
-  ticketsEditados       Ticket[]       @relation("TicketEditor")
+  areasCreadas          Area[]             @relation("AreaCreador")
+  areasEditadas         Area[]             @relation("AreaEditor")
+  edificiosCreadas      Edificio[]         @relation("EdificioCreador")
+  edificiosEditadas     Edificio[]         @relation("EdificioEditor")
+  tiposTicketCreadas    TipoTicket[]       @relation("TipoTicketCreador")
+  tiposTicketEditadas   TipoTicket[]       @relation("TipoTicketEditor")
+  prioridadesCreadas    Prioridad[]        @relation("PrioridadCreador")
+  prioridadesEditadas   Prioridad[]        @relation("PrioridadEditor")
+  modulosCreadas        Modulo[]           @relation("ModuloCreador")
+  modulosEditadas       Modulo[]           @relation("ModuloEditor")
+  proveedoresCreadas    Proveedor[]        @relation("ProveedorCreador")
+  proveedoresEditadas   Proveedor[]        @relation("ProveedorEditor")
+  estadosTicketCreadas  EstadoTicket[]     @relation("EstadoTicketCreador")
+  estadosTicketEditadas EstadoTicket[]     @relation("EstadoTicketEditor")
+  ticketsCreados        Ticket[]           @relation("TicketCreador")
+  ticketsEditados       Ticket[]           @relation("TicketEditor")
+  comentariosCreados    TicketComentario[] @relation("TicketComentarioAutor")
+  comentariosEditados   TicketComentario[] @relation("TicketComentarioEditor")
 
   @@unique([email])
   @@unique([username])
@@ -349,6 +351,25 @@ model Ticket {
   editor    User      @relation("TicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt DateTime?
 
+  comentarios TicketComentario[]
+
   @@index([departamentoId])
   @@map("ticket")
+}
+
+model TicketComentario {
+  id        String    @id @default(cuid())
+  ticketId  String
+  ticket    Ticket    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  texto     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt // solo cambia al eliminarlo: no hay edición
+  createdBy String
+  autor     User      @relation("TicketComentarioAutor", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy String
+  editor    User      @relation("TicketComentarioEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt DateTime?
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_comentario")
 }
