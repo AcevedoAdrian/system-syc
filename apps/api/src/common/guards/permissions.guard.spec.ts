@@ -1,4 +1,9 @@
-import { type ExecutionContext, ForbiddenException, UnauthorizedException } from "@nestjs/common";
+import {
+  type ExecutionContext,
+  ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ModuleRef, Reflector } from "@nestjs/core";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedRequest, AuthenticatedUser } from "../authenticated-request";
@@ -27,10 +32,37 @@ class Probe {
   @RequirePermission(PERMISSIONS.MANAGE)
   manage() {}
 
+  @RequirePermission(PERMISSIONS.TICKET_VIEW, {
+    departmentFrom: UrlDepartmentResolver,
+    outOfScope: "not-found",
+    notFoundMessage: "El ticket no existe",
+  })
+  viewScoped() {}
+
+  @RequirePermission(PERMISSIONS.TICKET_VIEW, {
+    departmentFrom: UrlDepartmentResolver,
+    outOfScope: "not-found",
+  })
+  viewScopedDefaultMessage() {}
+
+  @RequirePermission(PERMISSIONS.TICKET_DELETE, {
+    departmentFrom: UrlDepartmentResolver,
+    outOfScope: "not-found",
+  })
+  removeScoped() {}
+
   open() {}
 }
 
-type Handler = "view" | "create" | "remove" | "manage" | "open";
+type Handler =
+  | "view"
+  | "create"
+  | "remove"
+  | "manage"
+  | "viewScoped"
+  | "viewScopedDefaultMessage"
+  | "removeScoped"
+  | "open";
 
 const agente: AuthenticatedUser = {
   id: "ana",
@@ -144,6 +176,91 @@ describe("PermissionsGuard", () => {
       expect(reader.findDepartmentIdOf).not.toHaveBeenCalled();
       expect(resolve).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('PermissionsGuard con outOfScope: "not-found" (SPEC 05, Feature 5.8)', () => {
+  it("un agente en su departamento pasa y recibe su scope", async () => {
+    const { run } = setup("tec");
+
+    const { request, result } = run("viewScoped", agente, "tec");
+
+    await expect(result).resolves.toBe(true);
+    expect(request.currentUser?.scope).toEqual({ departmentId: "tec" });
+  });
+
+  it("responde 404 sobre un recurso de otro departamento", async () => {
+    const { run } = setup("tec");
+
+    await expect(run("viewScoped", agente, "red").result).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("responde 404 sobre un recurso inexistente (el resolver devuelve null)", async () => {
+    const { run } = setup("tec");
+
+    await expect(run("viewScoped", agente, "").result).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("ajeno e inexistente dan exactamente la misma respuesta", async () => {
+    const { run } = setup("tec");
+
+    const ajeno = await run("viewScoped", agente, "red").result.catch((e: NotFoundException) => e);
+    const inexistente = await run("viewScoped", agente, "").result.catch(
+      (e: NotFoundException) => e,
+    );
+
+    expect(ajeno).toBeInstanceOf(NotFoundException);
+    expect((ajeno as NotFoundException).getStatus()).toBe(404);
+    expect((ajeno as NotFoundException).getResponse()).toEqual(
+      (inexistente as NotFoundException).getResponse(),
+    );
+    expect((ajeno as NotFoundException).message).toBe("El ticket no existe");
+  });
+
+  it("sin `notFoundMessage` usa un mensaje genérico", async () => {
+    const { run } = setup("tec");
+
+    const error = await run("viewScopedDefaultMessage", agente, "red").result.catch(
+      (e: NotFoundException) => e,
+    );
+
+    expect(error).toBeInstanceOf(NotFoundException);
+    expect((error as NotFoundException).message).toBe("El recurso no existe");
+  });
+
+  it("el permiso se evalúa antes: un agente sin permiso recibe 403, no 404", async () => {
+    const { run, reader, resolve } = setup("tec");
+
+    await expect(run("removeScoped", agente, "tec").result).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(reader.findDepartmentIdOf).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("un agente sin Member sigue recibiendo 403 (estado inconsistente, no un recurso ajeno)", async () => {
+    const { run } = setup(null);
+
+    await expect(run("viewScoped", agente, "tec").result).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it("el admin no pasa por el resolver: accede a cualquier departamento", async () => {
+    const { run, resolve } = setup(null);
+
+    const { request, result } = run("viewScoped", admin, "cualquiera");
+
+    await expect(result).resolves.toBe(true);
+    expect(request.currentUser?.scope).toEqual({ departmentId: null });
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("sin la opción el comportamiento no cambia: 403", async () => {
+    const { run } = setup("tec");
+
+    await expect(run("view", agente, "red").result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(run("view", agente, "").result).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

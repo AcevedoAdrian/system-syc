@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ModuleRef, Reflector } from "@nestjs/core";
@@ -51,9 +52,16 @@ export class PermissionsGuard implements CanActivate {
 
     if (required.departmentFrom) {
       const resolver = this.moduleRef.get(required.departmentFrom, { strict: false });
-      // Recurso inexistente o de otro departamento: 403 igual, para no revelar si existe.
-      if ((await resolver.resolve(request)) !== departmentId) throw new ForbiddenException();
+      // Recurso inexistente o de otro departamento: la misma respuesta para los dos casos, para no
+      // revelar si existe (403, o 404 si el endpoint declara `outOfScope: "not-found"`).
+      if ((await resolver.resolve(request)) !== departmentId) throw this.outOfScope(required);
     }
     return true;
+  }
+
+  private outOfScope(required: RequirePermissionMetadata): Error {
+    return required.outOfScope === "not-found"
+      ? new NotFoundException(required.notFoundMessage ?? "El recurso no existe")
+      : new ForbiddenException();
   }
 }
