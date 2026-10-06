@@ -1,8 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-client";
+import type { TicketsSearch } from "../tickets-search";
 
-// La lista mínima de SPEC 05 (los 50 más recientes del alcance del usuario). SPEC 06 la reemplaza
-// por la bandeja con filtros.
-export function useTickets() {
-  return useQuery(orpc.tickets.list.queryOptions({ input: {} }));
+// Una página de la bandeja: filtros, búsqueda y página los resuelve la API (SPEC 06). Mientras llega la
+// siguiente se sigue mostrando la anterior, sin parpadeo.
+export function useTickets(filters: TicketsSearch) {
+  return useQuery({
+    ...orpc.tickets.list.queryOptions({ input: filters }),
+    placeholderData: keepPreviousData,
+  });
 }

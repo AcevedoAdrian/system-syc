@@ -17,8 +17,8 @@ const column = createColumnHelper<typeof features, TicketSummary>();
 
 const linkClassName = "hover:underline";
 
-// El número y el título abren el ticket. El orden es el que manda la API (número descendente): la
-// tabla solo renderiza, no ordena ni filtra (eso es de la bandeja de SPEC 06).
+// El número y el título abren el ticket. El orden es el que manda la API (fecha de recepción y número
+// descendentes): la tabla solo renderiza la página recibida, no ordena ni filtra.
 const columns = column.columns([
   column.accessor("numero", {
     header: "Número",
@@ -54,6 +54,7 @@ const columns = column.columns([
     cell: ({ row }) => <Badge variant="secondary">{row.original.estado.nombre}</Badge>,
   }),
   column.accessor((ticket) => ticket.prioridad.nombre, { id: "prioridad", header: "Prioridad" }),
+  column.accessor((ticket) => ticket.area?.nombre ?? "—", { id: "area", header: "Área" }),
   column.accessor("fechaRecepcion", {
     header: "Fecha de recepción",
     cell: ({ row }) => formatDay(row.original.fechaRecepcion),
