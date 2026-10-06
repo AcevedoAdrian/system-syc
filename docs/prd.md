@@ -68,6 +68,8 @@ Un sistema in-house, usado solo por el equipo interno, con base relacional (Post
 
 Razón: cada agente ve y opera solo en su departamento, sin poder quitar ese límite. El admin ve todos.
 
+Un agente que pide por URL un ticket de otro departamento recibe el mismo "no existe" (404) que por un número inexistente, para no revelar qué tickets hay en otros departamentos. Crear un ticket en otro departamento sí es un rechazo explícito (403).
+
 ## 5. Alcance
 
 
@@ -111,10 +113,10 @@ Razón: cada agente ve y opera solo en su departamento, sin poder quitar ese lí
 | `actuacionSimple`             | Texto opcional, con la referencia de la nota interna.                                                                                                                                                                                                          |
 | `proveedor`                   | Relación opcional al catálogo de Proveedores.                                                                                                                                                                                                                  |
 | `referenciaExterna`           | Número de ticket que asigna el proveedor, formato `Número/año` (ej. `19092/2026`, el número es solo un ejemplo). Opcional, texto validado con ese formato. Único por proveedor. Vive en el ticket; el catálogo de Proveedores solo guarda datos del proveedor. |
-| `fechaRecepcion`              | Fecha real en que llegó el requerimiento (puede ser anterior a la carga). Fecha sin hora; no puede ser futura.                                                                                                                                                 |
-| `fechaCierre`                 | Obligatoria al pasar a un estado de cierre (ver 6.2). La carga quien cambia el estado, no se completa sola; fecha sin hora, no futura. Se conserva al pasar entre estados de cierre, y quien guarda puede corregirla.                                          |
-| `fechaReabierto`              | Obligatoria al pasar a un estado de reapertura (ver 6.2). Misma regla que `fechaCierre`: la carga quien cambia el estado, fecha sin hora, no futura. Al reabrir, `fechaCierre` y `solucionDescripcion` ya cargadas se conservan.                              |
-| `solucionDescripcion`         | Opcional. Texto de la solución, si se documenta. No es obligatoria para cerrar.                                                                                                                                                                                |
+| `fechaRecepcion`              | Fecha real en que llegó el requerimiento (puede ser anterior a la carga). Fecha sin hora; no puede ser futura. Se puede corregir después, con la misma regla (hoy o anterior).                                                                                                                                                 |
+| `fechaCierre`                 | Obligatoria al pasar a un estado de cierre (ver 6.2). La carga quien cambia el estado, no se completa sola; fecha sin hora, no futura. Se conserva al pasar entre estados de cierre, y quien guarda puede corregirla. Cargada, se puede corregir al editar el ticket (hoy o anterior); no se puede borrar ni cargar por esa vía: solo al cambiar de estado.                                          |
+| `fechaReabierto`              | Obligatoria al pasar a un estado de reapertura (ver 6.2). Misma regla que `fechaCierre`: la carga quien cambia el estado, fecha sin hora, no futura. Al reabrir, `fechaCierre` y `solucionDescripcion` ya cargadas se conservan. Igual que `fechaCierre`: se corrige al editar, y se carga solo al cambiar de estado.                              |
+| `solucionDescripcion`         | Opcional. Texto de la solución, si se documenta. No es obligatoria para cerrar. Se edita en cualquier momento, también con el ticket cerrado.                                                                                                                                                                                |
 | `notificado`                  | Casilla manual de validación visual: "se notificó al usuario".                                                                                                                                                                                                 |
 | Auditoría                     | `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `deletedAt`.                                                                                                                                                                                               |
 
@@ -149,6 +151,8 @@ Cada ticket tiene notas de seguimiento (texto, autor y fecha). Son inmutables y 
 6. Al pasar a un estado de cierre (`Finalizado`, `Cerrado` o `Cancelado`) carga la fecha de cierre. La solución es opcional. `notificado` sigue siendo una casilla manual, en cualquier momento. Un ticket cerrado se puede reabrir (`Reabierto`, con su propia fecha) y se lo puede seguir editando y comentando.
 7. Solo el admin elimina un ticket o le cambia el departamento; solo el admin elimina un comentario.
 8. Cada cambio queda auditado automáticamente.
+
+Hasta que exista la bandeja (etapa 5), `/tickets` es una lista mínima: los 50 tickets más recientes del alcance del usuario, sin búsqueda ni filtros. Cambiar el estado o el departamento se hace desde diálogos aparte; el formulario de edición no los incluye, y no se puede cambiar el estado mientras haya cambios sin guardar en él.
 
 
 

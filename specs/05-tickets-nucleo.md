@@ -319,7 +319,7 @@ Convenciones:
     - exige `fechaReabierto`;
     - `fechaCierre` y `solucionDescripcion` se conservan (Q25).
   - Destino sin clave, o con otra clave: ninguna fecha ni la solución se piden ni se modifican (Q26).
-  - Elegir el estado actual sigue las mismas reglas. Sin cambios efectivos, no audita.
+  - Elegir el estado actual sigue las mismas reglas. Sin cambios efectivos, no audita. Si el estado actual se desactivó después, se acepta igual ("referencia válida"); uno nuevo debe estar activo.
   - `notificado` no participa: es una casilla manual de `update`, que no dispara avisos (Q27).
   - Asociar o cambiar un proveedor no cambia el estado (Q28).
   - Aplica el bloqueo optimista de Feature 5.3.
@@ -377,7 +377,7 @@ Convenciones:
 **Feature 5.8: Alcance por departamento (guard)**
 
 - **MUST:**
-  - `@RequirePermission` suma la opción `outOfScope: "not-found"`. Con ella, `PermissionsGuard` responde 404 ("El ticket no existe") en vez de 403 cuando el resolver devuelve `null` o un departamento que no es el del agente. Sin la opción, el comportamiento sigue igual (403).
+  - `@RequirePermission` suma la opción `outOfScope: "not-found"`, con `notFoundMessage` para el texto del 404 (el guard está en `common/` y no conoce el dominio; sin él dice "El recurso no existe"). Con ella, `PermissionsGuard` responde 404 ("El ticket no existe") en vez de 403 cuando el resolver devuelve `null` o un departamento que no es el del agente. Sin la opción, el comportamiento sigue igual (403).
   - Los tickets la usan en `get`, `update`, `changeStatus` y `history`.
   - `create` no la usa: un payload manipulado no revela nada y sigue en 403 (SPEC 02 Feature 2.5).
   - `TicketDepartmentResolver` lee `params.ticketId` y devuelve el departamento del ticket no eliminado, o `null`.
@@ -407,7 +407,7 @@ Convenciones:
 
 - **MUST:**
   - Navegación:
-    - El sidebar suma "Tickets" (`/tickets`) para todos los usuarios.
+    - El sidebar muestra "Tickets" (`/tickets`) a todos los usuarios, en lugar de "Inicio": con `/` redirigiendo, un "Inicio" aparte sería un segundo link a la misma pantalla.
     - `/` redirige a `/tickets`.
     - El estado de `health.check` pasa a un indicador al pie del sidebar (`features/health/components/HealthIndicator.tsx`), que reemplaza a `HealthStatusCard` (SPEC 01 sigue cumpliéndose).
   - Lista mínima (`routes/_authenticated/tickets/index.tsx`):
@@ -421,17 +421,17 @@ Convenciones:
     - Al guardar, navega al ticket.
   - Pantalla del ticket (`routes/_authenticated/tickets/$ticketId.tsx`):
     - Encabezado: número, estado actual y departamento.
-    - Botón "Cambiar estado", que abre un diálogo:
+    - Botón "Cambiar estado", que abre un diálogo (deshabilitado, igual que "Cambiar departamento", mientras el formulario tenga cambios sin guardar; "Eliminar" no):
       - estados activos, sin el actual;
       - con destino de cierre: fecha de cierre (propone la actual, o si no hoy) y solución (precargada);
       - con destino `REABIERTO`: fecha de reapertura (propone hoy).
-    - Formulario de datos con todos los campos de `update`:
+    - Formulario de datos con todos los campos de `update`, más "Guardar cambios" y "Descartar cambios":
       - `fechaCierre` y `fechaReabierto` solo aparecen si tienen valor;
       - al cambiar de proveedor se vacía la referencia.
     - Para el admin, además: "Cambiar departamento" (diálogo) y "Eliminar" (confirmación y vuelta a `/tickets`).
     - Historial debajo: fecha, usuario y una línea por campo ("Estado: Pendiente → En progreso"), con etiquetas en `features/tickets/ticket-fields.ts` y el `nombre` de las referencias de la foto.
   - Selectores de catálogo: ofrecen las opciones activas (`useCatalogOptions`) más el valor actual del ticket si está inactivo o eliminado, marcado "(inactivo)". El valor actual sale de `ticketSchema`.
-  - Un 409 por bloqueo optimista muestra el mensaje y un botón "Recargar", que vuelve a leer el ticket y reinicia el formulario. Un 404 muestra "El ticket no existe" con un link a `/tickets`.
+  - Un 409 por bloqueo optimista muestra el mensaje y un botón "Recargar", que vuelve a leer el ticket y reinicia el formulario. Se distingue de otro 409 (referencia duplicada, departamento desactivado) por el mensaje, `STALE_TICKET_MESSAGE` de `@syc/contracts`: en esos otros casos "Recargar" descartaría lo escrito sin necesidad. El ticket no se vuelve a leer al volver a la ventana: quien edita se entera al guardar. Un 404 muestra "El ticket no existe" con un link a `/tickets`.
   - Hooks en `features/tickets/hooks`: `useTickets`, `useTicket`, `useTicketHistory`, `useCreateTicket`, `useUpdateTicket`, `useChangeTicketStatus`, `useChangeTicketDepartment` y `useRemoveTicket`. Cada mutación invalida el ticket, su historial y la lista.
   - Los formularios usan react-hook-form con los esquemas del contrato.
 - **MUST NOT:**
@@ -498,30 +498,30 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] Un agente crea un ticket con su `departamentoId`, y el ticket queda en su departamento. Con el `departamentoId` de otro departamento, o sin él, recibe 403.
-- [ ] El admin crea un ticket en cualquier departamento activo. En uno desactivado recibe 409, y un agente de ese departamento también.
-- [ ] El ticket nace en el primer estado activo del orden, con `notificado: false`, área, edificio, tipo y módulo en `null`, y un `AuditLog` `create` del usuario.
-- [ ] 20 altas en paralelo reciben 20 números distintos. `formatTicketNumber` da `TE-000013` y `TE-1000000`.
-- [ ] `fechaRecepcion` de mañana (hora de Argentina) devuelve 400. Hoy funciona.
-- [ ] `referenciaExterna` sin `proveedorId` devuelve 400. `019092/2026` se guarda como `19092/2026`, y `000/2026` devuelve 400.
-- [ ] Dos tickets no eliminados con el mismo proveedor y la misma referencia: el segundo devuelve 409. Con otro proveedor funciona. Después de eliminar el primero, funciona.
-- [ ] Editar con un `updatedAt` viejo devuelve 409 y no cambia nada. Una edición sin cambios responde 200 y no deja `AuditLog`.
-- [ ] Un ticket cuya área se desactivó después se edita sin cambiar el área y guarda. Elegir otra área inactiva devuelve 400.
-- [ ] Pasar a Finalizado sin `fechaCierre` devuelve 400. Con `fechaCierre` y sin solución funciona.
-- [ ] Pasar a Reabierto exige `fechaReabierto` y conserva `fechaCierre` y `solucionDescripcion`.
-- [ ] Renombrar "Finalizado" a "Resuelto" no cambia la exigencia de `fechaCierre`.
-- [ ] Con el ticket cerrado, la edición corrige `fechaCierre` y la solución. Cargar `fechaCierre` en un ticket que nunca la tuvo devuelve 400.
-- [ ] Un agente recibe 404, con el mismo cuerpo, en `get`, `update`, `changeStatus` y `history` de un ticket de otro departamento y de un id inexistente. `list` nunca le devuelve tickets de otro departamento.
-- [ ] Un agente recibe 403 en `remove` y `changeDepartment`, también sobre un ticket de su propio departamento.
-- [ ] El admin cambia el departamento de un ticket. Después, un agente del departamento nuevo lo edita y uno del anterior recibe 404.
-- [ ] Un ticket eliminado no aparece en `list`, y `get` responde 404. Su historial sigue en `AuditLog` y el admin lo lee por `history`.
-- [ ] Cada operación (`create`, `update`, `changeStatus`, `changeDepartment` y `remove`) deja exactamente un `AuditLog` con `entityType: "Ticket"`. El diff de estado muestra `{ id, nombre }`.
-- [ ] Eliminar un ítem de catálogo que usa un ticket no eliminado devuelve 409. Si solo lo usan tickets eliminados, funciona.
-- [ ] Eliminar un departamento con tickets, aunque estén eliminados, devuelve 409.
-- [ ] Un ticket cuyo ítem de catálogo se eliminó sigue mostrando el nombre en `get` y en el historial.
-- [ ] En la web, el agente crea un ticket desde `/tickets/nuevo`, lo ve en `/tickets`, lo pasa a Finalizado desde el diálogo y ve el cambio en el historial. No ve "Cambiar departamento" ni "Eliminar".
-- [ ] `/_probe/*` responde 404. `pnpm verify --spec 02` sigue pasando con tickets reales.
-- [ ] `pnpm verify --spec 05` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] Un agente crea un ticket con su `departamentoId`, y el ticket queda en su departamento. Con el `departamentoId` de otro departamento, o sin él, recibe 403.
+- [X] El admin crea un ticket en cualquier departamento activo. En uno desactivado recibe 409, y un agente de ese departamento también.
+- [X] El ticket nace en el primer estado activo del orden, con `notificado: false`, área, edificio, tipo y módulo en `null`, y un `AuditLog` `create` del usuario.
+- [X] 20 altas en paralelo reciben 20 números distintos. `formatTicketNumber` da `TE-000013` y `TE-1000000`.
+- [X] `fechaRecepcion` de mañana (hora de Argentina) devuelve 400. Hoy funciona.
+- [X] `referenciaExterna` sin `proveedorId` devuelve 400. `019092/2026` se guarda como `19092/2026`, y `000/2026` devuelve 400.
+- [X] Dos tickets no eliminados con el mismo proveedor y la misma referencia: el segundo devuelve 409. Con otro proveedor funciona. Después de eliminar el primero, funciona.
+- [X] Editar con un `updatedAt` viejo devuelve 409 y no cambia nada. Una edición sin cambios responde 200 y no deja `AuditLog`.
+- [X] Un ticket cuya área se desactivó después se edita sin cambiar el área y guarda. Elegir otra área inactiva devuelve 400.
+- [X] Pasar a Finalizado sin `fechaCierre` devuelve 400. Con `fechaCierre` y sin solución funciona.
+- [X] Pasar a Reabierto exige `fechaReabierto` y conserva `fechaCierre` y `solucionDescripcion`.
+- [X] Renombrar "Finalizado" a "Resuelto" no cambia la exigencia de `fechaCierre`.
+- [X] Con el ticket cerrado, la edición corrige `fechaCierre` y la solución. Cargar `fechaCierre` en un ticket que nunca la tuvo devuelve 400.
+- [X] Un agente recibe 404, con el mismo cuerpo, en `get`, `update`, `changeStatus` y `history` de un ticket de otro departamento y de un id inexistente. `list` nunca le devuelve tickets de otro departamento.
+- [X] Un agente recibe 403 en `remove` y `changeDepartment`, también sobre un ticket de su propio departamento.
+- [X] El admin cambia el departamento de un ticket. Después, un agente del departamento nuevo lo edita y uno del anterior recibe 404.
+- [X] Un ticket eliminado no aparece en `list`, y `get` responde 404. Su historial sigue en `AuditLog` y el admin lo lee por `history`.
+- [X] Cada operación (`create`, `update`, `changeStatus`, `changeDepartment` y `remove`) deja exactamente un `AuditLog` con `entityType: "Ticket"`. El diff de estado muestra `{ id, nombre }`.
+- [X] Eliminar un ítem de catálogo que usa un ticket no eliminado devuelve 409. Si solo lo usan tickets eliminados, funciona.
+- [X] Eliminar un departamento con tickets, aunque estén eliminados, devuelve 409.
+- [X] Un ticket cuyo ítem de catálogo se eliminó sigue mostrando el nombre en `get` y en el historial.
+- [X] En la web, el agente crea un ticket desde `/tickets/nuevo`, lo ve en `/tickets`, lo pasa a Finalizado desde el diálogo y ve el cambio en el historial. No ve "Cambiar departamento" ni "Eliminar".
+- [X] `/_probe/*` responde 404. `pnpm verify --spec 02` sigue pasando con tickets reales.
+- [X] `pnpm verify --spec 05` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
 
@@ -553,6 +553,16 @@ Convenciones:
 - **Sí:** el 409 por referencia duplicada nombra el ticket solo si el usuario lo puede ver, por coherencia con el 404.
 - **Sí:** `solucionDescripcion` opcional, sin casilla `cerrado` y con `fechaReabierto` como campo nuevo (Q17, Q25, D1; ya volcados en `docs/prd.md` v4).
 - **Sí:** solo el admin elimina tickets (Q31).
+- **Sí:** `changeStatus` distingue "no viene" de "viene en blanco" en la solución: `blankToNullValue` (sin `default`) en vez de `blankToNull(...).optional()`, que dejaba `null` cuando el campo no venía y borraba la solución al reabrir (implementación, paso 2).
+- **Sí:** `notFoundMessage` en `@RequirePermission`, porque el 404 lo responde el guard de `common/` y no puede nombrar al ticket (paso 3).
+- **Sí:** el estado que el ticket ya tiene se acepta aunque se haya desactivado, igual que cualquier otra referencia (paso 6). Una lectura estricta de "estado destino inactivo: 400" lo rechazaría; el caso real es raro, porque el diálogo no ofrece el estado actual.
+- **Sí:** `STALE_TICKET_MESSAGE` y `CLAVES_DE_CIERRE` viven en `@syc/contracts`, compartidas por la API y la web: así "Recargar" aparece solo ante el 409 de versión, y una sola lista decide qué estados cierran (pasos 11 y 12).
+- **Sí:** el formulario de edición bloquea el cambio de estado y de departamento mientras tenga cambios sin guardar. Cambiar el estado refresca el ticket y reiniciaría el formulario, borrando lo escrito (paso 11).
+- **Sí:** `useTicket` no recarga al volver a la ventana, para que un cambio de otro usuario no reinicie el formulario en silencio; el 409 al guardar es el aviso (paso 11).
+- **Sí:** `useRemoveTicket` invalida solo la lista y sin esperar: volver a pedir el ticket eliminado da 404 y la pantalla mostraba "El ticket no existe" un instante antes de volver (paso 11).
+- **Sí:** el sidebar reemplaza "Inicio" por "Tickets" (paso 10). Descartado: mantener los dos, que apuntarían a la misma pantalla.
+- **Sí:** la web distingue el 404 solo por status. El guard lo responde como excepción de Nest y no como `ORPCError`, pero el cliente real entrega igual un `ORPCError` con `status` 404 (probado en `errors.test.ts`).
+- **Sí:** el criterio del ítem de catálogo eliminado se verifica simulando el borrado en la base (`UPDATE ... SET "deletedAt"`), porque por la API un ítem en uso no se puede eliminar (criterio de ítem en uso).
 - **No:** máquina de estados con transiciones restringidas (Q25).
 - **No:** una tabla de historial propia de `Ticket`: se usa `AuditLog`.
 
@@ -560,10 +570,11 @@ Convenciones:
 
 | Riesgo | Mitigación |
 |---|---|
-| `@orpc/nest` podría no exponer `request.params.ticketId` o `request.body` al guard, que corre antes del handler. | El paso 8 lo verifica con `pnpm verify --spec 02` y `--spec 05`. Si falla, el resolver lee la ruta de `request.url` con el patrón del contrato. |
-| La excepción de Nest (404 del guard) no tiene el formato de error de oRPC, y la web podría no leer el mensaje. | La pantalla trata cualquier 404 como "El ticket no existe", sin depender del mensaje. Un test del guard fija el status. |
+| `@orpc/nest` podría no exponer `request.params.ticketId` o `request.body` al guard, que corre antes del handler. **Resuelto:** sí los expone; lo prueban `verify` 02.19 y 05.14. | El paso 8 lo verifica con `pnpm verify --spec 02` y `--spec 05`. Si falla, el resolver lee la ruta de `request.url` con el patrón del contrato. |
+| La excepción de Nest (404 del guard) no tiene el formato de error de oRPC, y la web podría no leer el mensaje. **Resuelto:** el cliente real entrega un `ORPCError` con `status` 404 (`errors.test.ts`); la pantalla decide por status. | La pantalla trata cualquier 404 como "El ticket no existe", sin depender del mensaje. Un test del guard fija el status. |
 | Prisma no conoce el índice parcial de referencia, y un `migrate dev` futuro podría proponer borrarlo. | Igual que en catálogos: comentario en el SQL y verificación en el paso 1. |
 | `TicketsModule` global, inyectado en `catalogs` y `organizations`, puede crear una dependencia circular de Nest. | `tickets` no importa ni `CatalogsModule` ni `OrganizationsModule`: lee sus FK desde su propio repository. |
+| Borrar un departamento es "contar sus tickets y borrar", sin bloqueo: si en ese instante se crea un ticket en él, la FK `Restrict` responde 500 en lugar de 409. | Ventana mínima para un uso interno, y el chequeo cubre el caso real. Si molesta, traducir `P2003` a 409 en `organizations.repository.remove`. |
 | El bloqueo optimista frustra a quien guarda justo después de otro. | Mensaje claro y botón "Recargar" (Feature 5.10). |
 | `hoyArgentina()` depende de que el runtime tenga datos de zona horaria (ICU). | Node 22 y los navegadores actuales traen ICU completo. Un test fija una fecha cerca de la medianoche. |
 

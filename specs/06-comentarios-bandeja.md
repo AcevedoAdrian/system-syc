@@ -15,8 +15,8 @@ Es la etapa 5 del PRD §10 y el resultado verificable es "un agente encuentra y 
 
 - Modelo Prisma `TicketComentario`.
 - Módulo `comments` (o sub-router de `tickets`) en `apps/api/src/modules/tickets`.
-- Endpoint de listado de tickets con filtros, búsqueda de texto, orden y paginación.
-- `apps/web`: bandeja (`routes/_authenticated/tickets/index.tsx`) con TanStack Table, y vista de detalle completa (`routes/_authenticated/tickets/$id.tsx`) con campos, comentarios e historial.
+- Endpoint de listado de tickets con filtros, búsqueda de texto, orden y paginación. **Reemplaza** a `tickets.list` de SPEC 05, que hoy devuelve los 50 más recientes del alcance del usuario sin filtros (el contrato `tickets.list` y la ruta `/tickets` ya existen; este spec los amplía).
+- `apps/web`: bandeja (`routes/_authenticated/tickets/index.tsx`, hoy la lista mínima de SPEC 05) con TanStack Table y filtros, y los comentarios en la pantalla del ticket (`routes/_authenticated/tickets/$ticketId.tsx`, que SPEC 05 ya crea con los campos, las acciones y el historial).
 
 **Fuera de alcance (para specs futuros):**
 
@@ -102,8 +102,8 @@ export const listTicketsInputSchema = z.object({
 - **MUST:**
   - Muestra todos los campos del ticket, sus comentarios (con el formulario para agregar uno nuevo) y su historial (SPEC 05 Feature 5.6).
   - Las acciones de editar, cambiar estado, comentar y eliminar aparecen en la UI solo si el usuario tiene permiso; el backend las rechaza igual aunque la UI fallara en ocultarlas (PRD §4.2, SPEC 02 Feature 2.5).
-  - Ruta `/tickets/$id` (ARCH).
-- **EDGE CASES:** un ticket inexistente, o eliminado, o de un departamento que el agente no puede ver, devuelve 404 (no 403, para no confirmar que el ticket existe en otro departamento) *(propuesta técnica)*.
+  - Ruta `/tickets/$ticketId` (ARCH), ya creada por SPEC 05.
+- **EDGE CASES:** un ticket inexistente, o eliminado, o de un departamento que el agente no puede ver, devuelve 404 (no 403, para no confirmar que el ticket existe en otro departamento). *Resuelto en SPEC 05 (Feature 5.8): `@RequirePermission` con `outOfScope: "not-found"`. Los comentarios deben declarar lo mismo.*
 - **MUST NOT:** que `routes/` llame directamente al cliente oRPC — pasa siempre por `features/tickets/hooks` (ARCH, PRD §8.1).
 
 ## Plan de implementación
@@ -111,10 +111,10 @@ export const listTicketsInputSchema = z.object({
 1. Modelo `TicketComentario` + migración. Verificar: `prisma migrate dev` aplica limpio.
 2. `packages/contracts/src/comments.ts` y el esquema de listado en `packages/contracts/src/tickets.ts`. Verificar: `pnpm --filter @syc/contracts typecheck` pasa.
 3. `comments.service.ts`/`comments.repository.ts`: crear (con permisos de Feature 6.1) y eliminar (solo admin). Verificar: un agente que intenta eliminar un comentario recibe 403.
-4. `tickets.repository.ts`: extender con el método de listado — filtros, búsqueda de texto con escape de `%`/`_`, orden y paginación, acotado por departamento cuando el usuario es agente. Verificar: un agente autenticado contra el endpoint de listado nunca recibe un ticket de otro departamento, ni pasando un filtro manipulado.
-5. `apps/web`: `features/tickets/hooks/useTickets()` (bandeja, con filtros como query params de TanStack Router) y `useTicketComments()`/`useCreateComment()`. Verificar: cambiar un filtro actualiza la URL y la tabla.
+4. `tickets.repository.ts`: reemplazar `findRecent` (la lista mínima de SPEC 05, que ya acota por departamento) por el método de listado — filtros, búsqueda de texto con escape de `%`/`_`, orden y paginación, acotado por departamento cuando el usuario es agente. Verificar: un agente autenticado contra el endpoint de listado nunca recibe un ticket de otro departamento, ni pasando un filtro manipulado.
+5. `apps/web`: `features/tickets/hooks/useTickets()` (ya existe, sin filtros; pasa a ser la bandeja, con filtros como query params de TanStack Router) y `useTicketComments()`/`useCreateComment()`. Verificar: cambiar un filtro actualiza la URL y la tabla.
 6. `routes/_authenticated/tickets/index.tsx`: TanStack Table con columnas número, título, estado, área, prioridad, fecha de recepción; filtros en la cabecera. Verificar: la bandeja de un agente no muestra tickets de otro departamento aunque existan en la base.
-7. `routes/_authenticated/tickets/$id.tsx`: composición de campos + comentarios + historial, ya con las acciones de SPEC 05 conectadas. Verificar: un ticket de otro departamento (para un agente) devuelve 404 al navegar directo a la URL.
+7. `routes/_authenticated/tickets/$ticketId.tsx` (ya creada por SPEC 05, con campos, acciones e historial): suma los comentarios. Verificar: un ticket de otro departamento (para un agente) devuelve 404 al navegar directo a la URL.
 8. Tests Vitest: `comments.service.spec.ts` (solo admin elimina) y `tickets.repository.spec.ts` o `tickets.service.spec.ts` para el listado (filtro por departamento, texto libre sin distinguir mayúsculas/acentos, orden y paginación). Verificar: `pnpm --filter @syc/api test` pasa.
 
 ## Criterios de aceptación
@@ -125,7 +125,7 @@ export const listTicketsInputSchema = z.object({
 - [ ] Buscar "impresora" encuentra un ticket con "Impresora" o "IMPRESORA" en el título.
 - [ ] Sin filtros, la bandeja ordena por fecha de recepción descendente y muestra 20 tickets por página.
 - [ ] Filtrar por proveedor, módulo o un rango de fecha de recepción devuelve solo los tickets que coinciden.
-- [ ] Navegar a `/tickets/$id` de un ticket de otro departamento (como agente) devuelve 404.
+- [ ] Navegar a `/tickets/$ticketId` de un ticket de otro departamento (como agente) devuelve 404.
 - [ ] `pnpm turbo lint typecheck test build` termina con código 0.
 
 ## Decisiones

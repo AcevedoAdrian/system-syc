@@ -220,8 +220,9 @@ Convenciones:
   - El departamento del usuario se lee de `Member` en cada request, no de la sesión.
   - La barrera real está en el backend; la UI solo oculta lo que el usuario no podría ejecutar.
   - SPEC 02 implementa y prueba la mecánica con un endpoint de prueba temporal con recurso ficticio; SPEC 05 la reutiliza con tickets reales.
+  - **Actualización (SPEC 05, 2026-10-06):** el endpoint temporal y su módulo `permissions-probe` ya no existen. Para tickets, `@RequirePermission` suma `outOfScope: "not-found"` y el guard responde 404 (no 403) cuando el recurso es de otro departamento o no existe; el resto de los recursos sigue en 403.
 - **EDGE CASES:**
-  - Un agente intenta crear, ver, editar o comentar en otro departamento (URL directa o payload manipulado): 403.
+  - Un agente intenta crear, ver, editar o comentar en otro departamento (URL directa o payload manipulado): 403. *(Desde SPEC 05, en tickets: crear en otro departamento sigue siendo 403; ver, editar, cambiar el estado o leer el historial de uno ajeno es 404, igual que para un id inexistente.)*
   - Un agente cuyo `Member` no existe (estado inconsistente): 403 en todo lo que exija departamento.
   - Cambiar el rol o el departamento de un usuario con sesión abierta: los permisos cambian en la siguiente request, sin invalidar la sesión.
 - **MUST NOT:** permisos resueltos dentro de un service; roles adicionales a `agente` y `admin` en el MVP.
@@ -277,7 +278,7 @@ Convenciones:
 - [X] Eliminar un departamento con al menos un agente (activo o desactivado) devuelve 409; desactivarlo funciona.
 - [X] Desactivar o eliminar el último departamento activo devuelve 409.
 - [X] Crear un departamento no deja al admin como `Member` de ese departamento.
-- [X] En el endpoint de prueba, un agente contra un recurso de otro departamento recibe 403; el admin accede a recursos de todos los departamentos.
+- [X] En el endpoint de prueba, un agente contra un recurso de otro departamento recibe 403; el admin accede a recursos de todos los departamentos. *(SPEC 05: este criterio se verifica ahora con tickets reales, 02.19 de `pnpm verify`: 404 al ver o editar uno ajeno, 403 al crear en otro departamento.)*
 - [X] Un cambio de departamento de un agente se refleja en su siguiente request sin cerrar sesión.
 - [X] Sin sesión, cualquier ruta `_authenticated/*` redirige a `/login`; un agente que entra por URL a `/admin/*` vuelve a `/`.
 - [X] El login funciona por HTTP (sin `Secure` en la cookie) con `NODE_ENV=production`.
