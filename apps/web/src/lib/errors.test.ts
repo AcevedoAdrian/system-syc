@@ -1,6 +1,9 @@
-import { ORPCError } from "@orpc/client";
+import { createORPCClient, ORPCError } from "@orpc/client";
+import type { ContractRouterClient } from "@orpc/contract";
+import { OpenAPILink } from "@orpc/openapi-client/fetch";
+import { contract } from "@syc/contracts";
 import { describe, expect, it } from "vitest";
-import { getErrorMessage, isUnauthorized } from "./errors";
+import { getErrorMessage, isConflict, isNotFound, isUnauthorized } from "./errors";
 
 describe("isUnauthorized", () => {
   it("detecta el 401 de la API, venga o no con el formato de oRPC", () => {
@@ -35,5 +38,36 @@ describe("getErrorMessage", () => {
     expect(getErrorMessage(new Error("boom"))).toBe(
       "No se pudo completar la operación. Intentá de nuevo.",
     );
+  });
+});
+
+describe("isNotFound e isConflict", () => {
+  it("detectan el status, sin mirar el mensaje", () => {
+    expect(isNotFound(new ORPCError("NOT_FOUND", { status: 404 }))).toBe(true);
+    expect(isNotFound(new ORPCError("CONFLICT", { status: 409 }))).toBe(false);
+    expect(isNotFound(new Error("404"))).toBe(false);
+    expect(isConflict(new ORPCError("CONFLICT", { status: 409 }))).toBe(true);
+    expect(isConflict(new ORPCError("NOT_FOUND", { status: 404 }))).toBe(false);
+  });
+
+  // El guard de la API responde el 404 de un ticket ajeno con el cuerpo de una excepción de Nest, no
+  // con el formato de oRPC. Se prueba con el cliente real que el status llega igual, porque la
+  // pantalla del ticket decide "El ticket no existe" solo por el status.
+  it("el 404 con el cuerpo de Nest llega al cliente real como ORPCError con status 404", async () => {
+    const nestBody = { statusCode: 404, message: "El ticket no existe", error: "Not Found" };
+    const fetch = async () =>
+      new Response(JSON.stringify(nestBody), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    const client: ContractRouterClient<typeof contract> = createORPCClient(
+      new OpenAPILink(contract, { url: "http://api.test", fetch }),
+    );
+
+    const error = await client.tickets.get({ ticketId: "t1" }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ORPCError);
+    expect(isNotFound(error)).toBe(true);
+    expect(isConflict(error)).toBe(false);
   });
 });

@@ -16,6 +16,9 @@ import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminCatalogosRouteImport } from './routes/_authenticated/admin/catalogos'
 import { Route as AuthenticatedAdminDepartamentosRouteImport } from './routes/_authenticated/admin/departamentos'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin/usuarios'
+import { Route as AuthenticatedTicketsIndexRouteImport } from './routes/_authenticated/tickets/index'
+import { Route as AuthenticatedTicketsTicketIdRouteImport } from './routes/_authenticated/tickets/$ticketId'
+import { Route as AuthenticatedTicketsNuevoRouteImport } from './routes/_authenticated/tickets/nuevo'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -54,6 +57,24 @@ const AuthenticatedAdminUsuariosRoute =
     path: '/usuarios',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedTicketsIndexRoute =
+  AuthenticatedTicketsIndexRouteImport.update({
+    id: '/tickets/',
+    path: '/tickets/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTicketsTicketIdRoute =
+  AuthenticatedTicketsTicketIdRouteImport.update({
+    id: '/tickets/$ticketId',
+    path: '/tickets/$ticketId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTicketsNuevoRoute =
+  AuthenticatedTicketsNuevoRouteImport.update({
+    id: '/tickets/nuevo',
+    path: '/tickets/nuevo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -62,6 +83,9 @@ export interface FileRoutesByFullPath {
   '/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/tickets/$ticketId': typeof AuthenticatedTicketsTicketIdRoute
+  '/tickets/nuevo': typeof AuthenticatedTicketsNuevoRoute
+  '/tickets/': typeof AuthenticatedTicketsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -70,6 +94,9 @@ export interface FileRoutesByTo {
   '/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/tickets/$ticketId': typeof AuthenticatedTicketsTicketIdRoute
+  '/tickets/nuevo': typeof AuthenticatedTicketsNuevoRoute
+  '/tickets': typeof AuthenticatedTicketsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +107,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/_authenticated/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
   '/_authenticated/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
+  '/_authenticated/tickets/$ticketId': typeof AuthenticatedTicketsTicketIdRoute
+  '/_authenticated/tickets/nuevo': typeof AuthenticatedTicketsNuevoRoute
+  '/_authenticated/tickets/': typeof AuthenticatedTicketsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,6 +120,9 @@ export interface FileRouteTypes {
     | '/admin/catalogos'
     | '/admin/departamentos'
     | '/admin/usuarios'
+    | '/tickets/$ticketId'
+    | '/tickets/nuevo'
+    | '/tickets/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -98,6 +131,9 @@ export interface FileRouteTypes {
     | '/admin/catalogos'
     | '/admin/departamentos'
     | '/admin/usuarios'
+    | '/tickets/$ticketId'
+    | '/tickets/nuevo'
+    | '/tickets'
   id:
     | '__root__'
     | '/_authenticated'
@@ -107,6 +143,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/catalogos'
     | '/_authenticated/admin/departamentos'
     | '/_authenticated/admin/usuarios'
+    | '/_authenticated/tickets/$ticketId'
+    | '/_authenticated/tickets/nuevo'
+    | '/_authenticated/tickets/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -165,6 +204,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsuariosRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
+    '/_authenticated/tickets/': {
+      id: '/_authenticated/tickets/'
+      path: '/tickets'
+      fullPath: '/tickets/'
+      preLoaderRoute: typeof AuthenticatedTicketsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tickets/$ticketId': {
+      id: '/_authenticated/tickets/$ticketId'
+      path: '/tickets/$ticketId'
+      fullPath: '/tickets/$ticketId'
+      preLoaderRoute: typeof AuthenticatedTicketsTicketIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tickets/nuevo': {
+      id: '/_authenticated/tickets/nuevo'
+      path: '/tickets/nuevo'
+      fullPath: '/tickets/nuevo'
+      preLoaderRoute: typeof AuthenticatedTicketsNuevoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
@@ -189,11 +249,17 @@ const AuthenticatedAdminRouteRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedTicketsTicketIdRoute: typeof AuthenticatedTicketsTicketIdRoute
+  AuthenticatedTicketsNuevoRoute: typeof AuthenticatedTicketsNuevoRoute
+  AuthenticatedTicketsIndexRoute: typeof AuthenticatedTicketsIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedTicketsTicketIdRoute: AuthenticatedTicketsTicketIdRoute,
+  AuthenticatedTicketsNuevoRoute: AuthenticatedTicketsNuevoRoute,
+  AuthenticatedTicketsIndexRoute: AuthenticatedTicketsIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

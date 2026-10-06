@@ -1,21 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
-import { HealthStatusCard } from "@/features/health/components/HealthStatusCard";
-import { useHealth } from "@/features/health/hooks/useHealth";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Placeholder hasta SPEC 05 (bandeja de tickets).
-function HomePage() {
-  const { data: user } = useCurrentUser();
-  const { data, isPending, isError } = useHealth();
-
-  return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Hola, {user?.name}</h1>
-      <HealthStatusCard data={data} isPending={isPending} isError={isError} />
-    </div>
-  );
-}
-
+// La pantalla de inicio es la lista de tickets: `/` no tiene contenido propio (SPEC 05, Feature 5.10).
 export const Route = createFileRoute("/_authenticated/")({
-  component: HomePage,
+  beforeLoad: () => {
+    throw redirect({ to: "/tickets" });
+  },
 });

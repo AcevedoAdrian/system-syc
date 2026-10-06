@@ -5,6 +5,18 @@ export function isUnauthorized(error: unknown): boolean {
   return error instanceof ORPCError && error.status === 401;
 }
 
+// El 404 de un ticket de otro departamento (o inexistente) lo responde el guard de la API como
+// excepción de Nest, no como `ORPCError`: el cuerpo no trae el formato de oRPC, pero el status sí
+// llega. Por eso se detecta por status y nunca por mensaje.
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ORPCError && error.status === 404;
+}
+
+// Otro usuario modificó el ticket (bloqueo optimista): la pantalla pide recargar.
+export function isConflict(error: unknown): boolean {
+  return error instanceof ORPCError && error.status === 409;
+}
+
 const VALIDATION_MESSAGE = "Input validation failed";
 
 // Mensaje para mostrar al usuario. Los 400, 404 y 409 de la API traen un mensaje en español pensado
