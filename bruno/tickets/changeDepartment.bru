@@ -1,0 +1,48 @@
+meta {
+  name: tickets.changeDepartment
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/department
+  body: json
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+body:json {
+  {
+    "updatedAt": "{{ticketUpdatedAt}}",
+    "departamentoId": "{{newOrganizationId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("ticketUpdatedAt", res.body.updatedAt);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Cambia el departamento del ticket. Solo admin (permiso `ticket:change-department`).
+
+  Contrato: `tickets.changeDepartment` en `packages/contracts`.
+  Método: POST
+  Ruta: /tickets/{ticketId}/department
+
+  Conserva el número y el historial. Desde el cambio, editan los agentes del departamento nuevo.
+  Antes: `organizations.create`, que guarda `newOrganizationId`.
+  Errores: 400 departamento inexistente; 403 si no es admin; 404; 409 si el departamento está
+  desactivado o `updatedAt` quedó viejo. El mismo departamento responde 200 sin auditar.
+}

@@ -8,7 +8,9 @@ import {
   departments,
   loggedIn,
   newDepartment,
+  newTicket,
   newUser,
+  ticketBody,
   uniq,
 } from "../lib/fixtures.mjs";
 import { resetRateLimit, scalar, sql, state } from "../lib/infra.mjs";
@@ -492,25 +494,53 @@ export default defineSpec({
 
     criterion(
       19,
-      "Endpoint de prueba: un agente contra otro departamento recibe 403; el admin accede a todos",
+      "Tickets: un agente contra otro departamento recibe 404 (403 al crear o en lo solo del admin); el admin accede a todos",
       async () => {
         const a = await admin();
         const [tecnico, redes] = [await departmentNamed("Técnico"), await departmentNamed("Redes")];
         const client = await loggedIn(await newUser({ organizationId: tecnico.id }));
-        const probe = (d) => `/_probe/departments/${d.id}`;
-        assertStatus(await client.get(probe(tecnico)), 200, "agente en su departamento");
+        const propio = await newTicket(a, tecnico.id);
+        const ajeno = await newTicket(a, redes.id);
+
+        assertStatus(
+          await client.get(`/tickets/${propio.id}`),
+          200,
+          "agente ve el de su departamento",
+        );
+        const estadoId = (await a.get("/catalogs/estados")).body[0].id;
+        const edit = { updatedAt: ajeno.updatedAt, titulo: "x" };
         for (const [label, call] of [
-          ["GET", () => client.get(probe(redes))],
-          ["POST", () => client.post(probe(redes))],
-          ["DELETE", () => client.delete(probe(redes))],
+          ["get", () => client.get(`/tickets/${ajeno.id}`)],
+          ["update", () => client.put(`/tickets/${ajeno.id}`, edit)],
+          ["changeStatus", () => client.post(`/tickets/${ajeno.id}/status`, { ...edit, estadoId })],
+          ["history", () => client.get(`/tickets/${ajeno.id}/history`)],
+          ["un id inexistente", () => client.get("/tickets/no-existe")],
         ]) {
-          assertStatus(await call(), 403, `agente ${label} en otro departamento`);
+          assertStatus(await call(), 404, `agente ${label} en otro departamento`);
         }
-        for (const d of [tecnico, redes]) {
-          assertStatus(await a.get(probe(d)), 200, `admin GET en ${d.nombre}`);
-          assertStatus(await a.post(probe(d)), [200, 201], `admin POST en ${d.nombre}`);
-          assertStatus(await a.delete(probe(d)), 200, `admin DELETE en ${d.nombre}`);
+
+        // Crear en otro departamento es un payload manipulado: 403, sin revelar nada.
+        assertStatus(
+          await client.post("/tickets", await ticketBody(redes.id)),
+          403,
+          "agente crea en otro departamento",
+        );
+        // Lo que es solo del admin: 403 aun en el propio departamento.
+        assertStatus(await client.delete(`/tickets/${propio.id}`), 403, "agente elimina");
+        assertStatus(
+          await client.post(`/tickets/${propio.id}/department`, {
+            updatedAt: propio.updatedAt,
+            departamentoId: redes.id,
+          }),
+          403,
+          "agente cambia el departamento",
+        );
+
+        for (const t of [propio, ajeno]) {
+          assertStatus(await a.get(`/tickets/${t.id}`), 200, `admin ve ${t.id}`);
         }
+        assertStatus(await a.delete(`/tickets/${propio.id}`), 200, "admin elimina el de Técnico");
+        assertStatus(await a.delete(`/tickets/${ajeno.id}`), 200, "admin elimina el de Redes");
       },
     ),
 
@@ -522,20 +552,22 @@ export default defineSpec({
         const [tecnico, redes] = [await departmentNamed("Técnico"), await departmentNamed("Redes")];
         const user = await newUser({ organizationId: tecnico.id });
         const client = await loggedIn(user);
-        assertStatus(await client.get(`/_probe/departments/${redes.id}`), 403, "antes del cambio");
+        const enRedes = await newTicket(a, redes.id);
+        const enTecnico = await newTicket(a, tecnico.id);
+        assertStatus(await client.get(`/tickets/${enRedes.id}`), 404, "antes del cambio");
         assertStatus(
           await a.patch(`/users/${user.id}`, { organizationId: redes.id }),
           200,
           "mover al agente",
         );
         assertStatus(
-          await client.get(`/_probe/departments/${redes.id}`),
+          await client.get(`/tickets/${enRedes.id}`),
           200,
           "después del cambio, mismo cookie",
         );
         assertStatus(
-          await client.get(`/_probe/departments/${tecnico.id}`),
-          403,
+          await client.get(`/tickets/${enTecnico.id}`),
+          404,
           "el departamento anterior ya no",
         );
       },

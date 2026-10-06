@@ -15,6 +15,10 @@ assert {
   res.body: isArray
 }
 
+script:post-response {
+  if (res.status === 200 && res.body.length) bru.setVar("listedItemId", res.body[0].id);
+}
+
 settings {
   encodeUrl: true
   timeout: 0
@@ -30,5 +34,6 @@ docs {
 
   Respuesta 200: arreglo de { id, nombre, orden, activo }. Proveedores suma contacto, telefono,
   correo y sitioWeb; Estados suma clave (`FINALIZADO` | `CERRADO` | `CANCELADO` | `REABIERTO` | null).
+  Guarda el id del primer ítem en `listedItemId` (lo usan las peticiones de `tickets`: prioridad o estado).
   Errores: 401 sin sesión.
 }

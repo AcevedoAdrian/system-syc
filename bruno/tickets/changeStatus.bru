@@ -1,0 +1,53 @@
+meta {
+  name: tickets.changeStatus
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/status
+  body: json
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+body:json {
+  {
+    "updatedAt": "{{ticketUpdatedAt}}",
+    "estadoId": "{{listedItemId}}"
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("ticketUpdatedAt", res.body.updatedAt);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Cambia el estado. Cualquier estado activo puede pasar a cualquier otro.
+
+  Contrato: `tickets.changeStatus` en `packages/contracts`.
+  Método: POST
+  Ruta: /tickets/{ticketId}/status
+
+  Las fechas dependen de la `clave` del estado destino (nunca de su nombre):
+  - `FINALIZADO`, `CERRADO` o `CANCELADO`: exige `fechaCierre`; `solucionDescripcion` es opcional
+    (si va, reemplaza la actual; en blanco la borra).
+  - `REABIERTO`: exige `fechaReabierto`; conserva `fechaCierre` y la solución.
+  - Cualquier otro: no admite ninguna de las tres.
+
+  El cuerpo de ejemplo sirve para un estado sin clave (poné `catalog: estados` y corré `catalogs.list`).
+  Errores: 400 falta una fecha obligatoria, sobra una no admitida o el estado no existe o está
+  desactivado; 404; 409 si `updatedAt` quedó viejo.
+}

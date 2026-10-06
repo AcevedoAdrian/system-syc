@@ -5,7 +5,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { CatalogsModule } from "./modules/catalogs/catalogs.module";
 import { HealthModule } from "./modules/health/health.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
-import { PermissionsProbeModule } from "./modules/permissions-probe/permissions-probe.module";
+import { TicketsModule } from "./modules/tickets/tickets.module";
 import { UsersModule } from "./modules/users/users.module";
 
 @Module({
@@ -17,7 +17,7 @@ import { UsersModule } from "./modules/users/users.module";
     UsersModule,
     OrganizationsModule,
     CatalogsModule,
-    PermissionsProbeModule,
+    TicketsModule,
   ],
 })
 export class AppModule {}

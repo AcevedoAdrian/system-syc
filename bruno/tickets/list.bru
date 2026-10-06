@@ -1,0 +1,33 @@
+meta {
+  name: tickets.list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{urlBase}}:{{port}}/tickets
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Lista mínima: los 50 tickets más recientes por número, sin filtros ni paginación (la bandeja
+  completa es de SPEC 06). Un agente ve solo los de su departamento; el admin, los de todos.
+
+  Contrato: `tickets.list` en `packages/contracts`.
+  Método: GET
+  Ruta: /tickets
+
+  Respuesta 200: arreglo de { id, numero, titulo, departamento, estado, prioridad, fechaRecepcion }.
+  Errores: 401 sin sesión.
+}

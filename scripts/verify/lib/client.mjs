@@ -36,6 +36,7 @@ export class Client {
 
   get = (url) => this.request("GET", url);
   post = (url, json = {}) => this.request("POST", url, { json });
+  put = (url, json) => this.request("PUT", url, { json });
   patch = (url, json) => this.request("PATCH", url, { json });
   delete = (url) => this.request("DELETE", url);
 

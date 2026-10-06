@@ -1,0 +1,57 @@
+meta {
+  name: tickets.update
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+body:json {
+  {
+    "updatedAt": "{{ticketUpdatedAt}}",
+    "titulo": "Ticket de prueba (editado)",
+    "prioridadId": "{{listedItemId}}",
+    "fechaRecepcion": "2026-10-01",
+    "fechaCierre": null,
+    "fechaReabierto": null,
+    "notificado": false
+  }
+}
+
+assert {
+  res.status: eq 200
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("ticketUpdatedAt", res.body.updatedAt);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Edita un ticket: reemplaza todos los campos editables. Lo que no va, o va en blanco, se borra.
+
+  Contrato: `tickets.update` en `packages/contracts`.
+  Método: PUT
+  Ruta: /tickets/{ticketId}
+  Cuerpo: updatedAt (versión leída), titulo, prioridadId, fechaRecepcion, fechaCierre, fechaReabierto y
+  notificado son obligatorios. Opcionales: descripcion, actuacionSimple, areaId, edificioId, tipoId,
+  moduloId, proveedorId, referenciaExterna y solucionDescripcion.
+
+  `fechaCierre` y `fechaReabierto` solo se corrigen si el ticket ya tiene valor: se cargan al cambiar
+  de estado. No cambia el estado ni el departamento (tienen su propia petición).
+  Sin cambios efectivos responde 200 y no audita. Guarda la versión nueva en `ticketUpdatedAt`.
+  Errores: 400 validación o ítem nuevo inexistente o desactivado; 404; 409 si `updatedAt` quedó viejo
+  ("Otro usuario modificó este ticket") o la referencia ya existe.
+}

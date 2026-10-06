@@ -1,0 +1,38 @@
+meta {
+  name: tickets.history
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId/history
+  body: none
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Historial del ticket: lee el `AuditLog` con `entityType: "Ticket"`, del más reciente al más antiguo.
+
+  Contrato: `tickets.history` en `packages/contracts`.
+  Método: GET
+  Ruta: /tickets/{ticketId}/history
+
+  Respuesta 200: arreglo de { id, action, actor, payload, createdAt }. En `update`, el payload es
+  { before, after } con solo lo que cambió; las referencias van como { id, nombre }.
+  Lo ve quien ve el ticket. Un id sin registros devuelve [] (el admin también lee el de uno eliminado).
+  Errores: 401 sin sesión; 404 para un agente si el ticket es de otro departamento, no existe o fue eliminado.
+}

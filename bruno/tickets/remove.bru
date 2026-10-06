@@ -1,0 +1,37 @@
+meta {
+  name: tickets.remove
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+assert {
+  res.status: eq 200
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Elimina un ticket (borrado lógico). Solo admin (permiso `ticket:delete`).
+
+  Contrato: `tickets.remove` en `packages/contracts`.
+  Método: DELETE
+  Ruta: /tickets/{ticketId}
+
+  Sale de los listados, su número no se reutiliza y su referencia externa queda libre. El historial
+  se conserva.
+  Errores: 403 si no es admin (también para un ticket de su propio departamento); 404 si no existe o
+  ya está eliminado.
+}

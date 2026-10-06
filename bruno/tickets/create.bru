@@ -1,0 +1,54 @@
+meta {
+  name: tickets.create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{urlBase}}:{{port}}/tickets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "departamentoId": "{{organizationId}}",
+    "titulo": "Ticket de prueba",
+    "prioridadId": "{{listedItemId}}",
+    "fechaRecepcion": "2026-10-01"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("ticketId", res.body.id);
+    bru.setVar("ticketUpdatedAt", res.body.updatedAt);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Crea un ticket. Nace en el primer estado activo y recibe el siguiente número (`TE-000013`).
+
+  Contrato: `tickets.create` en `packages/contracts`.
+  Método: POST
+  Ruta: /tickets
+  Cuerpo: departamentoId, titulo (hasta 200) y prioridadId y fechaRecepcion (hoy o anterior, en hora
+  de Argentina) son obligatorios. Opcionales: descripcion (hasta 5000), actuacionSimple (hasta 500),
+  proveedorId y referenciaExterna (`número/año`, exige proveedorId; `019092/2026` se guarda como
+  `19092/2026`).
+
+  Antes: `organizations.list` (departamento) y `catalogs.list` con `catalog: prioridades` (prioridad).
+  Guarda `ticketId` y `ticketUpdatedAt`.
+  Errores: 400 validación, prioridad o proveedor inexistente o desactivado; 403 si un agente manda el
+  departamento de otro; 409 si el departamento está desactivado o la referencia ya existe.
+}

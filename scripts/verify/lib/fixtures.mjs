@@ -65,3 +65,35 @@ export async function loggedIn(user) {
   assertStatus(await client.login(user.username, user.password), 200, `login de ${user.username}`);
   return client;
 }
+
+let prioridadId = null;
+
+// Id de una prioridad activa del seed (la misma para todos los fixtures de tickets).
+export async function firstPrioridadId() {
+  if (!prioridadId) {
+    const res = await (await admin()).get("/catalogs/prioridades");
+    assertStatus(res, 200, "catalogs.prioridades.list");
+    const activa = res.body.find((p) => p.activo);
+    assert(activa, "no hay ninguna prioridad activa (¿corrió el seed?)");
+    prioridadId = activa.id;
+  }
+  return prioridadId;
+}
+
+// Cuerpo de un alta de ticket válido en `departamentoId`; `extra` pisa o suma campos.
+export async function ticketBody(departamentoId, extra = {}) {
+  return {
+    departamentoId,
+    titulo: `Ticket ${uniq()}`,
+    prioridadId: await firstPrioridadId(),
+    fechaRecepcion: "2020-01-01", // fija y pasada: nunca cae en el futuro de Argentina
+    ...extra,
+  };
+}
+
+// Crea un ticket por la API con la sesión de `client` (el admin, o un agente en su departamento).
+export async function newTicket(client, departamentoId, extra = {}) {
+  const res = await client.post("/tickets", await ticketBody(departamentoId, extra));
+  assertStatus(res, 200, "crear ticket");
+  return res.body;
+}

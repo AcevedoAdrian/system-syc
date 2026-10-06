@@ -1,0 +1,23 @@
+meta {
+  name: tickets
+  seq: 7
+}
+
+docs {
+  Ciclo de un ticket: alta, edición, cambio de estado, cambio de departamento, eliminación e historial.
+  Un agente solo opera en su departamento; el admin, en todos. Iniciar sesión primero (`auth.signIn`).
+
+  Variables que usan las peticiones:
+  - `ticketId` y `ticketUpdatedAt`: las guarda `tickets.create` y las renueva cada petición que
+    devuelve el ticket. `ticketUpdatedAt` es la versión para el bloqueo optimista (409 si quedó vieja).
+  - `organizationId`: el departamento del alta (admin: `organizations.list` guarda el primero; un
+    agente usa el suyo, `department.id` de `users.me`).
+  - `listedItemId`: lo guarda `catalogs.list` (el primer ítem del catálogo elegido en `catalog`).
+    `tickets.create` y `tickets.update` lo usan como prioridad (poné `catalog: prioridades` y corré
+    `catalogs.list` antes); `tickets.changeStatus`, como estado (`catalog: estados`).
+  - `newOrganizationId`: lo guarda `organizations.create`; es el destino de `tickets.changeDepartment`.
+
+  Para ver el 404 de un agente: iniciar sesión con un agente y pedir `tickets.get` de un ticket de
+  otro departamento (404, igual que uno inexistente). `tickets.remove` y `tickets.changeDepartment`
+  dan 403 a un agente, también en su propio departamento.
+}

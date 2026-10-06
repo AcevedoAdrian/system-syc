@@ -1,0 +1,40 @@
+meta {
+  name: tickets.get
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{urlBase}}:{{port}}/tickets/:ticketId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  ticketId: {{ticketId}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.id: isString
+}
+
+script:post-response {
+  if (res.status === 200) bru.setVar("ticketUpdatedAt", res.body.updatedAt);
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  Devuelve un ticket con todos sus campos y las referencias como { id, nombre }.
+
+  Contrato: `tickets.get` en `packages/contracts`.
+  Método: GET
+  Ruta: /tickets/{ticketId}
+
+  Guarda la versión en `ticketUpdatedAt`.
+  Errores: 401 sin sesión; 404 si no existe, está eliminado o (para un agente) es de otro departamento.
+}
