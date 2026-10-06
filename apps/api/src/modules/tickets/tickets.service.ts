@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import {
+  type AuditHistory,
+  type ChangeTicketDepartmentInput,
   type ChangeTicketStatusInput,
   type ClaveEstado,
   type CreateTicketInput,
@@ -10,6 +12,7 @@ import {
   type UpdateTicketInput,
 } from "@syc/contracts";
 import type { AuthenticatedUser, UserScope } from "../../common/authenticated-request";
+import { AuditService } from "../audit/audit.service";
 import { computeDiff } from "../audit/audit-diff";
 import { snapshotOf } from "./ticket-audit-snapshot";
 import {
@@ -62,7 +65,10 @@ const sameInstant = (a: string, b: string): boolean =>
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly repository: TicketsRepository) {}
+  constructor(
+    private readonly repository: TicketsRepository,
+    private readonly audit: AuditService,
+  ) {}
 
   // El alcance es un filtro obligatorio: el agente ve su departamento y el admin todos.
   async list(actor: AuthenticatedUser): Promise<TicketSummary[]> {
@@ -304,6 +310,60 @@ export class TicketsService {
       actorId: actor.id,
       payload: { ...diff },
     });
+  }
+
+  // Solo el admin (el guard lo exige). Conserva número, historial y, desde SPEC 06, comentarios; desde
+  // el cambio editan los agentes del departamento nuevo, que debe existir y estar activo.
+  async changeDepartment(
+    input: ChangeTicketDepartmentInput,
+    actor: AuthenticatedUser,
+  ): Promise<Ticket> {
+    const current = await this.get(input.ticketId);
+    if (!sameInstant(input.updatedAt, current.updatedAt)) {
+      throw new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE });
+    }
+    // El mismo departamento no cambia nada, ni siquiera si hoy está desactivado.
+    if (input.departamentoId === current.departamento.id) return current;
+
+    const destino = await this.repository.findDepartment(input.departamentoId);
+    if (!destino) throw new ORPCError("BAD_REQUEST", { message: "El departamento no existe" });
+    if (!destino.activo) {
+      throw new ORPCError("CONFLICT", {
+        message: "El departamento está desactivado: no puede recibir tickets",
+      });
+    }
+
+    const next: Ticket = { ...current, departamento: { id: destino.id, nombre: destino.nombre } };
+    const diff = computeDiff(snapshotOf(current), snapshotOf(next));
+    if (!diff) return current;
+
+    return this.repository.changeDepartment(current.id, input.updatedAt, destino.id, actor.id, {
+      entityType: ENTITY_TYPE,
+      entityId: current.id,
+      action: "update",
+      actorId: actor.id,
+      payload: { ...diff },
+    });
+  }
+
+  // Solo el admin (el guard lo exige), también sobre un ticket de su propio departamento. Eliminar
+  // algo ya eliminado o inexistente es 404.
+  async remove(ticketId: string, actor: AuthenticatedUser): Promise<void> {
+    await this.get(ticketId);
+    await this.repository.softDelete(ticketId, actor.id, {
+      entityType: ENTITY_TYPE,
+      entityId: ticketId,
+      action: "delete",
+      actorId: actor.id,
+      payload: {},
+    });
+  }
+
+  // Del más reciente al más antiguo. Sin chequear que el ticket exista: el de uno eliminado se sigue
+  // leyendo (solo el admin llega acá, porque para un agente el guard ya responde 404), y un id sin
+  // registros devuelve `[]`. No hay una tabla de historial propia: es `AuditLog`.
+  async history(ticketId: string): Promise<AuditHistory> {
+    return this.audit.history(ENTITY_TYPE, ticketId);
   }
 
   // "Referencia válida": un valor que el ticket ya tenía se acepta aunque hoy esté inactivo o

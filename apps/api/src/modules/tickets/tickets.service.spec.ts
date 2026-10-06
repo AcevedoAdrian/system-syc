@@ -1,7 +1,13 @@
-import type { ChangeTicketStatusInput, CreateTicketInput, UpdateTicketInput } from "@syc/contracts";
-import { describe, expect, it } from "vitest";
+import type {
+  ChangeTicketDepartmentInput,
+  ChangeTicketStatusInput,
+  CreateTicketInput,
+  UpdateTicketInput,
+} from "@syc/contracts";
+import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
+import type { AuditService } from "../audit/audit.service";
 import type {
   EstadoRow,
   ReferenceMatch,
@@ -130,6 +136,14 @@ function buildService(world: World = {}) {
   const referencias = world.referencias ?? [];
   const audits: AuditEntry[] = [];
   const created: { data: TicketCreateData; actorId: string }[] = [];
+  const departmentChanges: {
+    id: string;
+    expectedUpdatedAt: string;
+    departamentoId: string;
+    actorId: string;
+  }[] = [];
+  const deletions: { id: string; actorId: string }[] = [];
+  const history = vi.fn(async (_entityType: string, _entityId: string) => []);
   const statusChanges: {
     id: string;
     expectedUpdatedAt: string;
@@ -259,10 +273,34 @@ function buildService(world: World = {}) {
         updatedAt: "2026-10-06T11:00:00.000Z",
       };
     },
+    changeDepartment: async (
+      id: string,
+      expectedUpdatedAt: string,
+      departamentoId: string,
+      actorId: string,
+      audit: AuditEntry,
+    ): Promise<TicketRow> => {
+      departmentChanges.push({ id, expectedUpdatedAt, departamentoId, actorId });
+      audits.push(audit);
+      const current = tickets.find((t) => t.id === id) as TicketRow;
+      const destino = departamentos.find((d) => d.id === departamentoId) as ReferenceRow;
+      return {
+        ...current,
+        departamento: { id: destino.id, nombre: destino.nombre },
+        updatedAt: "2026-10-06T11:00:00.000Z",
+      };
+    },
+    softDelete: async (id: string, actorId: string, audit: AuditEntry) => {
+      deletions.push({ id, actorId });
+      audits.push(audit);
+    },
   } as unknown as TicketsRepository;
 
   return {
-    service: new TicketsService(repository),
+    service: new TicketsService(repository, { history } as unknown as AuditService),
+    history,
+    departmentChanges,
+    deletions,
     audits,
     created,
     updates,
@@ -1285,6 +1323,161 @@ describe("TicketsService.changeStatus", () => {
         status: 404,
       });
     });
+  });
+});
+
+describe("TicketsService.changeDepartment", () => {
+  const ticket = unTicket();
+  const mover = (
+    t: TicketRow,
+    departamentoId: string,
+    extra: Partial<ChangeTicketDepartmentInput> = {},
+  ): ChangeTicketDepartmentInput => ({
+    ticketId: t.id,
+    updatedAt: t.updatedAt,
+    departamentoId,
+    ...extra,
+  });
+
+  it("cambia el departamento, conserva el número y audita solo el departamento", async () => {
+    const { service, departmentChanges, audits } = buildService({ tickets: [ticket] });
+
+    const result = await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(result).toMatchObject({
+      numero: 13,
+      departamento: { id: "red", nombre: "Redes" },
+      titulo: "Impresora rota",
+    });
+    expect(departmentChanges).toEqual([
+      { id: "t-1", expectedUpdatedAt: ticket.updatedAt, departamentoId: "red", actorId: "admin-1" },
+    ]);
+    expect(audits).toEqual([
+      {
+        entityType: "Ticket",
+        entityId: "t-1",
+        action: "update",
+        actorId: "admin-1",
+        payload: {
+          before: { departamento: { id: "tec", nombre: "Técnico" } },
+          after: { departamento: { id: "red", nombre: "Redes" } },
+        },
+      },
+    ]);
+  });
+
+  it("el departamento nuevo desactivado: 409 y no cambia nada", async () => {
+    const { service, departmentChanges, audits } = buildService({
+      tickets: [ticket],
+      departamentos: [ref("tec", "Técnico"), ref("red", "Redes", false)],
+    });
+
+    await expect(service.changeDepartment(mover(ticket, "red"), admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      status: 409,
+      message: "El departamento está desactivado: no puede recibir tickets",
+    });
+    expect(departmentChanges).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it("el departamento nuevo inexistente: 400", async () => {
+    const { service, departmentChanges } = buildService({ tickets: [ticket] });
+
+    await expect(service.changeDepartment(mover(ticket, "nada"), admin)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      status: 400,
+      message: "El departamento no existe",
+    });
+    expect(departmentChanges).toHaveLength(0);
+  });
+
+  it("el mismo departamento responde 200, sin escribir ni auditar, aunque hoy esté desactivado", async () => {
+    const { service, departmentChanges, audits } = buildService({
+      tickets: [ticket],
+      departamentos: [ref("tec", "Técnico", false), ref("red", "Redes")],
+    });
+
+    await expect(service.changeDepartment(mover(ticket, "tec"), admin)).resolves.toEqual(ticket);
+    expect(departmentChanges).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it("con la versión desactualizada responde 409 y no guarda nada", async () => {
+    const { service, departmentChanges } = buildService({ tickets: [ticket] });
+
+    await expect(
+      service.changeDepartment(
+        mover(ticket, "red", { updatedAt: "2026-10-06T09:00:00.000Z" }),
+        admin,
+      ),
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "Otro usuario modificó este ticket. Recargá para ver los cambios.",
+    });
+    expect(departmentChanges).toHaveLength(0);
+  });
+
+  it("pasa la versión leída al repository para el bloqueo optimista", async () => {
+    const { service, departmentChanges } = buildService({ tickets: [ticket] });
+
+    await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(departmentChanges[0]?.expectedUpdatedAt).toBe(ticket.updatedAt);
+  });
+
+  it("un ticket inexistente o eliminado: 404", async () => {
+    const { service } = buildService();
+
+    await expect(service.changeDepartment(mover(ticket, "red"), admin)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+    });
+  });
+});
+
+describe("TicketsService.remove", () => {
+  const ticket = unTicket();
+
+  it("elimina de forma lógica y audita `delete` con payload vacío", async () => {
+    const { service, deletions, audits } = buildService({ tickets: [ticket] });
+
+    await expect(service.remove("t-1", admin)).resolves.toBeUndefined();
+
+    expect(deletions).toEqual([{ id: "t-1", actorId: "admin-1" }]);
+    expect(audits).toEqual([
+      { entityType: "Ticket", entityId: "t-1", action: "delete", actorId: "admin-1", payload: {} },
+    ]);
+  });
+
+  it("un ticket inexistente o ya eliminado: 404 y no escribe", async () => {
+    const { service, deletions, audits } = buildService();
+
+    await expect(service.remove("t-1", admin)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+      message: "El ticket no existe",
+    });
+    expect(deletions).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+});
+
+describe("TicketsService.history", () => {
+  it("lee el AuditLog de la entidad Ticket, sin tabla de historial propia", async () => {
+    const { service, history } = buildService();
+
+    await expect(service.history("t-1")).resolves.toEqual([]);
+
+    expect(history).toHaveBeenCalledWith("Ticket", "t-1");
+  });
+
+  it("no chequea que el ticket exista: el historial de uno eliminado se sigue leyendo", async () => {
+    const { service, history } = buildService({ tickets: [] });
+
+    await service.history("t-eliminado");
+
+    expect(history).toHaveBeenCalledWith("Ticket", "t-eliminado");
   });
 });
 

@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { ClaveEstado, Ticket, TicketSummary } from "@syc/contracts";
 import { getPrismaClient } from "@syc/db";
-import { notDeleted } from "../../common/soft-delete";
+import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { type AuditEntry, writeAuditEntry } from "../audit/audit.repository";
@@ -82,7 +82,7 @@ export interface TicketStatusData {
 }
 
 // Los campos que una escritura con bloqueo optimista puede tocar (la unión de las anteriores).
-type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string };
+type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string; departamentoId?: string };
 
 // Bloqueo optimista (Q22): la versión que el cliente leyó ya no es la de la base.
 export const STALE_TICKET_MESSAGE =
@@ -354,6 +354,30 @@ export class TicketsRepository {
     audit: AuditEntry,
   ): Promise<TicketRow> {
     return this.writeLocked(id, expectedUpdatedAt, data, actorId, audit);
+  }
+
+  async changeDepartment(
+    id: string,
+    expectedUpdatedAt: string,
+    departamentoId: string,
+    actorId: string,
+    audit: AuditEntry,
+  ): Promise<TicketRow> {
+    return this.writeLocked(id, expectedUpdatedAt, { departamentoId }, actorId, audit);
+  }
+
+  // Eliminación lógica: nunca hay `DELETE` físico. El número no se reutiliza y la referencia externa
+  // queda libre (el índice único parcial solo cuenta los no eliminados). Un ticket que ya no existe
+  // o ya está eliminado es 404, también si otro lo eliminó entre la lectura y esta escritura.
+  async softDelete(id: string, actorId: string, audit: AuditEntry): Promise<void> {
+    await this.db.$transaction(async (tx) => {
+      const { count } = await tx.ticket.updateMany({
+        where: { id, ...notDeleted },
+        data: softDeleteData(actorId),
+      });
+      if (count === 0) throw new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
+      await writeAuditEntry(tx, audit);
+    });
   }
 
   // Bloqueo optimista: la escritura exige que `updatedAt` siga siendo el que el cliente leyó. Si no
