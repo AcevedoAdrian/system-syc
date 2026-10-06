@@ -4,9 +4,10 @@ import {
   type AuditHistory,
   type ChangeTicketDepartmentInput,
   type ChangeTicketStatusInput,
-  type ClaveEstado,
+  CLAVES_DE_CIERRE,
   type CreateTicketInput,
   formatTicketNumber,
+  STALE_TICKET_MESSAGE,
   type Ticket,
   type TicketSummary,
   type UpdateTicketInput,
@@ -18,7 +19,6 @@ import { snapshotOf } from "./ticket-audit-snapshot";
 import {
   type ReferenceMatch,
   type ReferenceRow,
-  STALE_TICKET_MESSAGE,
   type TicketCatalog,
   type TicketStatusData,
   TicketsRepository,
@@ -39,10 +39,6 @@ function scopeOf(actor: AuthenticatedUser): UserScope {
 }
 
 type Ref = { id: string; nombre: string };
-
-// Los estados que cierran un ticket y exigen fecha de cierre. Siempre se compara la `clave`, nunca el
-// nombre: el admin puede renombrar "Finalizado" sin que la regla deje de aplicarse (D1).
-const CLAVES_DE_CIERRE: readonly ClaveEstado[] = ["FINALIZADO", "CERRADO", "CANCELADO"];
 
 // "Referencia válida" de un valor nuevo: existe (no eliminado) y está activo.
 function assertUsable(row: ReferenceRow | null, message: string): asserts row is ReferenceRow {

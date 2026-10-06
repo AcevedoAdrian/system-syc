@@ -1,6 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { CatalogRuta, ClaveEstado, Ticket, TicketSummary } from "@syc/contracts";
+import {
+  type CatalogRuta,
+  type ClaveEstado,
+  STALE_TICKET_MESSAGE,
+  type Ticket,
+  type TicketSummary,
+} from "@syc/contracts";
 import { getPrismaClient } from "@syc/db";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import type { TicketUsageReader } from "../../common/ticket-usage-reader";
@@ -84,10 +90,6 @@ export interface TicketStatusData {
 
 // Los campos que una escritura con bloqueo optimista puede tocar (la unión de las anteriores).
 type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string; departamentoId?: string };
-
-// Bloqueo optimista (Q22): la versión que el cliente leyó ya no es la de la base.
-export const STALE_TICKET_MESSAGE =
-  "Otro usuario modificó este ticket. Recargá para ver los cambios.";
 
 const ref = { select: { id: true, nombre: true } } as const;
 const user = { select: { id: true, name: true } } as const;

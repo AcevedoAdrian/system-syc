@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/client";
+import { STALE_TICKET_MESSAGE } from "@syc/contracts";
 
 // Una sesión vencida o revocada llega como 401 (el cliente oRPC lo mapea por status).
 export function isUnauthorized(error: unknown): boolean {
@@ -15,6 +16,13 @@ export function isNotFound(error: unknown): boolean {
 // Otro usuario modificó el ticket (bloqueo optimista): la pantalla pide recargar.
 export function isConflict(error: unknown): boolean {
   return error instanceof ORPCError && error.status === 409;
+}
+
+// El 409 del bloqueo optimista de un ticket (otro usuario lo modificó). Una referencia externa
+// duplicada también es 409, pero ahí recargar descartaría lo escrito sin necesidad: se distinguen por
+// el mensaje, que comparten la API y la web.
+export function isStaleTicket(error: unknown): boolean {
+  return isConflict(error) && error instanceof ORPCError && error.message === STALE_TICKET_MESSAGE;
 }
 
 const VALIDATION_MESSAGE = "Input validation failed";

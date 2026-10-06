@@ -118,6 +118,22 @@ describe("CatalogOptionSelect", () => {
     });
   });
 
+  it("`excludeId` quita un ítem de las opciones (el estado actual al cambiar de estado)", async () => {
+    render(
+      <CatalogOptionSelect
+        id="estado"
+        ruta="estados"
+        value=""
+        onChange={() => undefined}
+        excludeId="a1"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(optionNames()).toEqual(["Archivo"]);
+  });
+
   it("deshabilitado no se abre", async () => {
     render(
       <CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} disabled />,

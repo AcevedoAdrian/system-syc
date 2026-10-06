@@ -1,8 +1,18 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { auditHistorySchema } from "./audit.js";
-import { claveEstadoSchema } from "./catalogs.js";
+import { type ClaveEstado, claveEstadoSchema } from "./catalogs.js";
 import { blankToNull, blankToNullValue, fechaNoFuturaSchema } from "./fields.js";
+
+// Bloqueo optimista (Q22): la versión (`updatedAt`) que el cliente leyó ya no es la de la base. Es un 409,
+// igual que una referencia externa duplicada: la web compara este texto para ofrecer "Recargar" solo
+// en el primer caso, que es el que descarta lo escrito.
+export const STALE_TICKET_MESSAGE =
+  "Otro usuario modificó este ticket. Recargá para ver los cambios.";
+
+// Los estados que cierran un ticket y exigen fecha de cierre (Feature 5.4). Siempre se compara la `clave`,
+// nunca el nombre: el admin puede renombrar "Finalizado" sin que la regla deje de aplicarse (D1).
+export const CLAVES_DE_CIERRE: readonly ClaveEstado[] = ["FINALIZADO", "CERRADO", "CANCELADO"];
 
 // `TE-000013`: 6 dígitos con ceros hasta `TE-999999`; desde `TE-1000000` sin relleno (Q21, P9, P12).
 // `numero` se guarda como entero y solo se muestra así.

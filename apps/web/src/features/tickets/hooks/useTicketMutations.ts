@@ -27,6 +27,15 @@ export function useChangeTicketDepartment() {
   );
 }
 
+// Solo la lista, y sin esperar: volver a pedir el ticket que se acaba de eliminar da 404 y la pantalla
+// mostraría "El ticket no existe" un instante antes de volver a la lista.
 export function useRemoveTicket() {
-  return useMutation(orpc.tickets.remove.mutationOptions({ onSuccess: useInvalidateTickets() }));
+  const queryClient = useQueryClient();
+  return useMutation(
+    orpc.tickets.remove.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: orpc.tickets.list.key() });
+      },
+    }),
+  );
 }

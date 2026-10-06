@@ -23,6 +23,8 @@ interface CatalogOptionSelectProps {
   // El valor que el ticket ya tiene. Si hoy está desactivado o eliminado no está en las opciones, pero
   // se sigue mostrando (marcado) para que guardar sin tocarlo no lo borre (SPEC 05, "referencia válida").
   current?: { id: string; nombre: string } | null;
+  // Un ítem que no se ofrece (el estado actual al cambiar de estado).
+  excludeId?: string;
   invalid?: boolean;
   disabled?: boolean;
 }
@@ -37,10 +39,12 @@ export function CatalogOptionSelect({
   placeholder = "Elegí una opción",
   emptyLabel,
   current,
+  excludeId,
   invalid,
   disabled,
 }: CatalogOptionSelectProps) {
-  const { data: options = [] } = useCatalogOptions(ruta);
+  const { data: allOptions = [] } = useCatalogOptions(ruta);
+  const options = allOptions.filter((option) => option.id !== excludeId);
   const currentIsOutOfOptions = current && !options.some((option) => option.id === current.id);
 
   return (

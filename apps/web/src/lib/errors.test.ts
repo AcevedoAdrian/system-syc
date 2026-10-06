@@ -1,9 +1,9 @@
 import { createORPCClient, ORPCError } from "@orpc/client";
 import type { ContractRouterClient } from "@orpc/contract";
 import { OpenAPILink } from "@orpc/openapi-client/fetch";
-import { contract } from "@syc/contracts";
+import { contract, STALE_TICKET_MESSAGE } from "@syc/contracts";
 import { describe, expect, it } from "vitest";
-import { getErrorMessage, isConflict, isNotFound, isUnauthorized } from "./errors";
+import { getErrorMessage, isConflict, isNotFound, isStaleTicket, isUnauthorized } from "./errors";
 
 describe("isUnauthorized", () => {
   it("detecta el 401 de la API, venga o no con el formato de oRPC", () => {
@@ -69,5 +69,22 @@ describe("isNotFound e isConflict", () => {
     expect(error).toBeInstanceOf(ORPCError);
     expect(isNotFound(error)).toBe(true);
     expect(isConflict(error)).toBe(false);
+  });
+});
+
+describe("isStaleTicket", () => {
+  it("solo es la versión desactualizada, no cualquier 409", () => {
+    const stale = new ORPCError("CONFLICT", { status: 409, message: STALE_TICKET_MESSAGE });
+    const duplicate = new ORPCError("CONFLICT", {
+      status: 409,
+      message: "Esa referencia ya está cargada en el ticket TE-000013",
+    });
+
+    expect(isStaleTicket(stale)).toBe(true);
+    expect(isStaleTicket(duplicate)).toBe(false);
+    expect(isStaleTicket(new Error(STALE_TICKET_MESSAGE))).toBe(false);
+    expect(
+      isStaleTicket(new ORPCError("NOT_FOUND", { status: 404, message: STALE_TICKET_MESSAGE })),
+    ).toBe(false);
   });
 });
