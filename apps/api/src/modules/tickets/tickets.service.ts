@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import {
+  type ChangeTicketStatusInput,
+  type ClaveEstado,
   type CreateTicketInput,
   formatTicketNumber,
   type Ticket,
@@ -15,6 +17,7 @@ import {
   type ReferenceRow,
   STALE_TICKET_MESSAGE,
   type TicketCatalog,
+  type TicketStatusData,
   TicketsRepository,
 } from "./tickets.repository";
 
@@ -33,6 +36,10 @@ function scopeOf(actor: AuthenticatedUser): UserScope {
 }
 
 type Ref = { id: string; nombre: string };
+
+// Los estados que cierran un ticket y exigen fecha de cierre. Siempre se compara la `clave`, nunca el
+// nombre: el admin puede renombrar "Finalizado" sin que la regla deje de aplicarse (D1).
+const CLAVES_DE_CIERRE: readonly ClaveEstado[] = ["FINALIZADO", "CERRADO", "CANCELADO"];
 
 // "Referencia válida" de un valor nuevo: existe (no eliminado) y está activo.
 function assertUsable(row: ReferenceRow | null, message: string): asserts row is ReferenceRow {
@@ -225,6 +232,78 @@ export class TicketsService {
         payload: { ...diff },
       },
     );
+  }
+
+  // Cambia el estado (Feature 5.4). Cualquier estado activo puede pasar a cualquier otro. Las fechas y la
+  // solución que acepta la request dependen de la `clave` del estado destino: un estado de cierre pide
+  // `fechaCierre`, `REABIERTO` pide `fechaReabierto`, y cualquier otro no admite ninguna. Lo que la
+  // request no manda no se toca (al reabrir se conservan `fechaCierre` y la solución).
+  async changeStatus(input: ChangeTicketStatusInput, actor: AuthenticatedUser): Promise<Ticket> {
+    const current = await this.get(input.ticketId);
+    if (!sameInstant(input.updatedAt, current.updatedAt)) {
+      throw new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE });
+    }
+
+    const destino = (await this.repository.findEstados()).find((e) => e.id === input.estadoId);
+    if (!destino) throw new ORPCError("BAD_REQUEST", { message: "El estado no existe" });
+    // Como en el resto de las referencias, el estado que el ticket ya tiene se acepta aunque se
+    // haya desactivado después; uno nuevo debe estar activo.
+    if (!destino.activo && destino.id !== current.estado.id) {
+      throw new ORPCError("BAD_REQUEST", { message: "El estado está desactivado" });
+    }
+
+    const cierra = destino.clave !== null && CLAVES_DE_CIERRE.includes(destino.clave);
+    const reabre = destino.clave === "REABIERTO";
+    if (cierra && input.fechaCierre === undefined) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Para pasar a un estado de cierre hay que indicar la fecha de cierre",
+      });
+    }
+    if (reabre && input.fechaReabierto === undefined) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "Para reabrir el ticket hay que indicar la fecha de reapertura",
+      });
+    }
+    if (!cierra && input.fechaCierre !== undefined) {
+      throw new ORPCError("BAD_REQUEST", { message: "Este estado no admite fecha de cierre" });
+    }
+    if (!reabre && input.fechaReabierto !== undefined) {
+      throw new ORPCError("BAD_REQUEST", { message: "Este estado no admite fecha de reapertura" });
+    }
+    if (!cierra && input.solucionDescripcion !== undefined) {
+      throw new ORPCError("BAD_REQUEST", { message: "Este estado no admite una solución" });
+    }
+
+    const write: TicketStatusData = { estadoId: destino.id };
+    if (cierra) {
+      write.fechaCierre = input.fechaCierre;
+      if (input.solucionDescripcion !== undefined) {
+        write.solucionDescripcion = input.solucionDescripcion;
+      }
+    }
+    if (reabre) write.fechaReabierto = input.fechaReabierto;
+
+    const next: Ticket = {
+      ...current,
+      estado: { id: destino.id, nombre: destino.nombre, clave: destino.clave },
+      fechaCierre: write.fechaCierre !== undefined ? write.fechaCierre : current.fechaCierre,
+      fechaReabierto:
+        write.fechaReabierto !== undefined ? write.fechaReabierto : current.fechaReabierto,
+      solucionDescripcion:
+        write.solucionDescripcion !== undefined
+          ? write.solucionDescripcion
+          : current.solucionDescripcion,
+    };
+    const diff = computeDiff(snapshotOf(current), snapshotOf(next));
+    if (!diff) return current;
+
+    return this.repository.changeStatus(current.id, input.updatedAt, write, actor.id, {
+      entityType: ENTITY_TYPE,
+      entityId: current.id,
+      action: "update",
+      actorId: actor.id,
+      payload: { ...diff },
+    });
   }
 
   // "Referencia válida": un valor que el ticket ya tenía se acepta aunque hoy esté inactivo o

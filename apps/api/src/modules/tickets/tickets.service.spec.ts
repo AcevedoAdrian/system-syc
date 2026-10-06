@@ -1,4 +1,4 @@
-import type { CreateTicketInput, UpdateTicketInput } from "@syc/contracts";
+import type { ChangeTicketStatusInput, CreateTicketInput, UpdateTicketInput } from "@syc/contracts";
 import { describe, expect, it } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
@@ -9,6 +9,7 @@ import type {
   TicketCatalog,
   TicketCreateData,
   TicketRow,
+  TicketStatusData,
   TicketSummaryRow,
   TicketsRepository,
   TicketUpdateData,
@@ -129,6 +130,12 @@ function buildService(world: World = {}) {
   const referencias = world.referencias ?? [];
   const audits: AuditEntry[] = [];
   const created: { data: TicketCreateData; actorId: string }[] = [];
+  const statusChanges: {
+    id: string;
+    expectedUpdatedAt: string;
+    data: TicketStatusData;
+    actorId: string;
+  }[] = [];
   const updates: {
     id: string;
     expectedUpdatedAt: string;
@@ -232,6 +239,26 @@ function buildService(world: World = {}) {
         updatedAt: "2026-10-06T11:00:00.000Z",
       };
     },
+    // Imita el `changeStatus` real: solo pisa lo que el service manda (lo ausente no se toca).
+    changeStatus: async (
+      id: string,
+      expectedUpdatedAt: string,
+      data: TicketStatusData,
+      actorId: string,
+      audit: AuditEntry,
+    ): Promise<TicketRow> => {
+      statusChanges.push({ id, expectedUpdatedAt, data, actorId });
+      audits.push(audit);
+      const current = tickets.find((t) => t.id === id) as TicketRow;
+      const destino = estados.find((e) => e.id === data.estadoId) as EstadoRow;
+      const { estadoId: _estadoId, ...campos } = data;
+      return {
+        ...current,
+        ...campos,
+        estado: { id: destino.id, nombre: destino.nombre, clave: destino.clave },
+        updatedAt: "2026-10-06T11:00:00.000Z",
+      };
+    },
   } as unknown as TicketsRepository;
 
   return {
@@ -239,6 +266,7 @@ function buildService(world: World = {}) {
     audits,
     created,
     updates,
+    statusChanges,
     recentCalls,
   };
 }
@@ -778,6 +806,15 @@ describe("TicketsService.update", () => {
       });
     });
 
+    it("asociar un proveedor no toca el estado ni el departamento (Q28)", async () => {
+      const { service, updates } = buildService({ tickets: [ticket] });
+
+      await service.update(edit(ticket, { proveedorId: "acme" }), agenteTecnico);
+
+      expect(updates[0]?.data).not.toHaveProperty("estadoId");
+      expect(updates[0]?.data).not.toHaveProperty("departamentoId");
+    });
+
     it("la referencia que el propio ticket ya tiene no cuenta como duplicada", async () => {
       const propia = { ...ajeno, id: "t-1", numero: 13, referenciaExterna: "19092/2026" };
       const { service, updates } = buildService({
@@ -862,6 +899,391 @@ describe("TicketsService.update", () => {
       );
 
       expect(updates[0]?.data).toMatchObject({ proveedorId: "otro", referenciaExterna: null });
+    });
+  });
+});
+
+// Estados con `clave` como los del seed, pero con un nombre cambiado ("Resuelto") y otro sin clave
+// que se llama "Finalizado": la regla es por `clave`, nunca por nombre (D1).
+const ESTADOS: EstadoRow[] = [
+  { id: "pend", nombre: "Pendiente", activo: true, clave: null },
+  { id: "prog", nombre: "En progreso", activo: true, clave: null },
+  { id: "fin", nombre: "Resuelto", activo: true, clave: "FINALIZADO" },
+  { id: "cer", nombre: "Cerrado", activo: true, clave: "CERRADO" },
+  { id: "can", nombre: "Cancelado", activo: true, clave: "CANCELADO" },
+  { id: "rea", nombre: "Reabierto", activo: true, clave: "REABIERTO" },
+  { id: "falso", nombre: "Finalizado", activo: true, clave: null },
+  { id: "arch", nombre: "Archivado", activo: false, clave: null },
+];
+
+const cambio = (
+  t: TicketRow,
+  estadoId: string,
+  extra: Partial<ChangeTicketStatusInput> = {},
+): ChangeTicketStatusInput => ({ ticketId: t.id, updatedAt: t.updatedAt, estadoId, ...extra });
+
+describe("TicketsService.changeStatus", () => {
+  const ticket = unTicket();
+  const cerrado = unTicket({
+    estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO" },
+    fechaCierre: "2026-10-03",
+    solucionDescripcion: "Se cambió el toner",
+  });
+
+  describe("estados de cierre", () => {
+    it.each([
+      ["fin", "FINALIZADO"],
+      ["cer", "CERRADO"],
+      ["can", "CANCELADO"],
+    ])("pasar a %s (%s) sin fecha de cierre: 400 y el estado no cambia", async (estadoId) => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [ticket],
+        estados: ESTADOS,
+      });
+
+      await expect(
+        service.changeStatus(cambio(ticket, estadoId), agenteTecnico),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        status: 400,
+        message: "Para pasar a un estado de cierre hay que indicar la fecha de cierre",
+      });
+      expect(statusChanges).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("con la fecha de cierre y sin solución funciona, y deja el diff con el estado", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [ticket],
+        estados: ESTADOS,
+      });
+
+      const result = await service.changeStatus(
+        cambio(ticket, "fin", { fechaCierre: "2026-10-05" }),
+        agenteTecnico,
+      );
+
+      expect(result).toMatchObject({
+        estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO" },
+        fechaCierre: "2026-10-05",
+        solucionDescripcion: null,
+      });
+      // La solución no viene: no se toca (ni siquiera se escribe).
+      expect(statusChanges[0]?.data).toEqual({ estadoId: "fin", fechaCierre: "2026-10-05" });
+      expect(statusChanges[0]).toMatchObject({ id: "t-1", actorId: "ana" });
+      expect(audits).toEqual([
+        {
+          entityType: "Ticket",
+          entityId: "t-1",
+          action: "update",
+          actorId: "ana",
+          payload: {
+            before: { estado: { id: "pend", nombre: "Pendiente" }, fechaCierre: null },
+            after: { estado: { id: "fin", nombre: "Resuelto" }, fechaCierre: "2026-10-05" },
+          },
+        },
+      ]);
+    });
+
+    it("la solución es opcional: si viene reemplaza la actual, y en blanco la borra", async () => {
+      const { service, statusChanges } = buildService({
+        tickets: [ticket, cerrado],
+        estados: ESTADOS,
+      });
+      const otro = unTicket({ id: "t-2" });
+      const { service: s2, statusChanges: c2 } = buildService({
+        tickets: [otro],
+        estados: ESTADOS,
+      });
+
+      await s2.changeStatus(
+        cambio(otro, "cer", { fechaCierre: "2026-10-05", solucionDescripcion: "Se reinició" }),
+        admin,
+      );
+      await service.changeStatus(
+        cambio(cerrado, "cer", { fechaCierre: "2026-10-03", solucionDescripcion: null }),
+        admin,
+      );
+
+      expect(c2[0]?.data).toEqual({
+        estadoId: "cer",
+        fechaCierre: "2026-10-05",
+        solucionDescripcion: "Se reinició",
+      });
+      expect(statusChanges[0]?.data).toEqual({
+        estadoId: "cer",
+        fechaCierre: "2026-10-03",
+        solucionDescripcion: null,
+      });
+    });
+
+    it("de un estado de cierre a otro: la fecha llega igual, se puede corregir y no se recalcula sola", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [cerrado],
+        estados: ESTADOS,
+      });
+
+      await service.changeStatus(cambio(cerrado, "cer", { fechaCierre: "2026-10-03" }), admin);
+      expect(audits[0]?.payload).toEqual({
+        before: { estado: { id: "fin", nombre: "Resuelto" } },
+        after: { estado: { id: "cer", nombre: "Cerrado" } },
+      });
+
+      await service.changeStatus(cambio(cerrado, "can", { fechaCierre: "2026-10-02" }), admin);
+      expect(audits[1]?.payload).toMatchObject({
+        before: { fechaCierre: "2026-10-03" },
+        after: { fechaCierre: "2026-10-02" },
+      });
+      expect(statusChanges).toHaveLength(2);
+    });
+
+    it("un estado de cierre no admite fecha de reapertura: 400", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await expect(
+        service.changeStatus(
+          cambio(ticket, "fin", { fechaCierre: "2026-10-05", fechaReabierto: "2026-10-05" }),
+          admin,
+        ),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Este estado no admite fecha de reapertura",
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+  });
+
+  describe("la regla es por clave, no por nombre (D1)", () => {
+    it("un estado de cierre renombrado ('Resuelto') sigue exigiendo la fecha", async () => {
+      const { service } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await expect(service.changeStatus(cambio(ticket, "fin"), admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+      });
+    });
+
+    it("un estado sin clave que se llama 'Finalizado' no exige fecha ni la admite", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await service.changeStatus(cambio(ticket, "falso"), admin);
+      await expect(
+        service.changeStatus(cambio(ticket, "falso", { fechaCierre: "2026-10-05" }), admin),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Este estado no admite fecha de cierre",
+      });
+
+      expect(statusChanges).toHaveLength(1);
+      expect(statusChanges[0]?.data).toEqual({ estadoId: "falso" });
+    });
+  });
+
+  describe("reapertura", () => {
+    it("sin fecha de reapertura: 400 y el estado no cambia", async () => {
+      const { service, statusChanges } = buildService({ tickets: [cerrado], estados: ESTADOS });
+
+      await expect(service.changeStatus(cambio(cerrado, "rea"), admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Para reabrir el ticket hay que indicar la fecha de reapertura",
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+
+    it("con la fecha funciona y conserva la fecha de cierre y la solución", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [cerrado],
+        estados: ESTADOS,
+      });
+
+      const result = await service.changeStatus(
+        cambio(cerrado, "rea", { fechaReabierto: "2026-10-05" }),
+        agenteTecnico,
+      );
+
+      expect(statusChanges[0]?.data).toEqual({ estadoId: "rea", fechaReabierto: "2026-10-05" });
+      expect(result).toMatchObject({
+        estado: { id: "rea", clave: "REABIERTO" },
+        fechaReabierto: "2026-10-05",
+        fechaCierre: "2026-10-03",
+        solucionDescripcion: "Se cambió el toner",
+      });
+      expect(audits[0]?.payload).toEqual({
+        before: { estado: { id: "fin", nombre: "Resuelto" }, fechaReabierto: null },
+        after: { estado: { id: "rea", nombre: "Reabierto" }, fechaReabierto: "2026-10-05" },
+      });
+    });
+
+    it("no admite fecha de cierre ni solución: 400", async () => {
+      const { service, statusChanges } = buildService({ tickets: [cerrado], estados: ESTADOS });
+
+      await expect(
+        service.changeStatus(
+          cambio(cerrado, "rea", { fechaReabierto: "2026-10-05", fechaCierre: "2026-10-05" }),
+          admin,
+        ),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Este estado no admite fecha de cierre",
+      });
+      await expect(
+        service.changeStatus(
+          cambio(cerrado, "rea", { fechaReabierto: "2026-10-05", solucionDescripcion: "x" }),
+          admin,
+        ),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Este estado no admite una solución",
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+  });
+
+  describe("estados sin clave de cierre ni reapertura", () => {
+    it("pasar de un ticket cerrado a 'En progreso' no pide ni modifica ninguna fecha (Q26)", async () => {
+      const { service, statusChanges } = buildService({ tickets: [cerrado], estados: ESTADOS });
+
+      const result = await service.changeStatus(cambio(cerrado, "prog"), agenteTecnico);
+
+      expect(statusChanges[0]?.data).toEqual({ estadoId: "prog" });
+      expect(result).toMatchObject({
+        estado: { id: "prog" },
+        fechaCierre: "2026-10-03",
+        solucionDescripcion: "Se cambió el toner",
+      });
+    });
+
+    it.each([
+      ["fecha de cierre", { fechaCierre: "2026-10-05" }, "Este estado no admite fecha de cierre"],
+      [
+        "fecha de reapertura",
+        { fechaReabierto: "2026-10-05" },
+        "Este estado no admite fecha de reapertura",
+      ],
+      ["solución", { solucionDescripcion: "x" }, "Este estado no admite una solución"],
+    ])("mandar una %s: 400", async (_campo, extra, message) => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await expect(
+        service.changeStatus(cambio(ticket, "prog", extra), admin),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message,
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+  });
+
+  describe("estado destino", () => {
+    it("cualquier estado activo es válido: no hay máquina de transiciones (Q25)", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await service.changeStatus(cambio(ticket, "rea", { fechaReabierto: "2026-10-05" }), admin);
+      await service.changeStatus(cambio(ticket, "can", { fechaCierre: "2026-10-05" }), admin);
+      await service.changeStatus(cambio(ticket, "prog"), admin);
+
+      expect(statusChanges.map((c) => c.data.estadoId)).toEqual(["rea", "can", "prog"]);
+    });
+
+    it("inexistente: 400", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await expect(service.changeStatus(cambio(ticket, "nada"), admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El estado no existe",
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+
+    it("desactivado: 400", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await expect(service.changeStatus(cambio(ticket, "arch"), admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El estado está desactivado",
+      });
+      expect(statusChanges).toHaveLength(0);
+    });
+
+    it("el estado que el ticket ya tiene se acepta aunque se haya desactivado después", async () => {
+      const enArchivado = unTicket({ estado: { id: "arch", nombre: "Archivado", clave: null } });
+      const { service, statusChanges } = buildService({ tickets: [enArchivado], estados: ESTADOS });
+
+      await service.changeStatus(cambio(enArchivado, "arch"), admin);
+
+      expect(statusChanges).toHaveLength(0); // sin cambios efectivos
+    });
+  });
+
+  describe("sin cambios efectivos y concurrencia", () => {
+    it("elegir el estado actual sin tocar fechas responde 200 y no escribe ni audita", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [ticket],
+        estados: ESTADOS,
+      });
+
+      await expect(service.changeStatus(cambio(ticket, "pend"), admin)).resolves.toEqual(ticket);
+      expect(statusChanges).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("elegir el estado de cierre actual con la misma fecha tampoco audita", async () => {
+      const { service, statusChanges } = buildService({ tickets: [cerrado], estados: ESTADOS });
+
+      await service.changeStatus(cambio(cerrado, "fin", { fechaCierre: "2026-10-03" }), admin);
+
+      expect(statusChanges).toHaveLength(0);
+    });
+
+    it("elegir el estado de cierre actual con otra fecha la corrige y audita", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [cerrado],
+        estados: ESTADOS,
+      });
+
+      await service.changeStatus(cambio(cerrado, "fin", { fechaCierre: "2026-10-01" }), admin);
+
+      expect(statusChanges).toHaveLength(1);
+      expect(audits[0]?.payload).toEqual({
+        before: { fechaCierre: "2026-10-03" },
+        after: { fechaCierre: "2026-10-01" },
+      });
+    });
+
+    it("con la versión desactualizada responde 409 y no guarda nada", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [ticket],
+        estados: ESTADOS,
+      });
+
+      await expect(
+        service.changeStatus(
+          cambio(ticket, "prog", { updatedAt: "2026-10-06T09:00:00.000Z" }),
+          admin,
+        ),
+      ).rejects.toMatchObject({
+        code: "CONFLICT",
+        status: 409,
+        message: "Otro usuario modificó este ticket. Recargá para ver los cambios.",
+      });
+      expect(statusChanges).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("pasa la versión leída al repository para el bloqueo optimista", async () => {
+      const { service, statusChanges } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+      await service.changeStatus(cambio(ticket, "prog"), admin);
+
+      expect(statusChanges[0]?.expectedUpdatedAt).toBe(ticket.updatedAt);
+    });
+
+    it("un ticket inexistente o eliminado: 404", async () => {
+      const { service } = buildService({ estados: ESTADOS });
+
+      await expect(service.changeStatus(cambio(ticket, "prog"), admin)).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        status: 404,
+      });
     });
   });
 });

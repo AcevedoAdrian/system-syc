@@ -72,6 +72,18 @@ export interface TicketUpdateData {
   notificado: boolean;
 }
 
+// Lo que escribe el cambio de estado (Feature 5.4). Una fecha o la solución ausente (`undefined`) no
+// se toca; `null` la borra. El service decide cuáles manda según la `clave` del estado destino.
+export interface TicketStatusData {
+  estadoId: string;
+  fechaCierre?: string | null;
+  fechaReabierto?: string | null;
+  solucionDescripcion?: string | null;
+}
+
+// Los campos que una escritura con bloqueo optimista puede tocar (la unión de las anteriores).
+type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string };
+
 // Bloqueo optimista (Q22): la versión que el cliente leyó ya no es la de la base.
 export const STALE_TICKET_MESSAGE =
   "Otro usuario modificó este ticket. Recargá para ver los cambios.";
@@ -324,9 +336,6 @@ export class TicketsRepository {
     }
   }
 
-  // Bloqueo optimista: la escritura exige que `updatedAt` siga siendo el que el cliente leyó. Si no
-  // actualiza ninguna fila, o lo modificó otro (409) o ya no existe (404), y no se guarda nada. La
-  // edición y su `AuditLog` van en la misma transacción.
   async update(
     id: string,
     expectedUpdatedAt: string,
@@ -334,15 +343,41 @@ export class TicketsRepository {
     actorId: string,
     audit: AuditEntry,
   ): Promise<TicketRow> {
+    return this.writeLocked(id, expectedUpdatedAt, data, actorId, audit);
+  }
+
+  async changeStatus(
+    id: string,
+    expectedUpdatedAt: string,
+    data: TicketStatusData,
+    actorId: string,
+    audit: AuditEntry,
+  ): Promise<TicketRow> {
+    return this.writeLocked(id, expectedUpdatedAt, data, actorId, audit);
+  }
+
+  // Bloqueo optimista: la escritura exige que `updatedAt` siga siendo el que el cliente leyó. Si no
+  // actualiza ninguna fila, o lo modificó otro (409) o ya no existe (404), y no se guarda nada. La
+  // escritura y su `AuditLog` van en la misma transacción.
+  private async writeLocked(
+    id: string,
+    expectedUpdatedAt: string,
+    write: TicketWrite,
+    actorId: string,
+    audit: AuditEntry,
+  ): Promise<TicketRow> {
+    const { fechaRecepcion, fechaCierre, fechaReabierto, ...rest } = write;
+    // `undefined` no se toca; `null` borra; un día se guarda como `date`.
+    const dateOf = (day: string | null | undefined) => (day ? toDate(day) : day);
     try {
       return await this.db.$transaction(async (tx) => {
         const { count } = await tx.ticket.updateMany({
           where: { id, updatedAt: new Date(expectedUpdatedAt), ...notDeleted },
           data: {
-            ...data,
-            fechaRecepcion: toDate(data.fechaRecepcion),
-            fechaCierre: data.fechaCierre && toDate(data.fechaCierre),
-            fechaReabierto: data.fechaReabierto && toDate(data.fechaReabierto),
+            ...rest,
+            fechaRecepcion: dateOf(fechaRecepcion) ?? undefined,
+            fechaCierre: dateOf(fechaCierre),
+            fechaReabierto: dateOf(fechaReabierto),
             updatedBy: actorId,
           },
         });
