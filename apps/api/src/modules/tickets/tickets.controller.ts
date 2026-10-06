@@ -16,11 +16,12 @@ const c = contract.tickets;
 export class TicketsController {
   constructor(private readonly service: TicketsService) {}
 
-  // El agente ve su departamento y el admin todos: el service filtra con `user.scope`.
+  // El agente ve su departamento y el admin todos: el service filtra con `user.scope`. Los filtros y
+  // la página llegan en la query string.
   @RequirePermission(PERMISSIONS.TICKET_VIEW)
   @Implement(c.list)
   list(@CurrentUser() actor: AuthenticatedUser) {
-    return implement(c.list).handler(() => this.service.list(actor));
+    return implement(c.list).handler(({ input }) => this.service.list(actor, input));
   }
 
   @RequirePermission(PERMISSIONS.TICKET_VIEW, ownTicket)

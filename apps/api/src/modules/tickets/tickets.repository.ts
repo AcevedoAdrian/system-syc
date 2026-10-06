@@ -3,11 +3,13 @@ import { ORPCError } from "@orpc/server";
 import {
   type CatalogRuta,
   type ClaveEstado,
+  type ListTicketsInput,
   STALE_TICKET_MESSAGE,
+  TICKETS_PAGE_SIZE,
   type Ticket,
   type TicketSummary,
 } from "@syc/contracts";
-import { getPrismaClient } from "@syc/db";
+import { getPrismaClient, Prisma } from "@syc/db";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import type { TicketUsageReader } from "../../common/ticket-usage-reader";
 import { ENV } from "../../config/config.module";
@@ -259,15 +261,84 @@ export class TicketsRepository implements TicketUsageReader {
     return row && toRow(row);
   }
 
-  // Los más recientes por `numero`, acotados al departamento del agente (`null` = admin, todos).
-  async findRecent(departmentId: string | null, take: number): Promise<TicketSummaryRow[]> {
-    const rows = await this.db.ticket.findMany({
-      where: { ...notDeleted, ...(departmentId ? { departamentoId: departmentId } : {}) },
-      orderBy: { numero: "desc" },
-      take,
-      select: summarySelect,
-    });
-    return rows.map(toSummary);
+  // Una página de la bandeja (SPEC 06). `departmentId` es el alcance ya resuelto por el service: el del
+  // agente, o el filtro del admin (`null` = todos); el `departamentoId` de `filters` se ignora acá.
+  // Los filtros por igualdad y de fecha van por Prisma. El texto libre, por SQL a mano (Prisma no
+  // expresa `unaccent`), que solo devuelve los ids que coinciden. `count` y la página usan el mismo
+  // `where`. Orden fijo: `fechaRecepcion` y `numero` descendentes (Q34).
+  async findPage(
+    departmentId: string | null,
+    filters: ListTicketsInput,
+  ): Promise<{ items: TicketSummaryRow[]; total: number }> {
+    const matchingIds = filters.q ? await this.searchIds(departmentId, filters.q) : undefined;
+    if (matchingIds?.length === 0) return { items: [], total: 0 };
+
+    // Un filtro `undefined` no se aplica: Prisma lo ignora.
+    const where: Prisma.TicketWhereInput = {
+      ...notDeleted,
+      id: matchingIds && { in: matchingIds },
+      departamentoId: departmentId ?? undefined,
+      estadoId: filters.estadoId,
+      areaId: filters.areaId,
+      edificioId: filters.edificioId,
+      tipoId: filters.tipoId,
+      prioridadId: filters.prioridadId,
+      proveedorId: filters.proveedorId,
+      moduloId: filters.moduloId,
+      fechaRecepcion:
+        filters.fechaRecepcionDesde || filters.fechaRecepcionHasta
+          ? {
+              gte: filters.fechaRecepcionDesde ? toDate(filters.fechaRecepcionDesde) : undefined,
+              lte: filters.fechaRecepcionHasta ? toDate(filters.fechaRecepcionHasta) : undefined,
+            }
+          : undefined,
+    };
+
+    const [total, rows] = await this.db.$transaction([
+      this.db.ticket.count({ where }),
+      this.db.ticket.findMany({
+        where,
+        orderBy: [{ fechaRecepcion: "desc" }, { numero: "desc" }],
+        skip: (filters.page - 1) * TICKETS_PAGE_SIZE,
+        take: TICKETS_PAGE_SIZE,
+        select: summarySelect,
+      }),
+    ]);
+    return { items: rows.map(toSummary), total };
+  }
+
+  // Ids de los tickets cuyo título, descripción, solución o algún comentario no eliminado contiene `q`,
+  // sin distinguir mayúsculas ni acentos (D3): "tecnico" encuentra "Técnico". Es SQL escrito a mano y
+  // por eso repite lo que Prisma pone solo: `"deletedAt" IS NULL`, del ticket y del comentario, y el
+  // alcance. `q` siempre va como parámetro, nunca interpolado; se escapan `\`, `%` y `_` para que
+  // "50%" busque el texto literal. No busca en nombres de catálogo, número ni historial (Q33).
+  private async searchIds(departmentId: string | null, q: string): Promise<string[]> {
+    const pattern = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+    const matches = (column: Prisma.Sql) =>
+      Prisma.sql`lower(unaccent(${column})) LIKE lower(unaccent(${pattern}::text)) ESCAPE '\\'`;
+    const scope = departmentId
+      ? Prisma.sql`AND t."departamentoId" = ${departmentId}`
+      : Prisma.empty;
+
+    const rows = await this.db.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT t."id"
+      FROM "ticket" t
+      WHERE t."deletedAt" IS NULL
+        ${scope}
+        AND (
+          ${matches(Prisma.sql`t."titulo"`)}
+          OR ${matches(Prisma.sql`t."descripcion"`)}
+          OR ${matches(Prisma.sql`t."solucionDescripcion"`)}
+          OR EXISTS (
+            SELECT 1
+            FROM "ticket_comentario" c
+            WHERE c."ticketId" = t."id"
+              AND c."deletedAt" IS NULL
+              AND ${matches(Prisma.sql`c."texto"`)}
+          )
+        )
+    `);
+    return rows.map((row) => row.id);
   }
 
   // Departamento de un ticket no eliminado, o `null`. Lo usan los resolvers del guard.

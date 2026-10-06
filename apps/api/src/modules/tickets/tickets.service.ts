@@ -7,6 +7,7 @@ import {
   CLAVES_DE_CIERRE,
   type CreateTicketInput,
   formatTicketNumber,
+  type ListTicketsInput,
   STALE_TICKET_MESSAGE,
   TICKETS_PAGE_SIZE,
   type Ticket,
@@ -26,9 +27,6 @@ import {
 } from "./tickets.repository";
 
 const ENTITY_TYPE = "Ticket";
-
-// La lista mínima de SPEC 05: los más recientes, sin filtros ni paginación (la bandeja es SPEC 06).
-const RECENT_LIMIT = 50;
 
 // El guard deja `user.scope` en todo endpoint con `@RequirePermission`. Sin él, un endpoint olvidó
 // declararlo: se falla en vez de listar sin filtro.
@@ -67,11 +65,15 @@ export class TicketsService {
     private readonly audit: AuditService,
   ) {}
 
-  // El alcance es un filtro obligatorio: el agente ve su departamento y el admin todos.
-  // Provisorio hasta el Paso 5: la forma de la página, con los más recientes y sin filtros.
-  async list(actor: AuthenticatedUser): Promise<TicketsPage> {
-    const items = await this.repository.findRecent(scopeOf(actor).departmentId, RECENT_LIMIT);
-    return { items, total: items.length, page: 1, pageSize: TICKETS_PAGE_SIZE };
+  // El alcance es un filtro obligatorio: el agente ve su departamento y el admin todos. El filtro
+  // `departamentoId` solo lo aplica el admin; si lo manda un agente se ignora, su alcance siempre gana.
+  async list(actor: AuthenticatedUser, filters: ListTicketsInput): Promise<TicketsPage> {
+    const { departmentId } = scopeOf(actor);
+    const { items, total } = await this.repository.findPage(
+      departmentId ?? filters.departamentoId ?? null,
+      filters,
+    );
+    return { items, total, page: filters.page, pageSize: TICKETS_PAGE_SIZE };
   }
 
   // El guard ya acota a un agente a su departamento (404 si es ajeno); acá solo falta el caso del

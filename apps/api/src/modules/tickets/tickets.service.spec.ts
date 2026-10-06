@@ -2,8 +2,10 @@ import type {
   ChangeTicketDepartmentInput,
   ChangeTicketStatusInput,
   CreateTicketInput,
+  ListTicketsInput,
   UpdateTicketInput,
 } from "@syc/contracts";
+import { listTicketsInputSchema } from "@syc/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
@@ -156,7 +158,7 @@ function buildService(world: World = {}) {
     data: TicketUpdateData;
     actorId: string;
   }[] = [];
-  const recentCalls: { departmentId: string | null; take: number }[] = [];
+  const pageCalls: { departmentId: string | null; filters: ListTicketsInput }[] = [];
   let sequence = 12;
 
   const repository = {
@@ -172,9 +174,9 @@ function buildService(world: World = {}) {
           r.id !== exceptId,
       ) ?? null,
     findDetail: async (id: string) => tickets.find((t) => t.id === id) ?? null,
-    findRecent: async (departmentId: string | null, take: number) => {
-      recentCalls.push({ departmentId, take });
-      return tickets as unknown as TicketSummaryRow[];
+    findPage: async (departmentId: string | null, filters: ListTicketsInput) => {
+      pageCalls.push({ departmentId, filters });
+      return { items: tickets as unknown as TicketSummaryRow[], total: tickets.length };
     },
     create: async (
       data: TicketCreateData,
@@ -305,7 +307,7 @@ function buildService(world: World = {}) {
     created,
     updates,
     statusChanges,
-    recentCalls,
+    pageCalls,
   };
 }
 
@@ -1502,23 +1504,61 @@ describe("TicketsService.get", () => {
 });
 
 describe("TicketsService.list", () => {
+  // Lo que deja el esquema del contrato: todas las claves, sin valor si no se pidió el filtro.
+  const filters = (extra: Partial<ListTicketsInput> = {}): ListTicketsInput =>
+    listTicketsInputSchema.parse(extra);
+
   it("un agente solo pide los de su departamento, y el admin todos", async () => {
-    const { service, recentCalls } = buildService();
+    const { service, pageCalls } = buildService();
 
-    await service.list(agenteTecnico);
-    await service.list(admin);
+    await service.list(agenteTecnico, filters());
+    await service.list(admin, filters());
 
-    expect(recentCalls).toEqual([
-      { departmentId: "tec", take: 50 },
-      { departmentId: null, take: 50 },
-    ]);
+    expect(pageCalls.map((call) => call.departmentId)).toEqual(["tec", null]);
+  });
+
+  it("un agente que manda el departamentoId de otro recibe su propio alcance", async () => {
+    const { service, pageCalls } = buildService();
+
+    await service.list(agenteTecnico, filters({ departamentoId: "red" }));
+
+    expect(pageCalls).toHaveLength(1);
+    expect(pageCalls[0]?.departmentId).toBe("tec");
+  });
+
+  it("el admin aplica el departamentoId", async () => {
+    const { service, pageCalls } = buildService();
+
+    await service.list(admin, filters({ departamentoId: "red" }));
+
+    expect(pageCalls[0]?.departmentId).toBe("red");
+  });
+
+  it("devuelve la página con el total, la página pedida y el tamaño fijo", async () => {
+    const { service } = buildService({
+      tickets: [unTicket(), unTicket({ id: "t-2", numero: 14 })],
+    });
+
+    const result = await service.list(admin, filters({ page: 3 }));
+
+    expect(result).toMatchObject({ total: 2, page: 3, pageSize: 20 });
+    expect(result.items).toHaveLength(2);
+  });
+
+  it("pasa los filtros y la búsqueda tal cual al repository", async () => {
+    const { service, pageCalls } = buildService();
+    const pedido = filters({ q: "tecnico", estadoId: "pend", fechaRecepcionDesde: "2026-10-01" });
+
+    await service.list(admin, pedido);
+
+    expect(pageCalls[0]?.filters).toEqual(pedido);
   });
 
   it("sin scope en la request falla en vez de listar sin filtro", async () => {
-    const { service, recentCalls } = buildService();
+    const { service, pageCalls } = buildService();
     const { scope: _scope, ...sinScope } = agenteTecnico;
 
-    await expect(service.list(sinScope)).rejects.toThrow("Falta el scope");
-    expect(recentCalls).toHaveLength(0);
+    await expect(service.list(sinScope, filters())).rejects.toThrow("Falta el scope");
+    expect(pageCalls).toHaveLength(0);
   });
 });
