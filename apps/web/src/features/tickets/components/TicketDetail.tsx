@@ -10,10 +10,11 @@ import { useTicket } from "../hooks/useTicket";
 import { useRemoveTicket } from "../hooks/useTicketMutations";
 import { ChangeDepartmentDialog } from "./ChangeDepartmentDialog";
 import { ChangeStatusDialog } from "./ChangeStatusDialog";
+import { TicketComments } from "./TicketComments";
 import { TicketForm } from "./TicketForm";
 import { TicketHistory } from "./TicketHistory";
 
-// Pantalla del ticket: encabezado con sus acciones, formulario de datos e historial. Las acciones del
+// Pantalla del ticket: encabezado con sus acciones, formulario de datos, comentarios e historial. Las acciones del
 // admin (cambiar departamento y eliminar) se ocultan a un agente; la API las rechaza igual.
 export function TicketDetail({ ticketId }: { ticketId: string }) {
   const navigate = useNavigate();
@@ -112,6 +113,9 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
         onReload={reload}
         onDirtyChange={onDirtyChange}
       />
+
+      {/* Fuera del `key` del formulario: comentar no cambia el ticket y no lo reinicia. */}
+      <TicketComments ticketId={ticket.id} />
 
       <TicketHistory ticketId={ticket.id} />
 

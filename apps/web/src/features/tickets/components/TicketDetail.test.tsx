@@ -44,6 +44,11 @@ vi.mock("./TicketHistory", () => ({
     <div data-testid="historial">historial de {ticketId}</div>
   ),
 }));
+vi.mock("./TicketComments", () => ({
+  TicketComments: ({ ticketId }: { ticketId: string }) => (
+    <div data-testid="comentarios">comentarios de {ticketId}</div>
+  ),
+}));
 vi.mock("./TicketForm", async () => {
   const { useEffect } = await import("react");
   return {
@@ -172,11 +177,28 @@ describe("TicketDetail", () => {
       expect(screen.getByText("Técnico")).toBeInTheDocument();
     });
 
-    it("compone el formulario de datos y el historial del mismo ticket", () => {
+    it("compone el formulario de datos, los comentarios y el historial del mismo ticket", () => {
       show(makeTicket());
 
       expect(screen.getByTestId("formulario")).toBeInTheDocument();
+      expect(screen.getByTestId("comentarios")).toHaveTextContent("comentarios de t-13");
       expect(screen.getByTestId("historial")).toHaveTextContent("historial de t-13");
+    });
+
+    it("los comentarios van entre el formulario y el historial", () => {
+      show(makeTicket());
+
+      const order = screen
+        .getAllByTestId(/^(formulario|comentarios|historial)$/)
+        .map((element) => element.dataset.testid);
+      expect(order).toEqual(["formulario", "comentarios", "historial"]);
+    });
+
+    it("comentar no reinicia el formulario: sigue siendo la misma versión del ticket", () => {
+      show(makeTicket());
+
+      expect(mocks.formMounts).toBe(1);
+      expect(screen.getByTestId("comentarios")).toBeInTheDocument();
     });
   });
 

@@ -40,6 +40,9 @@ export function TicketHistory({ ticketId }: { ticketId: string }) {
                 </p>
                 {entry.action === "create" && <p>Ticket creado</p>}
                 {entry.action === "delete" && <p>Ticket eliminado</p>}
+                {/* Solo se anota que hubo un comentario: el texto nunca está en el historial. */}
+                {entry.action === "comment_create" && <p>Comentario agregado</p>}
+                {entry.action === "comment_delete" && <p>Comentario eliminado</p>}
                 {changes.map((change) => (
                   <p key={change.field}>
                     <span className="font-medium">{change.label}:</span> {change.before} →{" "}

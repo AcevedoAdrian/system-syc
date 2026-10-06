@@ -107,4 +107,18 @@ describe("TicketHistory", () => {
 
     expect(screen.getByRole("listitem")).toHaveTextContent("Área: Mantenimiento (vieja) → —");
   });
+
+  it("un comentario agregado o eliminado se anota con fecha y usuario, sin su texto", () => {
+    show([
+      entry("a3", "comment_delete", { comentarioId: "c-secreto" }, { id: "u0", name: "Admin" }),
+      entry("a2", "comment_create", { comentarioId: "c-secreto" }),
+    ]);
+
+    const [eliminado, agregado] = screen.getAllByRole("listitem");
+    expect(agregado).toHaveTextContent("06/10/2026 14:32 · Ana");
+    expect(agregado).toHaveTextContent("Comentario agregado");
+    expect(eliminado).toHaveTextContent("Admin");
+    expect(eliminado).toHaveTextContent("Comentario eliminado");
+    expect(screen.queryByText(/c-secreto/)).not.toBeInTheDocument();
+  });
 });
