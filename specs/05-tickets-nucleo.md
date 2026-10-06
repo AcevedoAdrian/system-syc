@@ -1,6 +1,6 @@
 # SPEC 05 — Tickets núcleo
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 02 (autenticación y acceso), SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos)
 > **Date:** 2026-10-06
 > **Objective:** módulo `tickets` con el ciclo completo de un ticket (alta con número `TE-` atómico, edición con bloqueo optimista, cambio de estado por `clave`, cambio de departamento y eliminación lógica, todo auditado y acotado por departamento en el guard), más una lista mínima, el alta y la pantalla del ticket con su historial en la web.
