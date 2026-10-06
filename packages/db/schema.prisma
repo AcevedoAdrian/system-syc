@@ -40,6 +40,8 @@ model User {
   proveedoresEditadas   Proveedor[]    @relation("ProveedorEditor")
   estadosTicketCreadas  EstadoTicket[] @relation("EstadoTicketCreador")
   estadosTicketEditadas EstadoTicket[] @relation("EstadoTicketEditor")
+  ticketsCreados        Ticket[]       @relation("TicketCreador")
+  ticketsEditados       Ticket[]       @relation("TicketEditor")
 
   @@unique([email])
   @@unique([username])
@@ -106,6 +108,7 @@ model Organization {
   activo      Boolean      @default(true)
   members     Member[]
   invitations Invitation[]
+  tickets     Ticket[]
 
   @@unique([slug])
   @@map("organization")
@@ -181,6 +184,7 @@ model Area {
   updatedBy         String
   editor            User      @relation("AreaEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tickets           Ticket[]
 
   @@map("area")
 }
@@ -198,6 +202,7 @@ model Edificio {
   updatedBy         String
   editor            User      @relation("EdificioEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tickets           Ticket[]
 
   @@map("edificio")
 }
@@ -215,6 +220,7 @@ model TipoTicket {
   updatedBy         String
   editor            User      @relation("TipoTicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tickets           Ticket[]
 
   @@map("tipo_ticket")
 }
@@ -232,6 +238,7 @@ model Prioridad {
   updatedBy         String
   editor            User      @relation("PrioridadEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tickets           Ticket[]
 
   @@map("prioridad")
 }
@@ -249,6 +256,7 @@ model Modulo {
   updatedBy         String
   editor            User      @relation("ModuloEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tickets           Ticket[]
 
   @@map("modulo")
 }
@@ -270,6 +278,7 @@ model Proveedor {
   telefono          String?
   correo            String?
   sitioWeb          String?
+  tickets           Ticket[]
 
   @@map("proveedor")
 }
@@ -289,7 +298,57 @@ model EstadoTicket {
   deletedAt         DateTime?
   // Clave interna de los estados de sistema (D1): "FINALIZADO" | "CERRADO" | "CANCELADO" | "REABIERTO" | null.
   clave             String?
+  tickets           Ticket[]
 
   @@unique([clave]) // Postgres no compara los NULL entre sí: solo restringe las 4 claves
   @@map("estado_ticket")
+}
+
+// Ticket (SPEC 05). `numero` sale de la secuencia nativa `ticket_numero_seq` (el autoincrement de una
+// columna que no es `@id` crea una secuencia en Postgres): nunca se repite entre transacciones
+// concurrentes y un alta fallida deja un hueco, que se tolera (Q21). `updatedAt` es también la versión
+// del bloqueo optimista. El índice único parcial de `referenciaExterna` vive en el SQL de la migración
+// `tickets` (Prisma no lo expresa).
+model Ticket {
+  id     String @id @default(cuid())
+  numero Int    @unique @default(autoincrement())
+
+  departamentoId String
+  departamento   Organization @relation(fields: [departamentoId], references: [id], onDelete: Restrict)
+  areaId         String?
+  area           Area?        @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  edificioId     String?
+  edificio       Edificio?    @relation(fields: [edificioId], references: [id], onDelete: Restrict)
+  tipoId         String?
+  tipo           TipoTicket?  @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  prioridadId    String
+  prioridad      Prioridad    @relation(fields: [prioridadId], references: [id], onDelete: Restrict)
+  moduloId       String?
+  modulo         Modulo?      @relation(fields: [moduloId], references: [id], onDelete: Restrict)
+  estadoId       String
+  estado         EstadoTicket @relation(fields: [estadoId], references: [id], onDelete: Restrict)
+  proveedorId    String?
+  proveedor      Proveedor?   @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+
+  titulo              String
+  descripcion         String?
+  actuacionSimple     String?
+  referenciaExterna   String? // "número/año" ya normalizado; único por proveedor (índice parcial)
+  solucionDescripcion String?
+  notificado          Boolean @default(false)
+
+  fechaRecepcion DateTime  @db.Date
+  fechaCierre    DateTime? @db.Date
+  fechaReabierto DateTime? @db.Date
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String
+  creador   User      @relation("TicketCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy String
+  editor    User      @relation("TicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt DateTime?
+
+  @@index([departamentoId])
+  @@map("ticket")
 }
