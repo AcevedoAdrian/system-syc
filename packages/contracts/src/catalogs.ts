@@ -1,23 +1,9 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { auditHistorySchema } from "./audit.js";
+import { blankToNull } from "./fields.js";
 
 const nombreSchema = z.string().trim().min(1).max(120);
-
-// Campo opcional de Proveedor: en blanco, ya recortado, se guarda como null. Si no viene, también.
-// Union en vez de `z.preprocess`: preprocess deja el tipo de entrada en `unknown` y se perdería el
-// tipado de los formularios.
-const blankToNull = <T extends z.ZodType<string, string>>(schema: T) =>
-  z
-    .union([
-      z.null(),
-      z
-        .string()
-        .trim()
-        .transform((v) => (v === "" ? null : v))
-        .pipe(schema.nullable()),
-    ])
-    .default(null);
 
 export const catalogItemInputSchema = z.object({ nombre: nombreSchema });
 
