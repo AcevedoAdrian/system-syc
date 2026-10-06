@@ -1,10 +1,10 @@
-import type { TicketSummary } from "@syc/contracts";
+import { TICKETS_PAGE_SIZE, type TicketSummary, type TicketsPage } from "@syc/contracts";
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hook = vi.hoisted(() => ({
   state: { data: undefined, isPending: true, isError: false } as {
-    data: TicketSummary[] | undefined;
+    data: TicketsPage | undefined;
     isPending: boolean;
     isError: boolean;
   },
@@ -32,8 +32,16 @@ const ticket = (numero: number, extra: Partial<TicketSummary> = {}): TicketSumma
   departamento: { id: "tec", nombre: "Técnico" },
   estado: { id: "pend", nombre: "Pendiente", clave: null },
   prioridad: { id: "alta", nombre: "Alta" },
+  area: null,
   fechaRecepcion: "2026-10-01",
   ...extra,
+});
+
+const page = (items: TicketSummary[]): TicketsPage => ({
+  items,
+  total: items.length,
+  page: 1,
+  pageSize: TICKETS_PAGE_SIZE,
 });
 
 describe("TicketsList", () => {
@@ -52,7 +60,7 @@ describe("TicketsList", () => {
   });
 
   it("sin tickets muestra el estado vacío, no un error", () => {
-    hook.state = { data: [], isPending: false, isError: false };
+    hook.state = { data: page([]), isPending: false, isError: false };
     render(<TicketsList />);
 
     expect(screen.getByText(/Todavía no hay tickets/)).toBeInTheDocument();
@@ -69,7 +77,7 @@ describe("TicketsList", () => {
 
   it("muestra una fila por ticket, en el orden recibido, con el número formateado", () => {
     hook.state = {
-      data: [ticket(13), ticket(1000000, { id: "t-grande" }), ticket(2)],
+      data: page([ticket(13), ticket(1000000, { id: "t-grande" }), ticket(2)]),
       isPending: false,
       isError: false,
     };
@@ -92,7 +100,7 @@ describe("TicketsList", () => {
   });
 
   it("muestra los datos del ticket y la fecha de recepción como dd/mm/aaaa", () => {
-    hook.state = { data: [ticket(13)], isPending: false, isError: false };
+    hook.state = { data: page([ticket(13)]), isPending: false, isError: false };
     render(<TicketsList />);
 
     const row = screen.getByTestId("ticket-row-13");
@@ -104,7 +112,7 @@ describe("TicketsList", () => {
   });
 
   it("el número y el título abren el ticket", () => {
-    hook.state = { data: [ticket(13)], isPending: false, isError: false };
+    hook.state = { data: page([ticket(13)]), isPending: false, isError: false };
     render(<TicketsList />);
 
     expect(screen.getByRole("link", { name: "TE-000013" })).toHaveAttribute(
@@ -119,7 +127,7 @@ describe("TicketsList", () => {
 
   it("avisa que son los más recientes solo cuando llegó el tope de 50", () => {
     hook.state = {
-      data: Array.from({ length: 50 }, (_, i) => ticket(i + 1)),
+      data: page(Array.from({ length: 50 }, (_, i) => ticket(i + 1))),
       isPending: false,
       isError: false,
     };
@@ -127,7 +135,7 @@ describe("TicketsList", () => {
     expect(screen.getByText("Se muestran los 50 más recientes.")).toBeInTheDocument();
     unmount();
 
-    hook.state = { data: [ticket(1)], isPending: false, isError: false };
+    hook.state = { data: page([ticket(1)]), isPending: false, isError: false };
     render(<TicketsList />);
     expect(screen.queryByText(/más recientes/)).not.toBeInTheDocument();
   });

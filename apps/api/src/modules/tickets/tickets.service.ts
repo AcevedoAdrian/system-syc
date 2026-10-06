@@ -8,8 +8,9 @@ import {
   type CreateTicketInput,
   formatTicketNumber,
   STALE_TICKET_MESSAGE,
+  TICKETS_PAGE_SIZE,
   type Ticket,
-  type TicketSummary,
+  type TicketsPage,
   type UpdateTicketInput,
 } from "@syc/contracts";
 import type { AuthenticatedUser, UserScope } from "../../common/authenticated-request";
@@ -67,8 +68,10 @@ export class TicketsService {
   ) {}
 
   // El alcance es un filtro obligatorio: el agente ve su departamento y el admin todos.
-  async list(actor: AuthenticatedUser): Promise<TicketSummary[]> {
-    return this.repository.findRecent(scopeOf(actor).departmentId, RECENT_LIMIT);
+  // Provisorio hasta el Paso 5: la forma de la página, con los más recientes y sin filtros.
+  async list(actor: AuthenticatedUser): Promise<TicketsPage> {
+    const items = await this.repository.findRecent(scopeOf(actor).departmentId, RECENT_LIMIT);
+    return { items, total: items.length, page: 1, pageSize: TICKETS_PAGE_SIZE };
   }
 
   // El guard ya acota a un agente a su departamento (404 si es ajeno); acá solo falta el caso del

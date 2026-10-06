@@ -9,7 +9,8 @@ const RECENT_LIMIT = 50;
 // Lista mínima de SPEC 05: los 50 más recientes del alcance del usuario, sin filtros ni paginación.
 // La bandeja completa (SPEC 06) la reemplaza.
 export function TicketsList() {
-  const { data: tickets, isPending, isError } = useTickets();
+  const { data, isPending, isError } = useTickets();
+  const tickets = data?.items;
 
   return (
     <section className="flex flex-col gap-4">

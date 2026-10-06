@@ -110,6 +110,47 @@ export const changeTicketDepartmentInputSchema = z.object({
 
 export const ticketIdInputSchema = z.object({ ticketId: z.string() });
 
+// Tickets por página de la bandeja (Q34).
+export const TICKETS_PAGE_SIZE = 20;
+
+// Los filtros llegan en la query string de un GET: un valor vacío o ausente es "sin filtro".
+const filtroId = z
+  .string()
+  .optional()
+  .transform((v) => v || undefined);
+
+// Filtros, búsqueda y página de la bandeja (SPEC 06). `departamentoId` solo lo aplica el admin: lo
+// decide el service, que conoce el alcance. Las fechas son inclusivas. `page` llega como texto.
+export const listTicketsInputSchema = z
+  .object({
+    q: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .transform((v) => v || undefined),
+    estadoId: filtroId,
+    areaId: filtroId,
+    edificioId: filtroId,
+    tipoId: filtroId,
+    prioridadId: filtroId,
+    proveedorId: filtroId,
+    moduloId: filtroId,
+    departamentoId: filtroId,
+    fechaRecepcionDesde: z.iso.date().optional(),
+    fechaRecepcionHasta: z.iso.date().optional(),
+    page: z.coerce.number().int().min(1).default(1),
+  })
+  .refine(
+    (v) =>
+      !(v.fechaRecepcionDesde && v.fechaRecepcionHasta) ||
+      v.fechaRecepcionDesde <= v.fechaRecepcionHasta,
+    {
+      path: ["fechaRecepcionHasta"],
+      message: "La fecha «hasta» no puede ser anterior a la fecha «desde»",
+    },
+  );
+
 const refSchema = z.object({ id: z.string(), nombre: z.string() });
 
 export const ticketSchema = z.object({
@@ -145,18 +186,31 @@ export const ticketSummarySchema = ticketSchema.pick({
   departamento: true,
   estado: true,
   prioridad: true,
+  area: true,
   fechaRecepcion: true,
+});
+
+export const ticketsPageSchema = z.object({
+  items: z.array(ticketSummarySchema),
+  total: z.number().int(), // tickets que cumplen los filtros, en el alcance del usuario
+  page: z.number().int(),
+  pageSize: z.number().int(), // siempre TICKETS_PAGE_SIZE
 });
 
 export type CreateTicketInput = z.infer<typeof createTicketInputSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketInputSchema>;
 export type ChangeTicketStatusInput = z.infer<typeof changeTicketStatusInputSchema>;
 export type ChangeTicketDepartmentInput = z.infer<typeof changeTicketDepartmentInputSchema>;
+export type ListTicketsInput = z.infer<typeof listTicketsInputSchema>;
 export type Ticket = z.infer<typeof ticketSchema>;
 export type TicketSummary = z.infer<typeof ticketSummarySchema>;
+export type TicketsPage = z.infer<typeof ticketsPageSchema>;
 
 export const ticketsContract = {
-  list: oc.route({ method: "GET", path: "/tickets" }).output(z.array(ticketSummarySchema)),
+  list: oc
+    .route({ method: "GET", path: "/tickets" })
+    .input(listTicketsInputSchema)
+    .output(ticketsPageSchema),
   get: oc
     .route({ method: "GET", path: "/tickets/{ticketId}" })
     .input(ticketIdInputSchema)

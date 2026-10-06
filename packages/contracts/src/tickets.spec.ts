@@ -4,6 +4,7 @@ import {
   changeTicketStatusInputSchema,
   createTicketInputSchema,
   formatTicketNumber,
+  listTicketsInputSchema,
   referenciaExternaSchema,
   updateTicketInputSchema,
 } from "./tickets.js";
@@ -214,5 +215,55 @@ describe("changeTicketStatusInputSchema", () => {
     expect(
       changeTicketStatusInputSchema.safeParse({ ...base, fechaReabierto: "2999-01-01" }).success,
     ).toBe(false);
+  });
+});
+
+describe("listTicketsInputSchema", () => {
+  it("sin nada, pide la página 1 sin filtros", () => {
+    expect(listTicketsInputSchema.parse({})).toEqual({ page: 1 });
+  });
+
+  it("convierte la página, que llega como texto en la query string", () => {
+    expect(listTicketsInputSchema.parse({ page: "2" }).page).toBe(2);
+  });
+
+  it.each(["0", "-1", "1.5", "abc", ""])("rechaza una página inválida: %j", (page) => {
+    expect(listTicketsInputSchema.safeParse({ page }).success).toBe(false);
+  });
+
+  it("una búsqueda de solo espacios equivale a no buscar", () => {
+    expect(listTicketsInputSchema.parse({ q: "  " }).q).toBeUndefined();
+    expect(listTicketsInputSchema.parse({ q: "" }).q).toBeUndefined();
+  });
+
+  it("recorta la búsqueda y rechaza más de 200 caracteres", () => {
+    expect(listTicketsInputSchema.parse({ q: "  impresora " }).q).toBe("impresora");
+    expect(listTicketsInputSchema.safeParse({ q: "a".repeat(201) }).success).toBe(false);
+  });
+
+  it("un filtro vacío equivale a no filtrar", () => {
+    const parsed = listTicketsInputSchema.parse({ estadoId: "", areaId: "a1" });
+    expect(parsed.estadoId).toBeUndefined();
+    expect(parsed.areaId).toBe("a1");
+  });
+
+  it("acepta un rango de fechas inclusivo, también de un solo día", () => {
+    const rango = { fechaRecepcionDesde: "2026-10-01", fechaRecepcionHasta: "2026-10-01" };
+    expect(listTicketsInputSchema.safeParse(rango).success).toBe(true);
+  });
+
+  it("rechaza «desde» posterior a «hasta», con el error en «hasta»", () => {
+    const result = listTicketsInputSchema.safeParse({
+      fechaRecepcionDesde: "2026-10-05",
+      fechaRecepcionHasta: "2026-10-01",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["fechaRecepcionHasta"]);
+  });
+
+  it("rechaza una fecha que no es YYYY-MM-DD", () => {
+    expect(listTicketsInputSchema.safeParse({ fechaRecepcionDesde: "01/10/2026" }).success).toBe(
+      false,
+    );
   });
 });

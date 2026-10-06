@@ -127,6 +127,7 @@ const summarySelect = {
   departamento: { select: { id: true, name: true } },
   estado: { select: { id: true, nombre: true, clave: true } },
   prioridad: ref,
+  area: ref,
   fechaRecepcion: true,
 } as const;
 
@@ -149,11 +150,11 @@ interface DbTicketSummary {
   departamento: DbUser;
   estado: DbEstado;
   prioridad: DbRef;
+  area: DbRef | null;
   fechaRecepcion: Date;
 }
 
 interface DbTicket extends DbTicketSummary {
-  area: DbRef | null;
   edificio: DbRef | null;
   tipo: DbRef | null;
   modulo: DbRef | null;
@@ -187,6 +188,7 @@ function toSummary(row: DbTicketSummary): TicketSummaryRow {
     departamento: fromUser(row.departamento),
     estado: fromEstado(row.estado),
     prioridad: row.prioridad,
+    area: row.area,
     fechaRecepcion: toDay(row.fechaRecepcion),
   };
 }
@@ -194,7 +196,6 @@ function toSummary(row: DbTicketSummary): TicketSummaryRow {
 function toRow(row: DbTicket): TicketRow {
   return {
     ...toSummary(row),
-    area: row.area,
     edificio: row.edificio,
     tipo: row.tipo,
     modulo: row.modulo,
