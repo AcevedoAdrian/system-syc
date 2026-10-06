@@ -1,4 +1,5 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
+import { TICKET_USAGE_READER } from "../../common/ticket-usage-reader";
 import { AuditModule } from "../audit/audit.module";
 import {
   TicketCreateDepartmentResolver,
@@ -9,6 +10,9 @@ import { TicketsRepository } from "./tickets.repository";
 import { TicketsService } from "./tickets.service";
 
 // Los resolvers son providers para que `PermissionsGuard` los obtenga por clase (`departmentFrom`).
+// Es global porque `catalogs` y `organizations` inyectan `TICKET_USAGE_READER` sin importar este
+// módulo: ninguno de los dos conoce la tabla `ticket` (SPEC 05, Feature 5.9).
+@Global()
 @Module({
   imports: [AuditModule],
   controllers: [TicketsController],
@@ -17,6 +21,8 @@ import { TicketsService } from "./tickets.service";
     TicketsRepository,
     TicketDepartmentResolver,
     TicketCreateDepartmentResolver,
+    { provide: TICKET_USAGE_READER, useExisting: TicketsRepository },
   ],
+  exports: [TICKET_USAGE_READER],
 })
 export class TicketsModule {}

@@ -1,8 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { ClaveEstado, Ticket, TicketSummary } from "@syc/contracts";
+import type { CatalogRuta, ClaveEstado, Ticket, TicketSummary } from "@syc/contracts";
 import { getPrismaClient } from "@syc/db";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
+import type { TicketUsageReader } from "../../common/ticket-usage-reader";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { type AuditEntry, writeAuditEntry } from "../audit/audit.repository";
@@ -210,6 +211,17 @@ function toRow(row: DbTicket): TicketRow {
   };
 }
 
+// La columna del ticket que referencia a cada catálogo, para contar el uso de un ítem.
+const CATALOG_COLUMN: Record<CatalogRuta, (itemId: string) => object> = {
+  areas: (id) => ({ areaId: id }),
+  edificios: (id) => ({ edificioId: id }),
+  tipos: (id) => ({ tipoId: id }),
+  prioridades: (id) => ({ prioridadId: id }),
+  modulos: (id) => ({ moduloId: id }),
+  proveedores: (id) => ({ proveedorId: id }),
+  estados: (id) => ({ estadoId: id }),
+};
+
 function hasCode(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
@@ -217,11 +229,21 @@ function hasCode(error: unknown, code: string): boolean {
 // Única capa que toca `Ticket`. También lee las filas de catálogo y de departamento que referencia
 // (son sus FK): validar que un valor nuevo esté activo es parte de escribir un ticket.
 @Injectable()
-export class TicketsRepository {
+export class TicketsRepository implements TicketUsageReader {
   constructor(@Inject(ENV) private readonly env: Env) {}
 
   private get db() {
     return getPrismaClient(this.env.DATABASE_URL);
+  }
+
+  // Uso de un ítem de catálogo (`TicketUsageReader`): solo cuentan los tickets no eliminados.
+  async countByCatalogItem(ruta: CatalogRuta, itemId: string): Promise<number> {
+    return this.db.ticket.count({ where: { ...CATALOG_COLUMN[ruta](itemId), ...notDeleted } });
+  }
+
+  // Uso de un departamento (`TicketUsageReader`): cuentan también los eliminados.
+  async countByDepartment(departmentId: string): Promise<number> {
+    return this.db.ticket.count({ where: { departamentoId: departmentId } });
   }
 
   // No eliminado, con sus referencias resueltas (nombre incluido, aunque el ítem esté inactivo o

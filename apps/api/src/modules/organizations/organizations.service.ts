@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type {
   AuditHistory,
@@ -9,6 +9,7 @@ import type {
 } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName, uniqueSlug } from "../../common/text";
+import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
 import { AuditService } from "../audit/audit.service";
 import { computeDiff, pickSnapshot } from "../audit/audit-diff";
@@ -30,6 +31,7 @@ export class OrganizationsService {
   constructor(
     private readonly repository: OrganizationsRepository,
     private readonly audit: AuditService,
+    @Inject(TICKET_USAGE_READER) private readonly tickets: TicketUsageReader,
   ) {}
 
   async list(): Promise<Organization[]> {
@@ -85,7 +87,8 @@ export class OrganizationsService {
     return toOrganization(await this.repository.setActive(current.id, input.activo, audit));
   }
 
-  // En SPEC 05 este mismo método suma el chequeo de tickets (ni siquiera eliminados lógicamente).
+  // Un departamento con agentes o con tickets (incluso eliminados lógicamente) no se elimina (D2):
+  // `Organization` se borra físicamente y la FK del ticket es `Restrict`.
   async remove(organizationId: string, actor: AuthenticatedUser): Promise<void> {
     const all = await this.repository.findAll();
     const current = this.requireIn(all, organizationId);
@@ -97,6 +100,11 @@ export class OrganizationsService {
     if (current.agentes > 0) {
       throw new ORPCError("CONFLICT", {
         message: "El departamento tiene agentes asignados: desactivalo en lugar de eliminarlo",
+      });
+    }
+    if ((await this.tickets.countByDepartment(organizationId)) > 0) {
+      throw new ORPCError("CONFLICT", {
+        message: "El departamento tiene tickets: desactivalo en lugar de eliminarlo",
       });
     }
     await this.repository.remove(organizationId, {

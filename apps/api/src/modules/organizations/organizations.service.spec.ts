@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
+import type { TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
 import type { AuditService } from "../audit/audit.service";
 import type { OrganizationRow, OrganizationsRepository } from "./organizations.repository";
@@ -19,7 +20,12 @@ const admin: AuthenticatedUser = {
 
 // Repository en memoria: el service solo lee la lista y escribe de a una fila. Cada mutación
 // recibe la entrada de auditoría (en producción se escribe en la misma transacción) y la anota.
-function buildService(initial: OrganizationRow[]) {
+// `ticketsByDepartment`: cuántos tickets tiene cada departamento, eliminados incluidos. Lo que no
+// figura, no tiene ninguno.
+function buildService(
+  initial: OrganizationRow[],
+  ticketsByDepartment: Record<string, number> = {},
+) {
   const rows = initial.map((r) => ({ ...r }));
   const audits: AuditEntry[] = [];
   const find = (id: string) => rows.find((r) => r.id === id) as OrganizationRow;
@@ -46,7 +52,15 @@ function buildService(initial: OrganizationRow[]) {
   } as unknown as OrganizationsRepository;
   const history = vi.fn(async () => []);
   const audit = { history } as unknown as AuditService;
-  return { service: new OrganizationsService(repository, audit), rows, audits, history };
+  const countByDepartment = vi.fn(async (id: string) => ticketsByDepartment[id] ?? 0);
+  const tickets = { countByDepartment } as unknown as TicketUsageReader;
+  return {
+    service: new OrganizationsService(repository, audit, tickets),
+    rows,
+    audits,
+    history,
+    countByDepartment,
+  };
 }
 
 const seed = () => [
@@ -182,6 +196,45 @@ describe("OrganizationsService.remove", () => {
     const { service } = buildService(seed());
 
     await expect(service.remove("nope", admin)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  describe("con tickets (SPEC 05, Feature 5.9)", () => {
+    it("rechaza con 409 si tiene tickets, aunque no tenga agentes", async () => {
+      const { service, rows, audits } = buildService(seed(), { adm: 1 });
+
+      await expect(service.remove("adm", admin)).rejects.toMatchObject({
+        code: "CONFLICT",
+        status: 409,
+        message: "El departamento tiene tickets: desactivalo en lugar de eliminarlo",
+      });
+      expect(rows).toHaveLength(3);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("cuenta también los tickets eliminados lógicamente: un solo ticket eliminado alcanza", async () => {
+      // El reader cuenta todas las filas (`countByDepartment` incluye los eliminados): la FK es Restrict.
+      const { service, countByDepartment } = buildService(seed(), { tec: 1 });
+
+      await expect(service.remove("tec", admin)).rejects.toMatchObject({ code: "CONFLICT" });
+      expect(countByDepartment).toHaveBeenCalledWith("tec");
+    });
+
+    it("sin tickets ni agentes se elimina", async () => {
+      const { service, rows } = buildService(seed(), { tec: 2 });
+
+      await service.remove("adm", admin);
+
+      expect(rows.map((r) => r.id)).toEqual(["tec", "red"]);
+    });
+
+    it("las demás reglas van primero: con agentes o último activo ni consulta los tickets", async () => {
+      const { service, countByDepartment } = buildService(seed(), { red: 9 });
+
+      await expect(service.remove("red", admin)).rejects.toMatchObject({
+        message: "El departamento tiene agentes asignados: desactivalo en lugar de eliminarlo",
+      });
+      expect(countByDepartment).not.toHaveBeenCalled();
+    });
   });
 });
 

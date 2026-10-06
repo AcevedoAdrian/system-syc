@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName } from "../../common/text";
+import type { TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
 import type { AuditService } from "../audit/audit.service";
 import { CATALOG_DEFINITIONS } from "./catalog-definitions";
@@ -40,7 +41,12 @@ function row(id: string, nombre: string, orden: number, extra: Partial<CatalogRo
 // Repository en memoria con una tabla por catálogo. Imita lo que hace el real: `findAll` devuelve
 // los no eliminados en el orden de `list`, y cada mutación anota la auditoría que en producción se
 // escribe en la misma transacción.
-function buildService(initial: Record<string, CatalogRow[]> = {}) {
+// `inUse`: cuántos tickets no eliminados usan cada ítem, como "ruta:id" → cantidad. Lo que no figura,
+// no lo usa ninguno.
+function buildService(
+  initial: Record<string, CatalogRow[]> = {},
+  inUse: Record<string, number> = {},
+) {
   const tables = new Map(
     Object.entries(initial).map(([ruta, rows]) => [ruta, rows.map((r) => ({ ...r }))]),
   );
@@ -111,8 +117,11 @@ function buildService(initial: Record<string, CatalogRow[]> = {}) {
 
   const history = vi.fn(async () => []);
   const audit = { history } as unknown as AuditService;
+  const countByCatalogItem = vi.fn(async (ruta: string, id: string) => inUse[`${ruta}:${id}`] ?? 0);
+  const tickets = { countByCatalogItem } as unknown as TicketUsageReader;
   return {
-    service: new CatalogsService(repository, audit),
+    service: new CatalogsService(repository, audit, tickets),
+    countByCatalogItem,
     audits,
     actors,
     creates,
@@ -410,6 +419,92 @@ describe("CatalogsService.remove", () => {
 
     await expect(service.remove(areas, "a2", admin)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
+
+  describe("ítem en uso por un ticket (SPEC 05, Feature 5.9)", () => {
+    it("un ítem que usa un ticket no eliminado: 409, no se elimina y no se audita", async () => {
+      const { service, audits } = buildService(threeAreas(), { "areas:a2": 1 });
+
+      await expect(service.remove(areas, "a2", admin)).rejects.toMatchObject({
+        code: "CONFLICT",
+        status: 409,
+        message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
+      });
+
+      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a2", "a3"]);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("un ítem que ningún ticket usa se elimina, aunque otro del catálogo esté en uso", async () => {
+      const { service } = buildService(threeAreas(), { "areas:a1": 3 });
+
+      await service.remove(areas, "a2", admin);
+
+      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+    });
+
+    it("lo que cuentan son los tickets no eliminados: uno usado solo por eliminados se elimina", async () => {
+      // El reader ya descuenta los eliminados (devuelve 0): el service no vuelve a mirarlos.
+      const { service } = buildService(threeAreas(), { "areas:a2": 0 });
+
+      await service.remove(areas, "a2", admin);
+
+      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+    });
+
+    it("consulta el catálogo correcto: la misma id en otro catálogo no cuenta", async () => {
+      const { service, countByCatalogItem } = buildService(threeAreas(), { "edificios:a2": 5 });
+
+      await service.remove(areas, "a2", admin);
+
+      expect(countByCatalogItem).toHaveBeenCalledWith("areas", "a2");
+    });
+
+    it("rige para los 7 catálogos: pregunta con la ruta de cada uno", async () => {
+      const rutas = [
+        "areas",
+        "edificios",
+        "tipos",
+        "prioridades",
+        "modulos",
+        "proveedores",
+      ] as const;
+      for (const ruta of rutas) {
+        const items = { [ruta]: [row("x1", "Uno", 1), row("x2", "Dos", 2)] };
+        const { service } = buildService(items, { [`${ruta}:x1`]: 2 });
+
+        await expect(service.remove(CATALOG_DEFINITIONS[ruta], "x1", admin)).rejects.toMatchObject({
+          code: "CONFLICT",
+        });
+        await service.remove(CATALOG_DEFINITIONS[ruta], "x2", admin);
+      }
+    });
+
+    it("un estado de sistema sigue sin poder eliminarse: la regla de la clave va primero", async () => {
+      const { service, countByCatalogItem } = buildService(
+        {
+          estados: [row("e1", "Pendiente", 1), row("e2", "Finalizado", 2, { clave: "FINALIZADO" })],
+        },
+        { "estados:e2": 4 },
+      );
+
+      await expect(service.remove(estados, "e2", admin)).rejects.toMatchObject({
+        message: "Es un estado de sistema: se puede renombrar o desactivar, pero no eliminar",
+      });
+      expect(countByCatalogItem).not.toHaveBeenCalled();
+    });
+
+    it("un estado sin clave usado por un ticket: 409", async () => {
+      const { service } = buildService(
+        { estados: [row("e1", "Pendiente", 1), row("e3", "En espera", 3)] },
+        { "estados:e3": 1 },
+      );
+
+      await expect(service.remove(estados, "e3", admin)).rejects.toMatchObject({
+        code: "CONFLICT",
+        message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
+      });
+    });
+  });
 });
 
 describe("CatalogsService.move", () => {
@@ -693,7 +788,11 @@ describe("CatalogsService.seedIfEmpty", () => {
   function buildSeedService(created: number) {
     const seedIfEmpty = vi.fn(async () => created);
     const repository = { seedIfEmpty } as unknown as CatalogsRepository;
-    const service = new CatalogsService(repository, {} as unknown as AuditService);
+    const service = new CatalogsService(
+      repository,
+      {} as unknown as AuditService,
+      {} as unknown as TicketUsageReader,
+    );
     return { service, seedIfEmpty };
   }
 

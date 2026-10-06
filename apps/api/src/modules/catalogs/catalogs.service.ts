@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { AuditHistory, CatalogItem, EstadoTicket, Proveedor } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName } from "../../common/text";
+import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
 import { AuditService } from "../audit/audit.service";
 import { type AuditSnapshot, computeDiff, pickSnapshot } from "../audit/audit-diff";
@@ -38,6 +39,7 @@ export class CatalogsService {
   constructor(
     private readonly repository: CatalogsRepository,
     private readonly audit: AuditService,
+    @Inject(TICKET_USAGE_READER) private readonly tickets: TicketUsageReader,
   ) {}
 
   async list(def: CatalogDefinition): Promise<CatalogItemView[]> {
@@ -130,7 +132,8 @@ export class CatalogsService {
     if (changes.length > 0) await this.repository.swapOrden(def, changes, actor.id);
   }
 
-  // En SPEC 05 este mismo método suma el chequeo de tickets (ni siquiera eliminados lógicamente).
+  // Un ítem que usa algún ticket no eliminado no se elimina (409): se desactiva (Q13, PRD §6.2). Los
+  // tickets eliminados no cuentan: su FK sigue válida porque el borrado es lógico.
   async remove(def: CatalogDefinition, itemId: string, actor: AuthenticatedUser): Promise<void> {
     const all = await this.repository.findAll(def);
     const current = this.requireIn(def, all, itemId);
@@ -139,6 +142,11 @@ export class CatalogsService {
     }
     if (def.rules.lastActive && this.isLastActive(all, current)) {
       throw new ORPCError("CONFLICT", { message: def.rules.lastActive.remove });
+    }
+    if ((await this.tickets.countByCatalogItem(def.ruta, itemId)) > 0) {
+      throw new ORPCError("CONFLICT", {
+        message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
+      });
     }
     await this.repository.softDelete(def, itemId, actor.id, {
       entityType: def.entityType,

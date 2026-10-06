@@ -7,6 +7,7 @@ import { type Auth, createAuth } from "./modules/auth/auth.config";
 import { CATALOG_DEFINITIONS } from "./modules/catalogs/catalog-definitions";
 import { CatalogsRepository } from "./modules/catalogs/catalogs.repository";
 import { CatalogsService } from "./modules/catalogs/catalogs.service";
+import { TicketsRepository } from "./modules/tickets/tickets.repository";
 import { toInternalEmail } from "./modules/users/internal-email";
 import { userAuditSnapshot } from "./modules/users/user-audit-snapshot";
 
@@ -177,7 +178,7 @@ async function main() {
   const admin = await seedAdmin(auth, audit, seedEnv);
   const departments = await seedDepartments(auth, audit);
   const catalogs = await seedCatalogs(
-    new CatalogsService(new CatalogsRepository(env), audit),
+    new CatalogsService(new CatalogsRepository(env), audit, new TicketsRepository(env)),
     await findAdminId(auth, seedEnv.SEED_ADMIN_USERNAME),
   );
 
