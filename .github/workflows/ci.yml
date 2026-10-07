@@ -32,3 +32,19 @@ jobs:
 
       - name: Typecheck, test y build de lo afectado
         run: pnpm turbo typecheck test build --filter="...[${{ github.event_name == 'pull_request' && 'origin/' || '' }}${{ github.event_name == 'pull_request' && github.base_ref || 'HEAD^1' }}]"
+
+  # Construye las imágenes de producción (SPEC 07) sin publicarlas ni desplegarlas: un Dockerfile roto
+  # se descubre en el PR, no el día del deploy. Sin filtro de turbo: corre siempre.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: API, target migrate
+        run: docker build -f apps/api/Dockerfile --target migrate -t syc-migrate:ci .
+
+      - name: API, target api
+        run: docker build -f apps/api/Dockerfile --target api -t syc-api:ci .
+
+      - name: Web (Nginx)
+        run: docker build -f apps/web/Dockerfile -t syc-web:ci .
