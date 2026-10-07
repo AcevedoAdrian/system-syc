@@ -1,6 +1,6 @@
 # SPEC 07 — Endurecimiento y despliegue
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 01 (esqueleto del monorepo), SPEC 02 (autenticación y acceso), SPEC 06 (comentarios, bandeja y detalle)
 > **Date:** 2026-10-07
 > **Objective:** dejar el sistema corriendo en el servidor on-premise. Un compose de producción con Nginx como única entrada HTTP aplica las migraciones solo, un backup diario rota 30 copias y un checklist de permisos queda tildado contra el servidor.
