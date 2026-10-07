@@ -53,7 +53,7 @@ export function createAuth(env: Env, callbacks: AuthCallbacks = {}) {
       useSecureCookies: false, // el despliegue es HTTP por IP, sin HTTPS (SPEC 07, Q37)
       // Nginx pisa `X-Real-IP` con la IP del cliente: el rate limit del login cuenta por persona.
       // Sin el header (desarrollo sin proxy) vuelve al contador compartido por ruta.
-      ipAddress: { ipAddressHeaders: ["x--ip"] },
+      ipAddress: { ipAddressHeaders: ["x-real-ip"] },
     },
     hooks: {
       // Al cambiar la propia contraseña se cierran siempre las otras sesiones, sin depender del cliente.
