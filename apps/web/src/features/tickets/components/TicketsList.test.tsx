@@ -34,12 +34,18 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({
     to,
     params,
+    className,
     children,
   }: {
     to: string;
     params?: { ticketId: string };
+    className?: string;
     children: React.ReactNode;
-  }) => <a href={params ? to.replace("$ticketId", params.ticketId) : to}>{children}</a>,
+  }) => (
+    <a href={params ? to.replace("$ticketId", params.ticketId) : to} className={className}>
+      {children}
+    </a>
+  ),
 }));
 
 import { TicketsList } from "./TicketsList";
@@ -191,6 +197,27 @@ describe("TicketsList", () => {
       expect(within(row).getByText("Sistemas")).toBeInTheDocument();
       expect(within(row).getByText("01/10/2026")).toBeInTheDocument();
       expect(within(screen.getByTestId("ticket-row-14")).getByText("—")).toBeInTheDocument();
+    });
+
+    it("la fecha va en un <time> con su valor ISO, y el número y la fecha usan cifras de ancho fijo", () => {
+      ready(page([ticket(13)]));
+      renderList();
+
+      const row = screen.getByTestId("ticket-row-13");
+      const fecha = within(row).getByText("01/10/2026");
+      expect(fecha.tagName).toBe("TIME");
+      expect(fecha).toHaveAttribute("datetime", "2026-10-01");
+      expect(fecha).toHaveClass("tabular-nums");
+      expect(within(row).getByRole("link", { name: "TE-000013" })).toHaveClass("tabular-nums");
+    });
+
+    it("un título largo se parte en líneas dentro de su celda y no ensancha la tabla", () => {
+      const largo = "x".repeat(300);
+      ready(page([ticket(13, { titulo: largo })]));
+      renderList();
+
+      const enlace = screen.getByRole("link", { name: largo });
+      expect(enlace).toHaveClass("whitespace-normal", "wrap-break-word", "max-w-md");
     });
 
     it("el número y el título abren el ticket", () => {

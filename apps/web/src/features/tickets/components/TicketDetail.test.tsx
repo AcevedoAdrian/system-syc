@@ -188,6 +188,12 @@ describe("TicketDetail", () => {
       expect(screen.getByText("Técnico")).toBeInTheDocument();
     });
 
+    it("un título larguísimo se parte en líneas en vez de desbordar la pantalla", () => {
+      show(makeTicket({ titulo: "y".repeat(400) }));
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveClass("wrap-break-word");
+    });
+
     it("compone el formulario de datos, los comentarios y el historial del mismo ticket", () => {
       show(makeTicket());
 
@@ -369,6 +375,8 @@ describe("TicketDetail", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "guardado" }));
       expect(screen.getByRole("status")).toHaveTextContent("Cambios guardados.");
+      // Usa el color del tema (con contraste AA en claro y oscuro), no un verde fijo.
+      expect(screen.getByRole("status")).toHaveClass("text-success");
 
       await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
       expect(screen.queryByRole("status")).not.toBeInTheDocument();

@@ -101,6 +101,20 @@ describe("TicketComments", () => {
 
       expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
     });
+
+    it("un comentario con una palabra larguísima se parte y conserva sus saltos de línea", () => {
+      show([comment("c1", `${"a".repeat(500)}\nsegunda línea`)]);
+
+      expect(screen.getByText(/^a{500}/)).toHaveClass("whitespace-pre-wrap", "wrap-break-word");
+    });
+
+    it("la fecha del comentario va en un <time> con su valor ISO", () => {
+      show([comment("c1", "Hola")]);
+
+      const fecha = within(screen.getByRole("listitem")).getByText("06/10/2026 14:32");
+      expect(fecha.tagName).toBe("TIME");
+      expect(fecha).toHaveAttribute("datetime", "2026-10-06T17:32:00.000Z");
+    });
   });
 
   describe("comentar", () => {

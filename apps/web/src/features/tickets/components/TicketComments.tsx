@@ -82,7 +82,8 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
             <li key={comment.id} className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-muted-foreground">
-                  {comment.autor.nombre} · {formatTimestamp(comment.createdAt)}
+                  {comment.autor.nombre} ·{" "}
+                  <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
                 </p>
                 {isAdmin && (
                   <Button
@@ -95,7 +96,7 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
                   </Button>
                 )}
               </div>
-              <p className="whitespace-pre-wrap">{comment.texto}</p>
+              <p className="whitespace-pre-wrap wrap-break-word">{comment.texto}</p>
             </li>
           ))}
         </ol>

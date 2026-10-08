@@ -78,7 +78,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
   return (
     <section className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">
+        <h1 className="text-2xl font-semibold wrap-break-word">
           {formatTicketNumber(ticket.numero)} · {ticket.titulo}
         </h1>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
           </p>
         )}
         {notice && (
-          <p role="status" className="text-sm text-green-600">
+          <p role="status" className="text-sm text-success">
             {notice}
           </p>
         )}

@@ -73,7 +73,7 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
         <div className="flex flex-col gap-3" aria-busy={isPlaceholderData}>
           <TicketsTable tickets={data.items} />
           <nav aria-label="Paginación" className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground tabular-nums">
               Página {data.page} de {totalPages} · {data.total}{" "}
               {data.total === 1 ? "ticket" : "tickets"}
             </p>

@@ -53,8 +53,27 @@ describe("TicketHistory", () => {
     ]);
 
     const item = screen.getByRole("listitem");
-    expect(within(item).getByText(/06\/10\/2026 14:32 · Ana/)).toBeInTheDocument();
+    expect(item).toHaveTextContent("06/10/2026 14:32 · Ana");
     expect(item).toHaveTextContent("Estado: Pendiente → En progreso");
+  });
+
+  it("cada cambio se parte en líneas si un valor es larguísimo, en vez de desbordar", () => {
+    show([
+      entry("a2", "update", {
+        before: { estado: { id: "e1", nombre: "x".repeat(400) } },
+        after: { estado: { id: "e2", nombre: "En progreso" } },
+      }),
+    ]);
+
+    expect(screen.getByText(/^Estado:/).closest("p")).toHaveClass("wrap-break-word");
+  });
+
+  it("la fecha va en un <time> con su valor ISO, para que un lector la entienda sin depender del formato", () => {
+    show([entry("a2", "comment_create", { comentarioId: "c1" })]);
+
+    const fecha = within(screen.getByRole("listitem")).getByText("06/10/2026 14:32");
+    expect(fecha.tagName).toBe("TIME");
+    expect(fecha).toHaveAttribute("datetime", "2026-10-06T17:32:00.000Z");
   });
 
   it("muestra una línea por cada campo que cambió", () => {
