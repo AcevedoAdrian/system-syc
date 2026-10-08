@@ -277,25 +277,25 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] Un agente comenta un ticket de su departamento, también en estado Finalizado. El comentario sale en `comments.list` con su nombre y la fecha.
-- [ ] Comentar no cambia el `updatedAt` del ticket: un `update` con el `updatedAt` leído antes del comentario guarda sin 409.
-- [ ] Un comentario de solo espacios, o de 2001 caracteres, devuelve 400.
-- [ ] Un agente recibe 404, con el mismo cuerpo, en `comments.list` y `comments.create` de un ticket de otro departamento y de un id inexistente.
-- [ ] Un agente recibe 403 en `comments.remove`, también sobre su propio comentario.
-- [ ] El admin elimina un comentario: deja de salir en `comments.list` y eliminarlo otra vez devuelve 404.
-- [ ] Comentar y eliminar dejan cada uno exactamente un `AuditLog` con `entityType: "Ticket"`, acción `comment_create` o `comment_delete`, y un `payload` sin el texto.
-- [ ] `tickets.list` de un agente nunca devuelve un ticket de otro departamento, tampoco mandando el `departamentoId` de otro. El admin, con `departamentoId`, recibe solo los de ese departamento.
-- [ ] Buscar "tecnico" encuentra un ticket con "Técnico" en el título, y uno con "TÉCNICO" en la descripción.
-- [ ] Buscar una palabra que solo está en un comentario encuentra el ticket. Después de que el admin elimina ese comentario, ya no lo encuentra.
-- [ ] Buscar "50%" encuentra un ticket con "50%" en el título y no uno con "500" en el título.
-- [ ] Un ticket eliminado no aparece en la bandeja con ningún filtro ni búsqueda.
-- [ ] Con 25 tickets: sin filtros, la página 1 trae 20 ordenados por `fechaRecepcion` descendente (y `numero` descendente al empatar), la página 2 trae 5 y las dos informan `total: 25`.
-- [ ] Filtrar por proveedor, por módulo y por un rango de fecha de recepción (con los dos extremos inclusive) devuelve solo los tickets que coinciden. Filtrar por un área desactivada encuentra sus tickets.
-- [ ] `fechaRecepcionDesde` posterior a `fechaRecepcionHasta` devuelve 400.
-- [ ] En la web, un agente busca un ticket por una palabra de un comentario, lo abre desde la bandeja, agrega un comentario y lo ve en la lista. No ve "Eliminar" en los comentarios ni el filtro "Departamento".
-- [ ] En la web, recargar `/tickets?q=impresora&page=2` muestra la misma búsqueda y la misma página.
-- [ ] En la web, el admin elimina un comentario y el historial muestra "Comentario eliminado" sin el texto.
-- [ ] `pnpm verify --spec 06` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] Un agente comenta un ticket de su departamento, también en estado Finalizado. El comentario sale en `comments.list` con su nombre y la fecha.
+- [X] Comentar no cambia el `updatedAt` del ticket: un `update` con el `updatedAt` leído antes del comentario guarda sin 409.
+- [X] Un comentario de solo espacios, o de 2001 caracteres, devuelve 400.
+- [X] Un agente recibe 404, con el mismo cuerpo, en `comments.list` y `comments.create` de un ticket de otro departamento y de un id inexistente.
+- [X] Un agente recibe 403 en `comments.remove`, también sobre su propio comentario.
+- [X] El admin elimina un comentario: deja de salir en `comments.list` y eliminarlo otra vez devuelve 404.
+- [X] Comentar y eliminar dejan cada uno exactamente un `AuditLog` con `entityType: "Ticket"`, acción `comment_create` o `comment_delete`, y un `payload` sin el texto.
+- [X] `tickets.list` de un agente nunca devuelve un ticket de otro departamento, tampoco mandando el `departamentoId` de otro. El admin, con `departamentoId`, recibe solo los de ese departamento.
+- [X] Buscar "tecnico" encuentra un ticket con "Técnico" en el título, y uno con "TÉCNICO" en la descripción.
+- [X] Buscar una palabra que solo está en un comentario encuentra el ticket. Después de que el admin elimina ese comentario, ya no lo encuentra.
+- [X] Buscar "50%" encuentra un ticket con "50%" en el título y no uno con "500" en el título.
+- [X] Un ticket eliminado no aparece en la bandeja con ningún filtro ni búsqueda.
+- [X] Con 25 tickets: sin filtros, la página 1 trae 20 ordenados por `fechaRecepcion` descendente (y `numero` descendente al empatar), la página 2 trae 5 y las dos informan `total: 25`.
+- [X] Filtrar por proveedor, por módulo y por un rango de fecha de recepción (con los dos extremos inclusive) devuelve solo los tickets que coinciden. Filtrar por un área desactivada encuentra sus tickets.
+- [X] `fechaRecepcionDesde` posterior a `fechaRecepcionHasta` devuelve 400.
+- [X] En la web, un agente busca un ticket por una palabra de un comentario, lo abre desde la bandeja, agrega un comentario y lo ve en la lista. No ve "Eliminar" en los comentarios ni el filtro "Departamento".
+- [X] En la web, recargar `/tickets?q=impresora&page=2` muestra la misma búsqueda y la misma página.
+- [X] En la web, el admin elimina un comentario y el historial muestra "Comentario eliminado" sin el texto.
+- [X] `pnpm verify --spec 06` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
 

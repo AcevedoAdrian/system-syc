@@ -1,6 +1,6 @@
 # SPEC 07 — Endurecimiento y despliegue
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 01 (esqueleto del monorepo), SPEC 02 (autenticación y acceso), SPEC 06 (comentarios, bandeja y detalle)
 > **Date:** 2026-10-07
 > **Objective:** dejar el sistema corriendo en el servidor on-premise. Un compose de producción con Nginx como única entrada HTTP aplica las migraciones solo, un backup diario rota 30 copias y un checklist de permisos queda tildado contra el servidor.
@@ -309,33 +309,33 @@ Nginx manda a la API `X-Real-IP: $remote_addr` y pisa el que haya mandado el cli
 
 Los marcados *(verify)* los comprueba `pnpm verify --spec 07`. Los demás se tildan a mano en el servidor.
 
-- [ ] *(verify)* Construir los targets `migrate` y `api` de `apps/api/Dockerfile`, y `apps/web/Dockerfile`, termina con código 0.
-- [ ] *(verify)* Ningún asset de la imagen de la web contiene `localhost:3000`, aunque el `.env` de la raíz lo defina.
-- [ ] *(verify)* `docker compose -f docker-compose.prod.yml config` sin `PUBLIC_URL`, sin `POSTGRES_PASSWORD` o sin `BETTER_AUTH_SECRET` falla nombrando la variable.
-- [ ] *(verify)* `up -d --build` desde cero deja `migrate` terminado con 0, y `postgres`, `api`, `web` y `backup` corriendo, con `api` sana.
-- [ ] *(verify)* Solo `web` publica un puerto. `postgres` y `api` no publican ninguno.
-- [ ] *(verify)* Todos los servicios tienen `json-file` con `max-size` y `max-file` en el `config` resuelto.
-- [ ] *(verify)* Por Nginx, `GET /api/health` responde `status: "ok"`. El admin entra por `/api/auth/sign-in/username`, y con esa cookie `GET /api/tickets` responde 200.
-- [ ] *(verify)* `GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404.
-- [ ] *(verify)* Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión.
-- [ ] *(verify)* Por Nginx, el sexto login fallido en un minuto responde 429, también mandando otro `X-Real-IP`.
-- [ ] *(verify)* Contra la API directa, el sexto login fallido con `X-Real-IP: 10.0.0.1` responde 429, y uno con `X-Real-IP: 10.0.0.2` responde 401.
-- [ ] *(verify)* Después de recrear solo `api` (`up -d --force-recreate api`), `GET /api/health` por Nginx sigue respondiendo `ok` sin reiniciar `web`.
-- [ ] *(verify)* `backup.sh` a mano crea un `syc-AAAAMMDD-HHMMSS.dump` en `BACKUP_DIR`. Con 30 copias viejas y un archivo ajeno en la carpeta, otra corrida deja exactamente 30, borra la más vieja y no toca el ajeno.
-- [ ] *(verify)* Con la contraseña de Postgres incorrecta, `backup.sh` termina con código distinto de 0, escribe `ERROR` en el log y no deja copia nueva ni `.partial`. Las copias anteriores siguen todas.
-- [ ] *(verify)* El contenedor `backup` tiene la tarea `0 2 * * *`, y `date` adentro muestra la hora de Argentina (-03).
-- [ ] *(verify)* Restauración:
+- [X] *(verify)* Construir los targets `migrate` y `api` de `apps/api/Dockerfile`, y `apps/web/Dockerfile`, termina con código 0.
+- [X] *(verify)* Ningún asset de la imagen de la web contiene `localhost:3000`, aunque el `.env` de la raíz lo defina.
+- [X] *(verify)* `docker compose -f docker-compose.prod.yml config` sin `PUBLIC_URL`, sin `POSTGRES_PASSWORD` o sin `BETTER_AUTH_SECRET` falla nombrando la variable.
+- [X] *(verify)* `up -d --build` desde cero deja `migrate` terminado con 0, y `postgres`, `api`, `web` y `backup` corriendo, con `api` sana.
+- [X] *(verify)* Solo `web` publica un puerto. `postgres` y `api` no publican ninguno.
+- [X] *(verify)* Todos los servicios tienen `json-file` con `max-size` y `max-file` en el `config` resuelto.
+- [X] *(verify)* Por Nginx, `GET /api/health` responde `status: "ok"`. El admin entra por `/api/auth/sign-in/username`, y con esa cookie `GET /api/tickets` responde 200.
+- [X] *(verify)* `GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404.
+- [X] *(verify)* Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión.
+- [X] *(verify)* Por Nginx, el sexto login fallido en un minuto responde 429, también mandando otro `X-Real-IP`.
+- [X] *(verify)* Contra la API directa, el sexto login fallido con `X-Real-IP: 10.0.0.1` responde 429, y uno con `X-Real-IP: 10.0.0.2` responde 401.
+- [X] *(verify)* Después de recrear solo `api` (`up -d --force-recreate api`), `GET /api/health` por Nginx sigue respondiendo `ok` sin reiniciar `web`.
+- [X] *(verify)* `backup.sh` a mano crea un `syc-AAAAMMDD-HHMMSS.dump` en `BACKUP_DIR`. Con 30 copias viejas y un archivo ajeno en la carpeta, otra corrida deja exactamente 30, borra la más vieja y no toca el ajeno.
+- [X] *(verify)* Con la contraseña de Postgres incorrecta, `backup.sh` termina con código distinto de 0, escribe `ERROR` en el log y no deja copia nueva ni `.partial`. Las copias anteriores siguen todas.
+- [X] *(verify)* El contenedor `backup` tiene la tarea `0 2 * * *`, y `date` adentro muestra la hora de Argentina (-03).
+- [X] *(verify)* Restauración:
   - se crea el ticket T1, se corre un backup y después se crea T2;
   - se detiene `api`, se corre `restore.sh --confirmar` con esa copia y se levanta `api`;
   - el admin entra, ve T1 y no ve T2.
-- [ ] *(verify)* `restore.sh` sin `--confirmar`, o con `api` corriendo, se niega y no toca la base.
-- [ ] El job `docker` del CI pasa en un PR.
-- [ ] `pnpm verify --spec 07` y `pnpm turbo lint typecheck test build` terminan con código 0, y `pnpm verify --spec 07` no deja restos del proyecto `syc-verify-07`.
-- [ ] En el servidor, siguiendo `docs/despliegue.md` desde un clon limpio, la web responde en `http://<ip-del-servidor>/` y el admin del seed entra.
-- [ ] En el servidor, la prueba de restauración pasa antes de la salida a producción.
-- [ ] El día siguiente al primer deploy, `docker compose -f docker-compose.prod.yml logs backup` muestra `backup OK` a las 02:00 y la copia está en `BACKUP_DIR`. Nadie la disparó a mano.
-- [ ] `docs/checklist-permisos.md` tiene todas las filas en ✅ contra el servidor, y una línea en el registro con la fecha, el tag y quién la hizo, commiteada.
-- [ ] La versión desplegada es un tag `vAAAA.MM.DD` creado sobre `main` con el CI en verde.
+- [X] *(verify)* `restore.sh` sin `--confirmar`, o con `api` corriendo, se niega y no toca la base.
+- [X] El job `docker` del CI pasa en un PR.
+- [X] `pnpm verify --spec 07` y `pnpm turbo lint typecheck test build` terminan con código 0, y `pnpm verify --spec 07` no deja restos del proyecto `syc-verify-07`.
+- [X] En el servidor, siguiendo `docs/despliegue.md` desde un clon limpio, la web responde en `http://<ip-del-servidor>/` y el admin del seed entra.
+- [X] En el servidor, la prueba de restauración pasa antes de la salida a producción.
+- [X] El día siguiente al primer deploy, `docker compose -f docker-compose.prod.yml logs backup` muestra `backup OK` a las 02:00 y la copia está en `BACKUP_DIR`. Nadie la disparó a mano.
+- [X] `docs/checklist-permisos.md` tiene todas las filas en ✅ contra el servidor, y una línea en el registro con la fecha, el tag y quién la hizo, commiteada.
+- [X] La versión desplegada es un tag `vAAAA.MM.DD` creado sobre `main` con el CI en verde.
 
 ## Decisiones
 
