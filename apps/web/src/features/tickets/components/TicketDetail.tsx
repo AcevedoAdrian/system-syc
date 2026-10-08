@@ -1,6 +1,6 @@
 import { formatTicketNumber } from "@syc/contracts";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
+import { useCallback, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,17 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
   const [departmentOpen, setDepartmentOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removeError, setRemoveError] = useState<string>();
+  // Eliminar sale de la pantalla a propósito, aunque el formulario tenga cambios: no debe frenarse.
+  const leaving = useRef(false);
+
+  // Con cambios sin guardar, salir de la pantalla (otro link, atrás) o cerrar la pestaña pide confirmar.
+  // Las funciones son estables: `useBlocker` vuelve a registrar el bloqueo cada vez que cambian.
+  const shouldBlock = useCallback(() => dirty && !leaving.current, [dirty]);
+  const blocker = useBlocker({
+    shouldBlockFn: shouldBlock,
+    enableBeforeUnload: shouldBlock,
+    withResolver: true,
+  });
 
   const reload = useCallback(() => refetch(), [refetch]);
   const onDirtyChange = useCallback((value: boolean) => {
@@ -56,8 +67,10 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
     setRemoveError(undefined);
     try {
       await remove.mutateAsync({ ticketId: ticket.id });
+      leaving.current = true;
       await navigate({ to: "/tickets" });
     } catch (failure) {
+      leaving.current = false;
       setRemoveError(getErrorMessage(failure));
     }
   };
@@ -125,6 +138,16 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
         open={statusOpen}
         onOpenChange={setStatusOpen}
         onReload={reload}
+      />
+      <ConfirmDialog
+        open={blocker.status === "blocked"}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.();
+        }}
+        title="Descartar cambios"
+        description="Hay cambios sin guardar en el ticket. Si salís, se pierden."
+        confirmLabel="Salir sin guardar"
+        onConfirm={() => blocker.proceed?.()}
       />
       {isAdmin && (
         <>

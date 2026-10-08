@@ -23,6 +23,11 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   navigate: vi.fn(),
   formMounts: 0,
+  // Lo que la pantalla le pide a `useBlocker`, y el resolver que se le devuelve (idle por defecto).
+  blockerOpts: undefined as
+    | { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean; withResolver: boolean }
+    | undefined,
+  blocker: { status: "idle" } as { status: "idle" | "blocked"; proceed?: unknown; reset?: unknown },
 }));
 
 vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
@@ -37,6 +42,10 @@ vi.mock("@tanstack/react-router", () => ({
     <a href={to}>{children}</a>
   ),
   useNavigate: () => mocks.navigate,
+  useBlocker: (opts: NonNullable<typeof mocks.blockerOpts>) => {
+    mocks.blockerOpts = opts;
+    return mocks.blocker;
+  },
 }));
 // Las piezas con su propia prueba se reemplazan por stubs que dejan ver lo que la pantalla les pasa.
 vi.mock("./TicketHistory", () => ({
@@ -136,6 +145,8 @@ describe("TicketDetail", () => {
     mocks.remove.mockReset();
     mocks.remove.mockResolvedValue(undefined);
     mocks.navigate.mockReset();
+    mocks.blockerOpts = undefined;
+    mocks.blocker = { status: "idle" };
   });
 
   describe("estados de la carga", () => {
@@ -266,6 +277,89 @@ describe("TicketDetail", () => {
       await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
 
       expect(screen.getByRole("button", { name: "Eliminar" })).toBeEnabled();
+    });
+  });
+
+  describe("salir con cambios sin guardar", () => {
+    const bloquea = () => mocks.blockerOpts?.shouldBlockFn();
+    const bloqueaAlCerrarLaPestaña = () => mocks.blockerOpts?.enableBeforeUnload();
+
+    it("solo frena la salida (y el cierre de la pestaña) cuando el formulario tiene cambios", async () => {
+      show(makeTicket());
+      expect(mocks.blockerOpts?.withResolver).toBe(true);
+      expect(bloquea()).toBe(false);
+      expect(bloqueaAlCerrarLaPestaña()).toBe(false);
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+      expect(bloquea()).toBe(true);
+      expect(bloqueaAlCerrarLaPestaña()).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "limpiar" }));
+      expect(bloquea()).toBe(false);
+    });
+
+    it("no muestra el aviso mientras la navegación no esté bloqueada", () => {
+      show(makeTicket());
+
+      expect(screen.queryByText("Descartar cambios")).not.toBeInTheDocument();
+    });
+
+    it("una navegación bloqueada pide confirmar, y «Salir sin guardar» la deja seguir", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mocks.blocker = { status: "blocked", proceed, reset };
+      show(makeTicket());
+
+      expect(await screen.findByText("Descartar cambios")).toBeInTheDocument();
+      expect(screen.getByText(/Hay cambios sin guardar en el ticket/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Salir sin guardar" }));
+
+      expect(proceed).toHaveBeenCalledTimes(1);
+    });
+
+    it("«Cancelar» se queda en el ticket", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mocks.blocker = { status: "blocked", proceed, reset };
+      show(makeTicket());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+
+      expect(reset).toHaveBeenCalledTimes(1);
+      expect(proceed).not.toHaveBeenCalled();
+    });
+
+    it("eliminar el ticket no queda frenado por sus propios cambios sin guardar", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+      expect(bloquea()).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      // Al navegar el ticket ya se eliminó: en ese instante el bloqueo tiene que estar apagado. Se
+      // registra acá y se afirma después: `confirmRemove` captura lo que lance `navigate`.
+      const alNavegar: boolean[] = [];
+      mocks.navigate.mockImplementationOnce(async () => {
+        alNavegar.push(bloquea() ?? true, bloqueaAlCerrarLaPestaña() ?? true);
+      });
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ to: "/tickets" }));
+      expect(alNavegar).toEqual([false, false]);
+    });
+
+    it("si eliminar falla, el bloqueo vuelve a estar activo", async () => {
+      mocks.user = admin;
+      mocks.remove.mockRejectedValue(new Error("falló"));
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      await waitFor(() => expect(mocks.remove).toHaveBeenCalled());
+      expect(mocks.navigate).not.toHaveBeenCalled();
+      expect(bloquea()).toBe(true);
     });
   });
 
