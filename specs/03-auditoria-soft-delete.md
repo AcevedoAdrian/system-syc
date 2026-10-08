@@ -144,16 +144,16 @@ Convención del `payload` (Q10):
 
 ## Criterios de aceptación
 
-- [ ] Crear, renombrar, desactivar, reactivar y eliminar un departamento deja, en cada paso, un `AuditLog` con `entityType: "Organization"`, el admin como actor y la acción y el `payload` de la convención.
-- [ ] Crear un usuario, editarlo (nombre, rol y departamento a la vez), desactivarlo, reactivarlo y resetearle la contraseña deja, respectivamente, `create`, **un** `update`, `update`, `update` y `reset_password`.
-- [ ] Renombrar "Soporte" a "Mesa de ayuda" deja exactamente `{ before: { nombre: "Soporte" }, after: { nombre: "Mesa de ayuda" } }`.
-- [ ] Una edición sin cambios efectivos (mismo nombre o mismo estado `activo`) no genera `AuditLog`.
-- [ ] Con un trigger temporal que hace fallar el `INSERT` en `AuditLog`, renombrar un departamento devuelve 500 y el nombre no cambia.
-- [ ] Cambiar la propia contraseña deja `change_password` con el propio usuario como actor; login y logout no dejan registro.
-- [ ] Correr el seed sobre una base vacía deja 5 `create` con `actorId: null` (admin y 4 departamentos); correrlo otra vez no agrega registros.
-- [ ] `users.history` y `organizations.history` devuelven al admin los registros del más reciente al más antiguo, con el actor `{ id, name }`; un agente recibe 403; un id sin registros devuelve `[]`.
-- [ ] Ningún `payload` de la base temporal contiene las claves `password`, `hash` o `token`, ni las contraseñas usadas en los criterios.
-- [ ] `pnpm turbo lint typecheck test build` termina con código 0.
+- [X] Crear, renombrar, desactivar, reactivar y eliminar un departamento deja, en cada paso, un `AuditLog` con `entityType: "Organization"`, el admin como actor y la acción y el `payload` de la convención.
+- [X] Crear un usuario, editarlo (nombre, rol y departamento a la vez), desactivarlo, reactivarlo y resetearle la contraseña deja, respectivamente, `create`, **un** `update`, `update`, `update` y `reset_password`.
+- [X] Renombrar "Soporte" a "Mesa de ayuda" deja exactamente `{ before: { nombre: "Soporte" }, after: { nombre: "Mesa de ayuda" } }`.
+- [X] Una edición sin cambios efectivos (mismo nombre o mismo estado `activo`) no genera `AuditLog`.
+- [X] Con un trigger temporal que hace fallar el `INSERT` en `AuditLog`, renombrar un departamento devuelve 500 y el nombre no cambia.
+- [X] Cambiar la propia contraseña deja `change_password` con el propio usuario como actor; login y logout no dejan registro.
+- [X] Correr el seed sobre una base vacía deja 5 `create` con `actorId: null` (admin y 4 departamentos); correrlo otra vez no agrega registros.
+- [X] `users.history` y `organizations.history` devuelven al admin los registros del más reciente al más antiguo, con el actor `{ id, name }`; un agente recibe 403; un id sin registros devuelve `[]`.
+- [X] Ningún `payload` de la base temporal contiene las claves `password`, `hash` o `token`, ni las contraseñas usadas en los criterios.
+- [X] `pnpm turbo lint typecheck test build` termina con código 0.
 
 Los criterios que necesitan catálogos y tickets están en SPEC 04 (ítem en uso → 409) y SPEC 05 (un ticket sigue mostrando un catálogo eliminado).
 
