@@ -147,7 +147,10 @@ describe("CreateTicketForm", () => {
     it("ve su departamento como texto, sin poder elegir otro", () => {
       render(<CreateTicketForm />);
 
-      expect(screen.getByText("Técnico")).toBeInTheDocument();
+      // Es un campo de solo lectura con su etiqueta, no un texto suelto que ningún lector asocie.
+      const departamento = screen.getByLabelText("Departamento");
+      expect(departamento).toHaveValue("Técnico");
+      expect(departamento).toHaveAttribute("readonly");
       expect(screen.queryByRole("combobox", { name: "Departamento" })).not.toBeInTheDocument();
       expect(screen.queryByText("Redes")).not.toBeInTheDocument();
     });

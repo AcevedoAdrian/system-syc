@@ -85,7 +85,12 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
                   {comment.autor.nombre} · {formatTimestamp(comment.createdAt)}
                 </p>
                 {isAdmin && (
-                  <Button variant="ghost" size="sm" onClick={() => setRemoving(comment)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Eliminar comentario de ${comment.autor.nombre}`}
+                    onClick={() => setRemoving(comment)}
+                  >
                     Eliminar
                   </Button>
                 )}

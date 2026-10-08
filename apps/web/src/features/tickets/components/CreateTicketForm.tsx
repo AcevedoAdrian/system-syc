@@ -130,9 +130,13 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             )}
           />
         ) : (
-          <p id="departamentoId" className="text-sm">
-            {ownDepartment?.nombre}
-          </p>
+          // Un campo de solo lectura, no un texto suelto: así el `<label>` tiene un control al que apuntar.
+          <Input
+            id="departamentoId"
+            value={ownDepartment?.nombre ?? ""}
+            readOnly
+            className="bg-muted"
+          />
         )}
       </Field>
 
