@@ -166,7 +166,17 @@ Las relaciones importantes entre entidades **no van como IDs dentro de JSONB**: 
 
 ## Infraestructura y despliegue
 
-- `docker-compose.yml` en la raíz levanta Postgres, la API y el frontend con un solo comando, tanto en desarrollo como en el servidor de destino.
+- `docker-compose.yml` en la raíz levanta Postgres, la API y el frontend con hot reload, con un solo comando, para **desarrollo**.
+- `docker-compose.prod.yml` es el entorno del **servidor on-premise** (SPEC 07, procedimiento en `docs/despliegue.md`). Tiene cinco servicios:
+  - `postgres`: sin puertos publicados.
+  - `migrate`: `prisma migrate deploy`, que corre y termina antes que `api`. Las migraciones se aplican solas; si fallan, la API nueva no arranca.
+  - `api`: el bundle de `tsdown` con solo las dependencias de producción, sin puertos publicados.
+  - `web`: Nginx, **única entrada HTTP**. Sirve la SPA y reenvía `/api` a la API, así que la API va por el mismo origen: un solo puerto abierto y sin CORS.
+  - `backup`: cron + `pg_dump -Fc` sobre `postgres:17-alpine`; una copia diaria a las 02:00 (hora de Argentina) en una carpeta del servidor (`BACKUP_DIR`), con rotación de 30. Un backup fallido no borra copias.
+- Las imágenes de producción (`apps/api/Dockerfile`, con los targets `migrate` y `api`, y `apps/web/Dockerfile`) se construyen en el servidor, sin registro de imágenes. Llevan versiones de base fijadas (`node:22-slim`, `nginx:1.28-alpine`, `postgres:17-alpine`), nunca `latest`.
+- Se despliega un tag `vAAAA.MM.DD` sobre `main`; el CI construye las imágenes para detectar un Dockerfile roto, pero no despliega ni publica.
+- Una sola URL de entrada (`PUBLIC_URL`) sobre HTTP, sin dominio ni HTTPS (decisión explícita). Nginx manda la IP real del cliente (`X-Real-IP`) para que el rate limit del login cuente por persona, y agrega cabeceras de seguridad.
+- Los logs de todos los servicios rotan (`json-file`, 10 MB × 5). Los backups viven en el mismo servidor que la base: es un riesgo aceptado y documentado, no un pendiente silencioso.
 - Variables de entorno validadas con Zod al arrancar cada servicio.
 - Versiones mayores de dependencias en transición (Prisma, Drizzle si se reconsiderara, etc.) se fijan explícitamente en `package.json`, nunca en `latest`.
 

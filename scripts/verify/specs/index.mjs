@@ -8,5 +8,6 @@ import spec03 from "./03-auditoria.mjs";
 import spec04 from "./04-catalogos.mjs";
 import spec05 from "./05-tickets.mjs";
 import spec06 from "./06-comentarios-bandeja.mjs";
+import spec07 from "./07-endurecimiento-despliegue.mjs";
 
-export const SPECS = [spec01, spec02, spec03, spec04, spec05, spec06];
+export const SPECS = [spec01, spec02, spec03, spec04, spec05, spec06, spec07];

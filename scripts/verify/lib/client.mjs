@@ -2,14 +2,21 @@ import { BASE, WEB_ORIGIN } from "./env.mjs";
 import { resetRateLimit } from "./infra.mjs";
 
 // Cliente HTTP contra la API de la verificación, con cookie jar (una sesión por instancia).
+// Por defecto le habla a la API directa; `base` y `origin` permiten apuntarlo a otra entrada
+// (el SPEC 07 lo usa contra Nginx, donde la API cuelga de `/api`).
 export class Client {
   jar = new Map();
 
+  constructor({ base = BASE, origin = WEB_ORIGIN } = {}) {
+    this.base = base;
+    this.origin = origin;
+  }
+
   async request(method, url, { json, headers } = {}) {
-    const h = { Origin: WEB_ORIGIN, ...headers };
+    const h = { Origin: this.origin, ...headers };
     if (json !== undefined) h["Content-Type"] = "application/json";
     if (this.jar.size > 0) h.Cookie = [...this.jar].map(([k, v]) => `${k}=${v}`).join("; ");
-    const res = await fetch(`${BASE}${url}`, {
+    const res = await fetch(`${this.base}${url}`, {
       method,
       headers: h,
       body: json === undefined ? undefined : JSON.stringify(json),
