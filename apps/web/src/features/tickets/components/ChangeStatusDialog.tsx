@@ -133,9 +133,9 @@ function StatusForm({
       {cierra && (
         <>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="fechaCierre">Fecha de cierre</Label>
+            <Label htmlFor="estado-fechaCierre">Fecha de cierre</Label>
             <Input
-              id="fechaCierre"
+              id="estado-fechaCierre"
               type="date"
               max={hoyArgentina()}
               aria-invalid={errors.fechaCierre ? true : undefined}
@@ -146,9 +146,9 @@ function StatusForm({
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="solucionDescripcion">Solución (opcional)</Label>
+            <Label htmlFor="estado-solucion">Solución (opcional)</Label>
             <Textarea
-              id="solucionDescripcion"
+              id="estado-solucion"
               rows={3}
               aria-invalid={errors.solucionDescripcion ? true : undefined}
               {...register("solucionDescripcion")}
@@ -162,9 +162,9 @@ function StatusForm({
 
       {reabre && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="fechaReabierto">Fecha de reapertura</Label>
+          <Label htmlFor="estado-fechaReabierto">Fecha de reapertura</Label>
           <Input
-            id="fechaReabierto"
+            id="estado-fechaReabierto"
             type="date"
             max={hoyArgentina()}
             aria-invalid={errors.fechaReabierto ? true : undefined}

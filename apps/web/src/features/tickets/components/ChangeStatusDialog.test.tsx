@@ -103,6 +103,51 @@ describe("ChangeStatusDialog", () => {
     expect(mocks.change).not.toHaveBeenCalled();
   });
 
+  describe("ids junto al formulario del ticket", () => {
+    // `TicketForm` sigue montado detrás del modal con estos mismos campos. Si el diálogo repitiera un
+    // id, el `<label htmlFor>` resolvería al control del formulario y no al del diálogo.
+    const idsDelFormulario = ["fechaCierre", "fechaReabierto", "solucionDescripcion"];
+
+    function renderJuntoAlFormulario() {
+      render(
+        <>
+          {idsDelFormulario.map((id) => (
+            <input key={id} id={id} aria-label={`formulario ${id}`} />
+          ))}
+          <ChangeStatusDialog
+            ticket={makeTicket()}
+            open
+            onOpenChange={onOpenChange}
+            onReload={onReload}
+          />
+        </>,
+      );
+    }
+
+    const idsRepetidos = () => {
+      const ids = [...document.body.querySelectorAll("[id]")].map((node) => node.id);
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    };
+
+    it.each([
+      ["fin", ["Fecha de cierre", "Solución (opcional)"]],
+      ["rea", ["Fecha de reapertura"]],
+    ])(
+      "al elegir %s ningún id se repite y cada etiqueta lleva a su control",
+      async (estadoId, etiquetas) => {
+        renderJuntoAlFormulario();
+
+        await elegir(estadoId);
+
+        expect(idsRepetidos()).toEqual([]);
+        for (const etiqueta of etiquetas) {
+          const control = screen.getByLabelText(etiqueta);
+          expect(control.closest("[role=dialog]")).not.toBeNull();
+        }
+      },
+    );
+  });
+
   describe("estado sin clave", () => {
     it("no pide ni manda fechas ni solución: solo cambia el estado", async () => {
       const ticket = renderDialog();
