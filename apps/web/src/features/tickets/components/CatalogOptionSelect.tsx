@@ -44,9 +44,12 @@ export function CatalogOptionSelect({
   disabled,
   ...aria
 }: CatalogOptionSelectProps) {
-  const { data: allOptions = [] } = useCatalogOptions(ruta);
+  const { data: allOptions = [], isPending } = useCatalogOptions(ruta);
   const options = allOptions.filter((option) => option.id !== excludeId);
-  const currentIsOutOfOptions = current && !options.some((option) => option.id === current.id);
+  // Hasta que llega el catálogo no se sabe si el valor actual sigue activo: se muestra sin marca, en vez de
+  // parpadear con «(inactivo)» y corregirse después.
+  const currentIsOutOfOptions =
+    !isPending && current && !options.some((option) => option.id === current.id);
 
   return (
     <Select
@@ -64,6 +67,7 @@ export function CatalogOptionSelect({
             {option.nombre}
           </SelectItem>
         ))}
+        {isPending && current && <SelectItem value={current.id}>{current.nombre}</SelectItem>}
         {currentIsOutOfOptions && (
           <SelectItem value={current.id}>{current.nombre} (inactivo)</SelectItem>
         )}

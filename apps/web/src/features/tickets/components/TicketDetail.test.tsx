@@ -379,7 +379,43 @@ describe("TicketDetail", () => {
       expect(screen.getByRole("status")).toHaveClass("text-success");
 
       await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    it("sin aviso la región queda vacía, pero montada: el lector solo anuncia lo que cambia en una ya existente", () => {
+      show(makeTicket());
+
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    it("el aviso va pegado al formulario (donde está «Guardar cambios»), no en el encabezado", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "guardado" }));
+
+      const aviso = screen.getByRole("status");
+      expect(screen.getByTestId("formulario").parentElement).toContainElement(aviso);
+      expect(screen.getByRole("banner")).not.toContainElement(aviso);
+    });
+
+    it("es el mismo elemento antes y después de guardar, aunque el formulario se vuelva a montar", async () => {
+      const { rerender } = show(makeTicket({ updatedAt: "2026-10-06T13:00:00.000Z" }));
+      const region = screen.getByRole("status");
+
+      await userEvent.click(screen.getByRole("button", { name: "guardado" }));
+      // Guardar cambia `updatedAt`: el formulario se vuelve a montar con la versión nueva.
+      mocks.ticket.data = makeTicket({ updatedAt: "2026-10-06T14:00:00.000Z" });
+      rerender(<TicketDetail ticketId="t-13" />);
+
+      expect(mocks.formMounts).toBe(2);
+      expect(screen.getByRole("status")).toBe(region);
+      expect(region).toHaveTextContent("Cambios guardados.");
+    });
+
+    it("mientras carga el ticket, el estado de carga es una región de estado", () => {
+      show(undefined, { isPending: true });
+
+      expect(screen.getByRole("status")).toHaveTextContent("Cargando ticket…");
     });
   });
 

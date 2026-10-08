@@ -45,7 +45,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
     if (value) setNotice(undefined);
   }, []);
 
-  if (isPending) return <p>Cargando ticket…</p>;
+  if (isPending) return <p role="status">Cargando ticket…</p>;
   if (isError) {
     // Ajeno, inexistente o eliminado dan el mismo 404: la pantalla no depende del mensaje.
     return (
@@ -105,11 +105,6 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
             Guardá o descartá los cambios para cambiar el estado o el departamento.
           </p>
         )}
-        {notice && (
-          <p role="status" className="text-sm text-success">
-            {notice}
-          </p>
-        )}
         {removeError && (
           <p role="alert" className="text-sm text-destructive">
             {removeError}
@@ -119,13 +114,21 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
 
       {/* Se vuelve a montar con cada versión nueva del ticket (`updatedAt`): así el formulario
           parte siempre de lo que guardó el servidor, y «Recargar» lo reinicia. */}
-      <TicketForm
-        key={ticket.updatedAt}
-        ticket={ticket}
-        onSaved={() => setNotice("Cambios guardados.")}
-        onReload={reload}
-        onDirtyChange={onDirtyChange}
-      />
+      <div className="flex flex-col gap-2">
+        <TicketForm
+          key={ticket.updatedAt}
+          ticket={ticket}
+          onSaved={() => setNotice("Cambios guardados.")}
+          onReload={reload}
+          onDirtyChange={onDirtyChange}
+        />
+        {/* Pegado al botón «Guardar cambios», que está al final del formulario. Siempre montado y fuera
+            del `key`: una región viva que aparece ya con su texto, o que se recrea con el formulario, no
+            siempre se anuncia. */}
+        <p role="status" className="text-sm text-success">
+          {notice}
+        </p>
+      </div>
 
       {/* Fuera del `key` del formulario: comentar no cambia el ticket y no lo reinicia. */}
       <TicketComments ticketId={ticket.id} />

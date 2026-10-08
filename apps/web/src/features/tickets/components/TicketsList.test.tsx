@@ -4,13 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TicketsSearch } from "../tickets-search";
 
+type HookState = {
+  data: TicketsPage | undefined;
+  isPending: boolean;
+  isError: boolean;
+  isPlaceholderData: boolean;
+  isFetching: boolean;
+  refetch: ReturnType<typeof vi.fn>;
+};
 const hook = vi.hoisted(() => ({
-  state: { data: undefined, isPending: true, isError: false, isPlaceholderData: false } as {
-    data: TicketsPage | undefined;
-    isPending: boolean;
-    isError: boolean;
-    isPlaceholderData: boolean;
-  },
+  state: {} as HookState,
   role: "agente" as "admin" | "agente",
   calls: [] as unknown[],
 }));
@@ -70,8 +73,18 @@ const page = (items: TicketSummary[], extra: Partial<TicketsPage> = {}): Tickets
   ...extra,
 });
 
-const ready = (data: TicketsPage, extra: Partial<typeof hook.state> = {}) => {
-  hook.state = { data, isPending: false, isError: false, isPlaceholderData: false, ...extra };
+const initialState = (extra: Partial<HookState> = {}): HookState => ({
+  data: undefined,
+  isPending: true,
+  isError: false,
+  isPlaceholderData: false,
+  isFetching: false,
+  refetch: vi.fn(),
+  ...extra,
+});
+
+const ready = (data: TicketsPage, extra: Partial<HookState> = {}) => {
+  hook.state = initialState({ data, isPending: false, ...extra });
 };
 
 const renderList = (filters: TicketsSearch = {}) => {
@@ -82,7 +95,7 @@ const renderList = (filters: TicketsSearch = {}) => {
 
 describe("TicketsList", () => {
   beforeEach(() => {
-    hook.state = { data: undefined, isPending: true, isError: false, isPlaceholderData: false };
+    hook.state = initialState();
     hook.role = "agente";
     hook.calls = [];
   });
@@ -145,10 +158,33 @@ describe("TicketsList", () => {
     });
 
     it("si falla la carga lo avisa", () => {
-      hook.state = { data: undefined, isPending: false, isError: true, isPlaceholderData: false };
+      hook.state = initialState({ isPending: false, isError: true });
       renderList();
 
       expect(screen.getByRole("alert")).toHaveTextContent("No se pudieron cargar los tickets");
+    });
+
+    it("si falla la carga ofrece «Reintentar», que vuelve a pedir los tickets", async () => {
+      hook.state = initialState({ isPending: false, isError: true });
+      renderList();
+
+      await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+
+      expect(hook.state.refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("mientras reintenta lo dice y no deja pulsar otra vez", () => {
+      hook.state = initialState({ isPending: false, isError: true, isFetching: true });
+      renderList();
+
+      expect(screen.getByRole("button", { name: "Reintentando…" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+    });
+
+    it("el estado de carga es una región de estado", () => {
+      renderList();
+
+      expect(screen.getByText("Cargando tickets…")).toHaveAttribute("role", "status");
     });
 
     it("mientras llega la página nueva sigue mostrando la anterior", () => {
@@ -160,6 +196,69 @@ describe("TicketsList", () => {
         "aria-busy",
         "true",
       );
+    });
+
+    it("la página que se está reemplazando se ve atenuada", () => {
+      ready(page([ticket(13)]), { isPlaceholderData: true });
+      renderList({ page: 2 });
+
+      expect(screen.getByText("Ticket 13").closest("[aria-busy]")).toHaveClass("opacity-60");
+    });
+
+    it("la página ya recibida se ve normal", () => {
+      ready(page([ticket(13)]));
+      renderList();
+
+      expect(screen.getByText("Ticket 13").closest("[aria-busy]")).not.toHaveClass("opacity-60");
+    });
+  });
+
+  describe("resumen para lectores de pantalla", () => {
+    // Una región viva siempre montada y oculta a la vista: lo visible cambia al filtrar o paginar y,
+    // sin ella, un lector de pantalla no se entera.
+    const resumen = (texto: string) => screen.getByText(texto);
+
+    it("anuncia cuántos tickets hay y en qué página", () => {
+      ready(page([ticket(13)], { total: 134, page: 2 }));
+      renderList({ page: 2 });
+
+      expect(resumen("134 tickets encontrados, página 2 de 7.")).toHaveAttribute("role", "status");
+      expect(resumen("134 tickets encontrados, página 2 de 7.")).toHaveClass("sr-only");
+    });
+
+    it("usa el singular con un solo ticket", () => {
+      ready(page([ticket(13)]));
+      renderList();
+
+      expect(resumen("1 ticket encontrado, página 1 de 1.")).toBeInTheDocument();
+    });
+
+    it("anuncia que no hubo resultados", () => {
+      ready(page([]));
+      renderList({ q: "zzz" });
+
+      expect(resumen("Sin resultados.")).toBeInTheDocument();
+    });
+
+    it("mientras llega la página nueva dice que está actualizando, en vez de repetir la anterior", () => {
+      ready(page([ticket(13)], { total: 134, page: 1 }), { isPlaceholderData: true });
+      renderList({ page: 2 });
+
+      expect(resumen("Actualizando tickets…")).toBeInTheDocument();
+      expect(screen.queryByText(/tickets encontrados/)).not.toBeInTheDocument();
+    });
+
+    it("es la misma región antes y después de recibir los datos", () => {
+      hook.state = initialState();
+      const { rerender } = render(<TicketsList filters={{}} onFiltersChange={vi.fn()} />);
+      const region = document.querySelector(".sr-only[role=status]");
+      expect(region).toBeEmptyDOMElement();
+
+      ready(page([ticket(13)]));
+      rerender(<TicketsList filters={{}} onFiltersChange={vi.fn()} />);
+
+      expect(document.querySelector(".sr-only[role=status]")).toBe(region);
+      expect(region).toHaveTextContent("1 ticket encontrado, página 1 de 1.");
     });
   });
 
