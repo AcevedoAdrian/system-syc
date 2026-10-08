@@ -1,0 +1,13 @@
+# Nada de esto entra a una imagen de producción (SPEC 07).
+**/node_modules
+**/dist
+**/.turbo
+**/generated/prisma
+.git
+
+# Ninguna imagen lleva un `.env` ni un secreto. Vite lee el `.env` de la raíz (`envDir`): uno que
+# se colara metería valores de desarrollo en el build de la web.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example

@@ -1,0 +1,117 @@
+# Entorno de producción (SPEC 07): postgres + migrate + api + web (Nginx) + backup.
+# Procedimiento completo en `docs/despliegue.md`. Las variables salen del `.env` de la raíz
+# (copiado de `.env.production.example`); las obligatorias hacen fallar `docker compose` si faltan.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Solo `web` publica un puerto. `postgres` y `api` se alcanzan únicamente desde la red del compose.
+# El nombre del proyecto es propio para no compartir red ni volúmenes con `docker-compose.yml` (dev),
+# que se llama `system-syc`, si algún día corren en la misma máquina.
+name: syc-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-syc}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # Aplica las migraciones y termina. Si falla, `up -d` termina con error y `api` no se crea ni se recrea.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-syc}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Una sola variable para la URL por la que entran todos: Better Auth rechaza cualquier otro origen.
+      WEB_ORIGIN: ${PUBLIC_URL:?Falta PUBLIC_URL}
+      BETTER_AUTH_URL: ${PUBLIC_URL:?Falta PUBLIC_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Falta BETTER_AUTH_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-syc}
+      # Solo las usa el seed del primer deploy (`run --rm api node dist/seed.mjs`); la API no las necesita.
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Sana solo con `status: "ok"`: `degraded` (la base no responde) cuenta como no sana.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then((r) => r.json()).then((j) => process.exit(j.status === 'ok' ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  # Única entrada HTTP: sirve la SPA y reenvía `/api` a la API (apps/web/nginx.conf).
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+
+  # Cron + pg_dump: copia diaria a las 02:00 en `BACKUP_DIR` del servidor (docker/backup/).
+  backup:
+    build: ./docker/backup
+    restart: unless-stopped
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      BACKUP_KEEP: "30"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-syc}
+    volumes:
+      - ${BACKUP_DIR:-/srv/syc/backups}:/backups
+    # La imagen de Postgres declara un VOLUME en esta ruta y, sin esto, cada contenedor nuevo
+    # dejaría un volumen anónimo vacío en el disco. Este contenedor no guarda nada ahí.
+    tmpfs:
+      - /var/lib/postgresql/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+volumes:
+  postgres_data:

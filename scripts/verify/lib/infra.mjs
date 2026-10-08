@@ -15,6 +15,11 @@ export const state = {
   apiLog: "",
 };
 
+// Limpiezas extra que `teardownInfra` corre al terminar (un SPEC que levanta su propio entorno, como el
+// 07 con docker-compose.prod.yml, la registra al cargarse; tiene que ser un no-op si no se usó).
+const cleanups = [];
+export const registerCleanup = (fn) => cleanups.push(fn);
+
 export function ensureBuilt() {
   if (state.built) return;
   for (const [label, args] of [
@@ -123,6 +128,13 @@ export async function setupInfra() {
 }
 
 export async function teardownInfra() {
+  for (const cleanup of cleanups.splice(0)) {
+    try {
+      await cleanup();
+    } catch (error) {
+      console.error(`Falló una limpieza: ${error instanceof Error ? error.message : error}`);
+    }
+  }
   if (state.api && state.apiExit === undefined) {
     state.api.kill("SIGTERM");
     await new Promise((r) => setTimeout(r, 500));

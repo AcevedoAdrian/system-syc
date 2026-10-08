@@ -216,8 +216,11 @@ Cambiar el estado o el departamento se hace desde diálogos aparte; el formulari
 
 ## 9. Infraestructura y despliegue
 
-- `docker-compose.yml` levanta Postgres, API y web con un solo comando, en desarrollo y en el servidor.
-- Producción: servidor Linux on-premise.
+- `docker-compose.yml` levanta Postgres, API y web con un solo comando, en desarrollo.
+- Producción: servidor Linux on-premise, con `docker-compose.prod.yml`: Postgres, un servicio que aplica las migraciones, la API, la web servida por Nginx (única entrada HTTP, la API va bajo `/api` en el mismo origen) y un contenedor de backup. Procedimiento en `docs/despliegue.md`.
+- Backups: copia diaria de Postgres a las 02:00 (hora de Argentina) en una carpeta del servidor, con rotación de 30. Quedan en el mismo servidor que la base: es una limitación aceptada.
+- Se despliega por tags `vAAAA.MM.DD` sobre `main`, con un backup manual antes de cada deploy. Sin HTTPS ni dominio propio (HTTP por IP en la red interna).
+- Los permisos de la matriz §4.2 se comprueban a mano contra el servidor con `docs/checklist-permisos.md`.
 - Variables de entorno validadas con Zod al arrancar.
 - Versiones exactas (sin `^`); nunca `latest` en dependencias en transición.
 

@@ -6,6 +6,8 @@ Sistema de gestión interna y seguimiento de tickets, construido como monolito m
 
 - [`docs/prd.md`](./docs/prd.md): qué es el sistema, usuarios y permisos, modelo del ticket y etapas de desarrollo.
 - [`docs/architecture.md`](./docs/architecture.md): stack, por qué cada elección, estructura de `apps/api` y `apps/web`, y cómo crecen los campos y las tablas.
+- [`docs/despliegue.md`](./docs/despliegue.md): cómo poner el sistema en el servidor (primer deploy, deploy regular, vuelta atrás) y operar los backups.
+- [`docs/checklist-permisos.md`](./docs/checklist-permisos.md): la matriz de permisos para recorrer a mano contra el servidor, con el registro de corridas.
 - [`specs/`](./specs/): un SPEC por etapa de desarrollo.
 
 ## Tecnología utilizada
@@ -26,7 +28,7 @@ Sistema de gestión interna y seguimiento de tickets, construido como monolito m
 | UI | Tailwind CSS + shadcn/ui |
 | Calidad | Biome (lint + formato) |
 | Tests | Vitest (Playwright pendiente) |
-| Infraestructura | Docker Compose (postgres + api + web) |
+| Infraestructura | Docker Compose (postgres + api + web); en producción, Nginx como única entrada y un contenedor de backup |
 | CI | GitHub Actions, ejecutando solo lo afectado con `turbo --filter` |
 
 ## Estructura del monorepo
@@ -41,9 +43,11 @@ packages/
   config/                 # tsconfig base, biome.json
   ui/                     # componentes compartidos (cuando haya más de una app)
 bruno/                    # colección Bruno: peticiones HTTP de la API
-docs/                     # PRD y arquitectura
+docs/                     # PRD, arquitectura, despliegue y checklist de permisos
 specs/                    # un SPEC por etapa
-docker-compose.yml
+docker/                   # Dockerfile.dev y el contenedor de backup (docker/backup/)
+docker-compose.yml        # desarrollo
+docker-compose.prod.yml   # producción (servidor on-premise)
 ```
 
 ## Cómo levantarlo
@@ -56,6 +60,8 @@ docker compose up         # web :5173, api :3000, postgres :5432
 ```
 
 El `.env` es opcional con Docker; `.env.example` lista las variables.
+
+Para el servidor, usá `docker-compose.prod.yml` y seguí [`docs/despliegue.md`](./docs/despliegue.md); las variables salen de `.env.production.example`.
 
 ## Peticiones a la API
 

@@ -74,13 +74,23 @@ SPEC 06 (`specs/06-comentarios-bandeja.md`). Viven en `modules/tickets` (PRD §8
 - **El texto libre (`q`) es SQL escrito a mano**, el único del módulo (`TicketsRepository.searchIds`, `$queryRaw` con `Prisma.sql`), porque Prisma no expresa `unaccent`. Devuelve los ids que coinciden (título, descripción, solución o algún comentario no eliminado, con `lower(unaccent(...)) LIKE ... ESCAPE '\'`) y el `where` de Prisma los usa como `id: { in }`. **Como no pasa por las convenciones de Prisma, repite a mano `"deletedAt" IS NULL` (del ticket y del comentario) y el alcance**: si se olvida uno, la bandeja mostraría tickets eliminados o ajenos. `q` siempre va como parámetro (nunca interpolado) y se escapan `\`, `%` y `_`, para que "50%" busque el texto literal. No busca en nombres de catálogo, número ni historial. `pnpm verify --spec 06` cubre ticket eliminado, comentario eliminado y agente de otro departamento, todos con búsqueda.
 - **Un filtro compara ids, no los valida**: un ítem de catálogo inactivo o eliminado se puede filtrar, y un id que no existe devuelve una página vacía, no un error.
 
+## Imágenes de producción
+
+`apps/api/Dockerfile` (SPEC 07; el contexto es la raíz del repo) sale de `node:22-slim` y tiene un stage de build y dos targets finales. `docker/Dockerfile.dev` es solo para desarrollo.
+
+- **`migrate`**: el CLI de Prisma con `schema.prisma`, `prisma.config.ts` y `migrations/`; corre `prisma migrate deploy` y termina. Es el servicio `migrate` del compose de producción, que corre antes que `api`.
+- **`api`**: `dist/` (el bundle de `tsdown`) y solo las dependencias de producción, sin pnpm; corre como el usuario `node` con `node dist/main.mjs`. El seed sale de esta misma imagen: `node dist/seed.mjs`.
+- El build usa `pnpm deploy --legacy` (sin `--legacy`, pnpm 11 exige `inject-workspace-packages=true`, que cambiaría el workspace de desarrollo). Una dependencia que el bundle deje externa tiene que estar en `dependencies`, no en `devDependencies`: la imagen `api` no instala las de desarrollo.
+- La API valida sus variables con Zod al arrancar: sin `DATABASE_URL` (u otra) termina nombrándola.
+- El healthcheck de la imagen en el compose es `GET /health` con `status: "ok"`; `degraded` (la base no responde) cuenta como no sana.
+
 ## Better Auth
 
 - **Montaje** (`modules/auth/auth.handler.ts`, llamado desde `main.ts`): Nest se crea con `bodyParser: false`, el handler de Better Auth va **antes** de `app.useBodyParser("json")` (lee el cuerpo del stream) y solo deja pasar la allowlist (`POST /sign-in/username`, `POST /sign-out`, `GET /get-session`, `POST /change-password`). El resto responde 404.
 - **Usuarios**: el ABM llama a `auth.api.*` reenviando las cabeceras del admin (`@RequestHeaders()`), porque casi todos los endpoints de su plugin `admin` exigen una sesión real; solo `createUser` funciona sin ella. El plugin `username` normaliza a minúsculas, pero su validación de unicidad al editar compara contra el admin que llama, no contra el usuario editado: el service chequea duplicados por su cuenta (409).
 - **Departamentos y `Member`**: se escriben con Prisma desde su repository, no con `auth.api.*` de `organization`. Esas rutas crean un `Member` con rol `owner`, validan el rol contra `owner`/`admin`/`member` (no existe `agente`) y exigen ser miembro; el admin no tiene departamento. Cambiar el departamento de un agente es una transacción (agrega el nuevo y quita los anteriores).
 - **Sesiones**: 12 h, renovadas con actividad cada 1 h, sin `cookieCache`: el rol, el departamento y el ban se ven en la siguiente request (el guard lee `Member` en cada una). Desactivar (ban) y resetear la contraseña cierran las sesiones del usuario; cambiar la propia cierra las otras (un hook de Better Auth fuerza `revokeOtherSessions`).
-- **Rate limit del login**: 5 por minuto, guardado en la base (tabla `RateLimit`). Sin proxy no hay IP del cliente y el contador es uno solo por ruta; SPEC 07 debe configurar `advanced.ipAddress`.
+- **Rate limit del login**: 5 por minuto, guardado en la base (tabla `RateLimit`). Cuenta por la IP que manda Nginx en `X-Real-IP` (`advanced.ipAddress.ipAddressHeaders: ["x-real-ip"]` en `auth.config.ts`), que pisa el que traiga el cliente: por eso mandar otro `X-Real-IP` a través de Nginx no esquiva el límite. Sin ese header, como en desarrollo sin proxy, Better Auth no ve la IP y el contador es uno solo por ruta. La API directa confía en ese header, así que **nunca debe publicarse un puerto de la API**: en producción solo `web` lo hace.
 - **Esquema**: lo genera el CLI de Better Auth (paquete `auth`, devDependency; el viejo `@better-auth/cli` quedó congelado en la 1.4). Necesita un archivo que exporte `auth`; como `createAuth(env)` recibe el `env`, se usa uno temporal. El CLI no actualiza modelos que ya existen: para regenerar hay que partir del schema sin ellos. Cualquier cambio queda en una migración de Prisma.
 
 ## Seed
