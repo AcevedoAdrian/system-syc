@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
+import { useReloadTicket } from "../hooks/useReloadTicket";
 import { useChangeTicketStatus } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
 import { Field } from "./Field";
@@ -49,6 +50,7 @@ function StatusForm({
   const { data: estados = [] } = useCatalogOptions("estados");
   const [serverError, setServerError] = useState<string>();
   const [stale, setStale] = useState(false);
+  const { reloading, reload } = useReloadTicket(onReload, onDone, setServerError);
   const {
     control,
     register,
@@ -188,23 +190,15 @@ function StatusForm({
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
           <p>{serverError}</p>
           {stale && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await onReload();
-                onDone();
-              }}
-            >
-              Recargar
+            <Button type="button" variant="outline" size="sm" onClick={reload} disabled={reloading}>
+              {reloading ? "Recargando…" : "Recargar"}
             </Button>
           )}
         </div>
       )}
       <DialogFooter>
         <Button type="submit" disabled={isSubmitting}>
-          Cambiar estado
+          {isSubmitting ? "Cambiando…" : "Cambiar estado"}
         </Button>
       </DialogFooter>
     </form>

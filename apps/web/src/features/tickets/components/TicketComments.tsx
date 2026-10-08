@@ -129,7 +129,7 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
         )}
         <div>
           <Button type="submit" disabled={isSubmitting}>
-            Comentar
+            {isSubmitting ? "Comentando…" : "Comentar"}
           </Button>
         </div>
       </form>

@@ -12,6 +12,7 @@ import {
 import { useOrganizations } from "@/features/organizations/hooks/useOrganizations";
 import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
+import { useReloadTicket } from "../hooks/useReloadTicket";
 import { useChangeTicketDepartment } from "../hooks/useTicketMutations";
 import { Field } from "./Field";
 
@@ -33,6 +34,7 @@ function DepartmentForm({
   const [departamentoId, setDepartamentoId] = useState("");
   const [serverError, setServerError] = useState<string>();
   const [stale, setStale] = useState(false);
+  const { reloading, reload } = useReloadTicket(onReload, onDone, setServerError);
   const [pending, setPending] = useState(false);
   const [missing, setMissing] = useState(false);
 
@@ -88,23 +90,15 @@ function DepartmentForm({
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
           <p>{serverError}</p>
           {stale && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await onReload();
-                onDone();
-              }}
-            >
-              Recargar
+            <Button type="button" variant="outline" size="sm" onClick={reload} disabled={reloading}>
+              {reloading ? "Recargando…" : "Recargar"}
             </Button>
           )}
         </div>
       )}
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          Cambiar departamento
+          {pending ? "Cambiando…" : "Cambiar departamento"}
         </Button>
       </DialogFooter>
     </form>

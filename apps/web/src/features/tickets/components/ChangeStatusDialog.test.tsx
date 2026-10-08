@@ -339,6 +339,60 @@ describe("ChangeStatusDialog", () => {
     });
   });
 
+  describe("mientras cambia", () => {
+    it("el botón dice «Cambiando…» y no deja confirmar otra vez", async () => {
+      let finish: () => void = () => undefined;
+      mocks.change.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderDialog();
+
+      await elegir("prog");
+      await confirmar();
+
+      expect(await screen.findByRole("button", { name: "Cambiando…" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Cambiar estado" })).not.toBeInTheDocument();
+      finish();
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+  });
+
+  describe("«Recargar» tras un 409", () => {
+    const stale = () => new ORPCError("CONFLICT", { status: 409, message: STALE_TICKET_MESSAGE });
+
+    it("mientras lee dice «Recargando…», no se puede volver a pulsar, y al terminar cierra", async () => {
+      mocks.change.mockRejectedValue(stale());
+      let finish: () => void = () => undefined;
+      onReload.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderDialog();
+      await elegir("prog");
+      await confirmar();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Recargar" }));
+
+      expect(await screen.findByRole("button", { name: "Recargando…" })).toBeDisabled();
+      expect(onOpenChange).not.toHaveBeenCalled();
+      finish();
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+
+    it("si no puede leer el ticket muestra el error, no cierra y deja reintentar", async () => {
+      mocks.change.mockRejectedValue(stale());
+      onReload.mockRejectedValueOnce(new Error("sin red"));
+      renderDialog();
+      await elegir("prog");
+      await confirmar();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Recargar" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No se pudo completar la operación. Intentá de nuevo.",
+      );
+      expect(onOpenChange).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Recargar" }));
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+      expect(onReload).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("errores de la API", () => {
     it("un 409 por versión desactualizada ofrece «Recargar», que vuelve a leer y cierra el diálogo", async () => {
       mocks.change.mockRejectedValue(

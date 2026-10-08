@@ -225,6 +225,24 @@ describe("TicketForm", () => {
     });
   });
 
+  describe("mientras guarda", () => {
+    it("el botón dice «Guardando…» y no deja enviar otra vez, y al terminar vuelve a su texto", async () => {
+      let finish: () => void = () => undefined;
+      mocks.update.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderForm();
+
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+      await save();
+
+      const guardando = await screen.findByRole("button", { name: "Guardando…" });
+      expect(guardando).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+
+      finish();
+      expect(await screen.findByRole("button", { name: "Guardar cambios" })).toBeEnabled();
+    });
+  });
+
   describe("guardar y descartar", () => {
     it("sin cambios no se puede guardar ni descartar", () => {
       renderForm();

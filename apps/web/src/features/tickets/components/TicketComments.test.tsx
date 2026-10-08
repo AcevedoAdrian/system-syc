@@ -127,6 +127,18 @@ describe("TicketComments", () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
+    it("mientras comenta el botón dice «Comentando…» y no deja enviar otra vez", async () => {
+      let finish: () => void = () => undefined;
+      mocks.create.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      show([]);
+
+      await write("Hola");
+
+      expect(await screen.findByRole("button", { name: "Comentando…" })).toBeDisabled();
+      finish();
+      expect(await screen.findByRole("button", { name: "Comentar" })).toBeEnabled();
+    });
+
     it("el error de validación queda ligado al campo", async () => {
       show([]);
 

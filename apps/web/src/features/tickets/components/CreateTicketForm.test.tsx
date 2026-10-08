@@ -292,6 +292,26 @@ describe("CreateTicketForm", () => {
     });
   });
 
+  describe("mientras crea", () => {
+    it("el botón dice «Creando…» y no deja enviar otra vez", async () => {
+      let finish: (ticket: typeof created) => void = () => undefined;
+      mocks.create.mockImplementation(
+        () => new Promise<typeof created>((resolve) => (finish = resolve)),
+      );
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Sin red");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByRole("button", { name: "Creando…" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Crear ticket" })).not.toBeInTheDocument();
+
+      finish(created);
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalled());
+    });
+  });
+
   describe("validaciones", () => {
     it("pide título y prioridad, y no envía", async () => {
       render(<CreateTicketForm />);

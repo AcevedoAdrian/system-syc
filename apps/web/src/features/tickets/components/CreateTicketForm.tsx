@@ -259,7 +259,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       )}
       <div>
         <Button type="submit" disabled={isSubmitting}>
-          Crear ticket
+          {isSubmitting ? "Creando…" : "Crear ticket"}
         </Button>
       </div>
     </form>

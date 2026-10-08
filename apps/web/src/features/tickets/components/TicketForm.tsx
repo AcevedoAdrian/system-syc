@@ -348,7 +348,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
       )}
       <div className="flex gap-2">
         <Button type="submit" disabled={!isDirty || isSubmitting}>
-          Guardar cambios
+          {isSubmitting ? "Guardando…" : "Guardar cambios"}
         </Button>
         <Button
           type="button"
