@@ -127,6 +127,16 @@ describe("TicketComments", () => {
       expect(mocks.create).not.toHaveBeenCalled();
     });
 
+    it("el error de validación queda ligado al campo", async () => {
+      show([]);
+
+      await write("");
+
+      const textbox = screen.getByRole("textbox", { name: "Nuevo comentario" });
+      expect(textbox).toHaveAttribute("aria-invalid", "true");
+      expect(textbox).toHaveAccessibleDescription(/El comentario es obligatorio/);
+    });
+
     it("rechaza más de 2000 caracteres y no pierde lo escrito", async () => {
       show([]);
       const textbox = screen.getByRole("textbox");

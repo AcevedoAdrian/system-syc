@@ -16,12 +16,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useChangeTicketStatus } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
+import { Field } from "./Field";
 
 interface StatusFormValues {
   estadoId: string;
@@ -110,70 +110,78 @@ function StatusForm({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="estadoId">Nuevo estado</Label>
-        <Controller
-          control={control}
-          name="estadoId"
-          render={({ field }) => (
-            <CatalogOptionSelect
-              id="estadoId"
-              ruta="estados"
-              value={field.value}
-              onChange={field.onChange}
-              placeholder="Elegí un estado"
-              excludeId={ticket.estado.id}
-              invalid={Boolean(errors.estadoId)}
-            />
-          )}
-        />
-        {errors.estadoId && <p className="text-sm text-destructive">{errors.estadoId.message}</p>}
-      </div>
+      <Field id="estadoId" label="Nuevo estado" required error={errors.estadoId?.message}>
+        {(aria) => (
+          <Controller
+            control={control}
+            name="estadoId"
+            render={({ field }) => (
+              <CatalogOptionSelect
+                id="estadoId"
+                ruta="estados"
+                value={field.value}
+                onChange={field.onChange}
+                placeholder="Elegí un estado"
+                excludeId={ticket.estado.id}
+                {...aria}
+              />
+            )}
+          />
+        )}
+      </Field>
 
       {cierra && (
         <>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="estado-fechaCierre">Fecha de cierre</Label>
-            <Input
-              id="estado-fechaCierre"
-              type="date"
-              max={hoyArgentina()}
-              aria-invalid={errors.fechaCierre ? true : undefined}
-              {...register("fechaCierre")}
-            />
-            {errors.fechaCierre && (
-              <p className="text-sm text-destructive">{errors.fechaCierre.message}</p>
+          <Field
+            id="estado-fechaCierre"
+            label="Fecha de cierre"
+            required
+            error={errors.fechaCierre?.message}
+          >
+            {(aria) => (
+              <Input
+                id="estado-fechaCierre"
+                type="date"
+                max={hoyArgentina()}
+                {...aria}
+                {...register("fechaCierre")}
+              />
             )}
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="estado-solucion">Solución (opcional)</Label>
-            <Textarea
-              id="estado-solucion"
-              rows={3}
-              aria-invalid={errors.solucionDescripcion ? true : undefined}
-              {...register("solucionDescripcion")}
-            />
-            {errors.solucionDescripcion && (
-              <p className="text-sm text-destructive">{errors.solucionDescripcion.message}</p>
+          </Field>
+          <Field
+            id="estado-solucion"
+            label="Solución (opcional)"
+            error={errors.solucionDescripcion?.message}
+          >
+            {(aria) => (
+              <Textarea
+                id="estado-solucion"
+                rows={3}
+                {...aria}
+                {...register("solucionDescripcion")}
+              />
             )}
-          </div>
+          </Field>
         </>
       )}
 
       {reabre && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="estado-fechaReabierto">Fecha de reapertura</Label>
-          <Input
-            id="estado-fechaReabierto"
-            type="date"
-            max={hoyArgentina()}
-            aria-invalid={errors.fechaReabierto ? true : undefined}
-            {...register("fechaReabierto")}
-          />
-          {errors.fechaReabierto && (
-            <p className="text-sm text-destructive">{errors.fechaReabierto.message}</p>
+        <Field
+          id="estado-fechaReabierto"
+          label="Fecha de reapertura"
+          required
+          error={errors.fechaReabierto?.message}
+        >
+          {(aria) => (
+            <Input
+              id="estado-fechaReabierto"
+              type="date"
+              max={hoyArgentina()}
+              {...aria}
+              {...register("fechaReabierto")}
+            />
           )}
-        </div>
+        </Field>
       )}
 
       {serverError && (

@@ -7,11 +7,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
+import type { FieldControlProps } from "./Field";
 
 // Radix no admite un ítem con valor "": el "sin valor" viaja con este centinela y se traduce a "".
 const NONE = "__none__";
 
-interface CatalogOptionSelectProps {
+// Los atributos `aria-*` son los que entrega `Field`: van al botón del selector.
+interface CatalogOptionSelectProps extends FieldControlProps {
   id: string;
   ruta: CatalogRuta;
   // Id elegido, o "" si no hay.
@@ -25,7 +27,6 @@ interface CatalogOptionSelectProps {
   current?: { id: string; nombre: string } | null;
   // Un ítem que no se ofrece (el estado actual al cambiar de estado).
   excludeId?: string;
-  invalid?: boolean;
   disabled?: boolean;
 }
 
@@ -40,8 +41,8 @@ export function CatalogOptionSelect({
   emptyLabel,
   current,
   excludeId,
-  invalid,
   disabled,
+  ...aria
 }: CatalogOptionSelectProps) {
   const { data: allOptions = [] } = useCatalogOptions(ruta);
   const options = allOptions.filter((option) => option.id !== excludeId);
@@ -53,7 +54,7 @@ export function CatalogOptionSelect({
       onValueChange={(next) => onChange(next === NONE ? "" : next)}
       disabled={disabled}
     >
-      <SelectTrigger id={id} className="w-full" aria-invalid={invalid ? true : undefined}>
+      <SelectTrigger id={id} className="w-full" {...aria}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

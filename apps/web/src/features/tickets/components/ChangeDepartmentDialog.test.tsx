@@ -28,15 +28,25 @@ vi.mock("@/features/users/components/DepartmentSelect", () => ({
     value,
     onChange,
     departments,
+    "aria-describedby": describedBy,
+    "aria-required": required,
   }: {
     id: string;
     value: string;
     onChange: (v: string) => void;
     departments: { id: string; nombre: string }[];
+    "aria-describedby"?: string;
+    "aria-required"?: boolean;
   }) => {
     mocks.offered = departments.map((d) => d.id);
     return (
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={describedBy}
+        aria-required={required}
+      >
         <option value="">Elegí un departamento</option>
         {departments.map((d) => (
           <option key={d.id} value={d.id}>
@@ -100,6 +110,18 @@ describe("ChangeDepartmentDialog", () => {
 
     expect(await screen.findByText("Elegí un departamento.")).toBeInTheDocument();
     expect(mocks.change).not.toHaveBeenCalled();
+  });
+
+  it("el departamento nuevo es obligatorio y su error queda ligado al campo", async () => {
+    renderDialog();
+    const select = screen.getByLabelText("Nuevo departamento");
+    expect(select).toHaveAttribute("aria-required", "true");
+    expect(select).not.toHaveAccessibleDescription();
+
+    await confirmar();
+
+    expect(await screen.findByText("Elegí un departamento.")).toBeInTheDocument();
+    expect(select).toHaveAccessibleDescription("Elegí un departamento.");
   });
 
   it("un departamento desactivado (409) muestra el mensaje, sin «Recargar», y deja el diálogo abierto", async () => {

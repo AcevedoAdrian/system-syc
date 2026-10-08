@@ -5,7 +5,7 @@ import {
   type UpdateTicketInput,
   updateTicketInputSchema,
 } from "@syc/contracts";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useUpdateTicket } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
+import { Field } from "./Field";
 
 // El formulario trabaja con texto (un campo en blanco es ""); el esquema lo convierte en `null`.
 type TicketFormInput = z.input<typeof updateTicketInputSchema>;
@@ -45,27 +46,10 @@ function valuesOf(ticket: Ticket): TicketFormInput {
   };
 }
 
-function Field({
-  id,
-  label,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {error && <p className="text-sm text-destructive">{error}</p>}
-    </div>
-  );
-}
-
 const DATE_ERROR = "Ingresá una fecha válida, de hoy o anterior.";
+const REFERENCIA_ERROR =
+  "Usá el formato número/año, por ejemplo 19092/2026 (el año va de 2000 a 2100).";
+const REFERENCIA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la referencia.";
 
 interface TicketFormProps {
   ticket: Ticket;
@@ -140,69 +124,75 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
       <Field
         id="titulo"
         label="Título"
+        required
         error={errors.titulo && "El título es obligatorio (hasta 200 caracteres)."}
       >
-        <Input
-          id="titulo"
-          aria-invalid={errors.titulo ? true : undefined}
-          {...register("titulo")}
-        />
+        {(control) => <Input id="titulo" autoComplete="off" {...control} {...register("titulo")} />}
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id="prioridadId"
           label="Prioridad"
+          required
           error={errors.prioridadId && "Elegí una prioridad."}
         >
-          <Controller
-            control={control}
-            name="prioridadId"
-            render={({ field }) => (
-              <CatalogOptionSelect
-                id="prioridadId"
-                ruta="prioridades"
-                value={field.value}
-                onChange={field.onChange}
-                current={ticket.prioridad}
-                invalid={Boolean(errors.prioridadId)}
-              />
-            )}
-          />
+          {(aria) => (
+            <Controller
+              control={control}
+              name="prioridadId"
+              render={({ field }) => (
+                <CatalogOptionSelect
+                  id="prioridadId"
+                  ruta="prioridades"
+                  value={field.value}
+                  onChange={field.onChange}
+                  current={ticket.prioridad}
+                  {...aria}
+                />
+              )}
+            />
+          )}
         </Field>
         <Field
           id="fechaRecepcion"
           label="Fecha de recepción"
+          required
           error={errors.fechaRecepcion && DATE_ERROR}
         >
-          <Input
-            id="fechaRecepcion"
-            type="date"
-            max={hoyArgentina()}
-            aria-invalid={errors.fechaRecepcion ? true : undefined}
-            {...register("fechaRecepcion")}
-          />
+          {(aria) => (
+            <Input
+              id="fechaRecepcion"
+              type="date"
+              max={hoyArgentina()}
+              {...aria}
+              {...register("fechaRecepcion")}
+            />
+          )}
         </Field>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {catalogs.map((catalog) => (
           <Field key={catalog.id} id={catalog.id} label={catalog.label}>
-            <Controller
-              control={control}
-              name={catalog.id}
-              render={({ field }) => (
-                <CatalogOptionSelect
-                  id={catalog.id}
-                  ruta={catalog.ruta}
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  placeholder="Sin asignar"
-                  emptyLabel="Sin asignar"
-                  current={catalog.current}
-                />
-              )}
-            />
+            {(aria) => (
+              <Controller
+                control={control}
+                name={catalog.id}
+                render={({ field }) => (
+                  <CatalogOptionSelect
+                    id={catalog.id}
+                    ruta={catalog.ruta}
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Sin asignar"
+                    emptyLabel="Sin asignar"
+                    current={catalog.current}
+                    {...aria}
+                  />
+                )}
+              />
+            )}
           </Field>
         ))}
       </div>
@@ -212,12 +202,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
         label="Descripción"
         error={errors.descripcion && "Hasta 5000 caracteres."}
       >
-        <Textarea
-          id="descripcion"
-          rows={4}
-          aria-invalid={errors.descripcion ? true : undefined}
-          {...register("descripcion")}
-        />
+        {(aria) => <Textarea id="descripcion" rows={4} {...aria} {...register("descripcion")} />}
       </Field>
 
       <Field
@@ -225,51 +210,58 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
         label="Actuación simple"
         error={errors.actuacionSimple && "Hasta 500 caracteres."}
       >
-        <Input
-          id="actuacionSimple"
-          aria-invalid={errors.actuacionSimple ? true : undefined}
-          {...register("actuacionSimple")}
-        />
+        {(aria) => (
+          <Input
+            id="actuacionSimple"
+            autoComplete="off"
+            {...aria}
+            {...register("actuacionSimple")}
+          />
+        )}
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="proveedorId" label="Proveedor">
-          <Controller
-            control={control}
-            name="proveedorId"
-            render={({ field }) => (
-              <CatalogOptionSelect
-                id="proveedorId"
-                ruta="proveedores"
-                value={field.value ?? ""}
-                onChange={(value) => {
-                  field.onChange(value);
-                  // La referencia es del proveedor: al cambiar de proveedor (o quitarlo) no se
-                  // conserva; se carga la del nuevo o queda vacía (Q30).
-                  setValue("referenciaExterna", "", { shouldDirty: true });
-                }}
-                placeholder="Sin proveedor"
-                emptyLabel="Sin proveedor"
-                current={ticket.proveedor}
-              />
-            )}
-          />
+          {(aria) => (
+            <Controller
+              control={control}
+              name="proveedorId"
+              render={({ field }) => (
+                <CatalogOptionSelect
+                  id="proveedorId"
+                  ruta="proveedores"
+                  value={field.value ?? ""}
+                  onChange={(value) => {
+                    field.onChange(value);
+                    // La referencia es del proveedor: al cambiar de proveedor (o quitarlo) no se
+                    // conserva; se carga la del nuevo o queda vacía (Q30).
+                    setValue("referenciaExterna", "", { shouldDirty: true });
+                  }}
+                  placeholder="Sin proveedor"
+                  emptyLabel="Sin proveedor"
+                  current={ticket.proveedor}
+                  {...aria}
+                />
+              )}
+            />
+          )}
         </Field>
         <Field
           id="referenciaExterna"
           label="Referencia externa"
-          error={
-            errors.referenciaExterna &&
-            "Usá el formato número/año, por ejemplo 19092/2026 (el año va de 2000 a 2100)."
-          }
+          hint={hasProveedor ? undefined : REFERENCIA_SIN_PROVEEDOR}
+          error={errors.referenciaExterna && REFERENCIA_ERROR}
         >
-          <Input
-            id="referenciaExterna"
-            placeholder="19092/2026"
-            disabled={!hasProveedor}
-            aria-invalid={errors.referenciaExterna ? true : undefined}
-            {...register("referenciaExterna")}
-          />
+          {(aria) => (
+            <Input
+              id="referenciaExterna"
+              placeholder="19092/2026"
+              autoComplete="off"
+              disabled={!hasProveedor}
+              {...aria}
+              {...register("referenciaExterna")}
+            />
+          )}
         </Field>
       </div>
 
@@ -278,12 +270,14 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
         label="Solución"
         error={errors.solucionDescripcion && "Hasta 5000 caracteres."}
       >
-        <Textarea
-          id="solucionDescripcion"
-          rows={3}
-          aria-invalid={errors.solucionDescripcion ? true : undefined}
-          {...register("solucionDescripcion")}
-        />
+        {(aria) => (
+          <Textarea
+            id="solucionDescripcion"
+            rows={3}
+            {...aria}
+            {...register("solucionDescripcion")}
+          />
+        )}
       </Field>
 
       {(ticket.fechaCierre || ticket.fechaReabierto) && (
@@ -292,30 +286,36 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange }: TicketF
             <Field
               id="fechaCierre"
               label="Fecha de cierre"
+              required
               error={errors.fechaCierre && DATE_ERROR}
             >
-              <Input
-                id="fechaCierre"
-                type="date"
-                max={hoyArgentina()}
-                aria-invalid={errors.fechaCierre ? true : undefined}
-                {...register("fechaCierre")}
-              />
+              {(aria) => (
+                <Input
+                  id="fechaCierre"
+                  type="date"
+                  max={hoyArgentina()}
+                  {...aria}
+                  {...register("fechaCierre")}
+                />
+              )}
             </Field>
           )}
           {ticket.fechaReabierto && (
             <Field
               id="fechaReabierto"
               label="Fecha de reapertura"
+              required
               error={errors.fechaReabierto && DATE_ERROR}
             >
-              <Input
-                id="fechaReabierto"
-                type="date"
-                max={hoyArgentina()}
-                aria-invalid={errors.fechaReabierto ? true : undefined}
-                {...register("fechaReabierto")}
-              />
+              {(aria) => (
+                <Input
+                  id="fechaReabierto"
+                  type="date"
+                  max={hoyArgentina()}
+                  {...aria}
+                  {...register("fechaReabierto")}
+                />
+              )}
             </Field>
           )}
         </div>

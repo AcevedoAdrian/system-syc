@@ -112,12 +112,13 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
         </Label>
         <Textarea
           id="comentario-texto"
-          placeholder="Escribí un comentario"
+          placeholder="Escribí un comentario…"
           aria-invalid={errors.texto ? true : undefined}
+          aria-describedby={errors.texto ? "comentario-texto-error" : undefined}
           {...register("texto")}
         />
         {errors.texto && (
-          <p className="text-sm text-destructive">
+          <p id="comentario-texto-error" className="text-sm text-destructive">
             El comentario es obligatorio (hasta 2000 caracteres).
           </p>
         )}

@@ -148,6 +148,37 @@ describe("ChangeStatusDialog", () => {
     );
   });
 
+  describe("accesibilidad de los campos", () => {
+    it("el estado y la fecha de cierre son obligatorios; la solución, no", async () => {
+      renderDialog();
+
+      await elegir("fin");
+
+      expect(screen.getByLabelText("Fecha de cierre")).toHaveAttribute("aria-required", "true");
+      expect(screen.getByLabelText("Solución (opcional)")).not.toHaveAttribute("aria-required");
+    });
+
+    it("el error de la fecha queda ligado al campo", async () => {
+      renderDialog();
+      await elegir("fin");
+
+      await userEvent.clear(screen.getByLabelText("Fecha de cierre"));
+      await confirmar();
+
+      const fecha = screen.getByLabelText("Fecha de cierre");
+      await waitFor(() => expect(fecha).toHaveAttribute("aria-invalid", "true"));
+      expect(fecha).toHaveAccessibleDescription("Ingresá una fecha válida, de hoy o anterior.");
+    });
+
+    it("la fecha de reapertura es obligatoria", async () => {
+      renderDialog();
+
+      await elegir("rea");
+
+      expect(screen.getByLabelText("Fecha de reapertura")).toHaveAttribute("aria-required", "true");
+    });
+  });
+
   describe("estado sin clave", () => {
     it("no pide ni manda fechas ni solución: solo cambia el estado", async () => {
       const ticket = renderDialog();

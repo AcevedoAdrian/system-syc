@@ -134,6 +134,36 @@ describe("CatalogOptionSelect", () => {
     expect(optionNames()).toEqual(["Archivo"]);
   });
 
+  it("pasa al botón del selector lo que entrega `Field`: error, ayuda y campo obligatorio", () => {
+    render(
+      <>
+        <p id="prio-error">Elegí una prioridad.</p>
+        <CatalogOptionSelect
+          id="prio"
+          ruta="prioridades"
+          value=""
+          onChange={() => undefined}
+          aria-invalid
+          aria-describedby="prio-error"
+          aria-required
+        />
+      </>,
+    );
+
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toHaveAttribute("aria-invalid", "true");
+    expect(combobox).toHaveAttribute("aria-required", "true");
+    expect(combobox).toHaveAccessibleDescription("Elegí una prioridad.");
+  });
+
+  it("sin esos atributos el botón no los lleva", () => {
+    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).not.toHaveAttribute("aria-invalid");
+    expect(combobox).not.toHaveAttribute("aria-describedby");
+  });
+
   it("deshabilitado no se abre", async () => {
     render(
       <CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} disabled />,
