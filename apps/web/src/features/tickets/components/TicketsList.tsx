@@ -20,8 +20,11 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
   const { data, isPending, isError, isPlaceholderData, isFetching, refetch } = useTickets(filters);
   const filtered = hasActiveFilters(filters);
 
-  const goToPage = (page: number) =>
-    onFiltersChange({ ...filters, page: page === 1 ? undefined : page });
+  // La página 1 es la URL sin `page`. Cambiar de página conserva la búsqueda y los filtros.
+  const pageSearch = (page: number): TicketsSearch => ({
+    ...filters,
+    page: page === 1 ? undefined : page,
+  });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const resumen = isPlaceholderData
@@ -67,8 +70,10 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
         // Una página posterior a la última (por ejemplo, desde un link viejo).
         <div className="flex flex-col items-start gap-2">
           <p className="text-muted-foreground">Ningún ticket coincide con la búsqueda</p>
-          <Button variant="link" className="px-0" onClick={() => goToPage(1)}>
-            Ir a la página 1
+          <Button variant="link" className="px-0" asChild>
+            <Link to="/tickets" search={pageSearch(1)}>
+              Ir a la página 1
+            </Link>
           </Button>
         </div>
       )}
@@ -98,20 +103,30 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
               {data.total === 1 ? "ticket" : "tickets"}
             </p>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                disabled={data.page <= 1}
-                onClick={() => goToPage(data.page - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                disabled={data.page >= totalPages}
-                onClick={() => goToPage(data.page + 1)}
-              >
-                Siguiente
-              </Button>
+              {/* Enlaces reales (se pueden abrir en otra pestaña); donde no hay página, un botón
+                  deshabilitado, porque un enlace no se puede deshabilitar. */}
+              {data.page > 1 ? (
+                <Button variant="outline" asChild>
+                  <Link to="/tickets" search={pageSearch(data.page - 1)}>
+                    Anterior
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  Anterior
+                </Button>
+              )}
+              {data.page < totalPages ? (
+                <Button variant="outline" asChild>
+                  <Link to="/tickets" search={pageSearch(data.page + 1)}>
+                    Siguiente
+                  </Link>
+                </Button>
+              ) : (
+                <Button variant="outline" disabled>
+                  Siguiente
+                </Button>
+              )}
             </div>
           </nav>
         </div>

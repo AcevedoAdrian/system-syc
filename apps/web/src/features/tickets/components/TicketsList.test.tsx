@@ -37,18 +37,29 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({
     to,
     params,
+    search,
     className,
     children,
   }: {
     to: string;
     params?: { ticketId: string };
+    search?: Record<string, unknown>;
     className?: string;
     children: React.ReactNode;
-  }) => (
-    <a href={params ? to.replace("$ticketId", params.ticketId) : to} className={className}>
-      {children}
-    </a>
-  ),
+  }) => {
+    // El `search` queda en el href como en la URL real; el router de verdad se prueba aparte.
+    const query = new URLSearchParams(
+      Object.entries(search ?? {})
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, String(value)]),
+    ).toString();
+    const path = params ? to.replace("$ticketId", params.ticketId) : to;
+    return (
+      <a href={query ? `${path}?${query}` : path} className={className}>
+        {children}
+      </a>
+    );
+  },
 }));
 
 import { TicketsList } from "./TicketsList";
@@ -147,14 +158,16 @@ describe("TicketsList", () => {
       expect(onFiltersChange).toHaveBeenCalledWith({});
     });
 
-    it("una página posterior a la última ofrece volver a la página 1", async () => {
+    it("una página posterior a la última ofrece volver a la página 1", () => {
       ready(page([], { total: 25, page: 5 }));
-      const onFiltersChange = renderList({ q: "impresora", page: 5 });
+      renderList({ q: "impresora", page: 5 });
 
       expect(screen.getByText("Ningún ticket coincide con la búsqueda")).toBeInTheDocument();
-      await userEvent.click(screen.getByRole("button", { name: "Ir a la página 1" }));
-
-      expect(onFiltersChange).toHaveBeenCalledWith({ q: "impresora", page: undefined });
+      // Un enlace real a la misma búsqueda sin `page` (la página 1).
+      expect(screen.getByRole("link", { name: "Ir a la página 1" })).toHaveAttribute(
+        "href",
+        "/tickets?q=impresora",
+      );
     });
 
     it("si falla la carga lo avisa", () => {
@@ -373,29 +386,43 @@ describe("TicketsList", () => {
       expect(screen.getByText("Página 1 de 1 · 1 ticket")).toBeInTheDocument();
     });
 
-    it("«Siguiente» y «Anterior» cambian de página y conservan los filtros", async () => {
+    it("«Siguiente» y «Anterior» son enlaces a la página vecina y conservan los filtros", () => {
       twentyOnPage2();
-      const onFiltersChange = renderList({ q: "impresora", page: 2 });
+      renderList({ q: "impresora", page: 2 });
 
-      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-      await userEvent.click(screen.getByRole("button", { name: "Anterior" }));
-
-      expect(onFiltersChange).toHaveBeenNthCalledWith(1, { q: "impresora", page: 3 });
+      expect(screen.getByRole("link", { name: "Siguiente" })).toHaveAttribute(
+        "href",
+        "/tickets?q=impresora&page=3",
+      );
       // La página 1 es la de la URL sin `page`.
-      expect(onFiltersChange).toHaveBeenNthCalledWith(2, { q: "impresora", page: undefined });
+      expect(screen.getByRole("link", { name: "Anterior" })).toHaveAttribute(
+        "href",
+        "/tickets?q=impresora",
+      );
+    });
+
+    it("cambiar de página no pasa por onFiltersChange: navega el propio enlace", async () => {
+      twentyOnPage2();
+      const onFiltersChange = renderList({ page: 2 });
+
+      await userEvent.click(screen.getByRole("link", { name: "Siguiente" }));
+
+      expect(onFiltersChange).not.toHaveBeenCalled();
     });
 
     it("en la primera página no hay «Anterior», y en la última no hay «Siguiente»", () => {
       ready(page([ticket(1)], { total: 25 }));
       const { unmount } = render(<TicketsList filters={{}} onFiltersChange={() => undefined} />);
       expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled();
+      expect(screen.queryByRole("link", { name: "Anterior" })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Siguiente" })).toBeInTheDocument();
       unmount();
 
       ready(page([ticket(21)], { total: 25, page: 2 }));
       render(<TicketsList filters={{ page: 2 }} onFiltersChange={() => undefined} />);
-      expect(screen.getByRole("button", { name: "Anterior" })).toBeEnabled();
+      expect(screen.getByRole("link", { name: "Anterior" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+      expect(screen.queryByRole("link", { name: "Siguiente" })).not.toBeInTheDocument();
     });
   });
 });
