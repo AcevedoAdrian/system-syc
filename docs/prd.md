@@ -271,7 +271,7 @@ El detalle completo de cada decisión, con sus edge cases y su contrato técnico
 - **P19.** El alta de un ticket solo exige título, departamento (implícito para el agente), prioridad y fecha de recepción; área, edificio, tipo y módulo quedan sin asignar hasta una edición posterior. El estado nace en el primero activo del catálogo y no se pregunta en el alta.
 - **P20.** Asociar o cambiar un proveedor no cambia el estado del ticket por sí solo. `notificado` es siempre informativa, nunca obligatoria para cerrar.
 - **P21.** Ediciones simultáneas sobre el mismo ticket usan bloqueo optimista por `updatedAt`: la segunda en llegar se rechaza con 409.
-- **P22.** `Prioridad` siempre conserva al menos un ítem activo (igual que Estados), porque el alta de un ticket exige elegir una. Arranca con `Baja`, `Media`, `Alta` y `Urgente`; el resto de los catálogos (Áreas, Edificios, Tipos, Módulos, Proveedores) arranca vacío y lo carga el admin.
+- **P22.** `Prioridad` siempre conserva al menos un ítem activo (igual que Estados), porque el alta de un ticket exige elegir una. Arranca con `Baja`, `Media`, `Alta` y `Urgente`; Áreas y Edificios arrancan con los datos de `seed-data/` (el mismo seed en desarrollo y producción); Tipos, Módulos y Proveedores arrancan vacíos y los carga el admin.
 
 ### 11.2 Puntos que quedaron fuera del MVP a propósito
 

@@ -39,7 +39,7 @@ pnpm verify                               # verifica los criterios de aceptació
 
 pnpm --filter @syc/db generate            # prisma generate (turbo ya lo corre antes de typecheck/test/build)
 pnpm --filter @syc/db exec prisma migrate deploy   # aplica las migraciones (necesita DATABASE_URL)
-pnpm --filter @syc/api seed               # admin raíz + 4 departamentos + 7 estados y 4 prioridades; manual e idempotente (necesita SEED_ADMIN_*)
+pnpm --filter @syc/api seed               # admin raíz, 4 departamentos, estados, prioridades, áreas, edificios y agentes; manual e idempotente (necesita SEED_ADMIN_*)
 pnpm --filter @syc/api test               # tests de un solo paquete
 pnpm --filter @syc/web dev                # web fuera de Docker (necesita VITE_API_URL)
 pnpm --filter @syc/api dev                # api fuera de Docker (necesita DATABASE_URL, WEB_ORIGIN, NODE_ENV, BETTER_AUTH_SECRET, BETTER_AUTH_URL; ver .env.example)
@@ -53,7 +53,16 @@ docker compose exec api pnpm --filter @syc/db exec prisma migrate deploy
 docker compose exec api pnpm --filter @syc/api seed
 ```
 
-El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
+El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` (y, opcional, `SEED_AGENTS_PASSWORD` para cargar los agentes de `seed-data/agentes.json`) del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
+
+**Volver a la base vacía** (para probar de nuevo; borra todos los datos de desarrollo), con el stack levantado:
+
+```bash
+docker compose exec api pnpm --filter @syc/db exec prisma migrate reset --force
+docker compose exec api pnpm --filter @syc/api seed   # el reset no corre el seed
+```
+
+Nunca `docker compose down -v` para esto: borra también los volúmenes de `node_modules` y el store de pnpm. El paso a paso completo, con la alternativa de borrar el volumen `system-syc_postgres_data`, está en el `README.md` (sección "Base de datos de desarrollo").
 
 **`pnpm verify`** (`scripts/verify-acceptance.mjs`, solo el CLI; un archivo por SPEC en `scripts/verify/specs/` y piezas compartidas en `scripts/verify/lib/`): recorre los criterios de aceptación (`--spec 05`, `--only 02.7,02.19`, `--skip-turbo`, `--keep-db`). Los de SPEC 02, 03, 04, 05 y 06 corren contra una API real en `NODE_ENV=production` y una base temporal creada en el Postgres del compose (se borra al terminar; la de desarrollo no se toca). Necesita Docker. Los criterios de SPEC 01 que dependen del compose (levantar, hot reload, `degraded`) no están cubiertos. **Los de SPEC 07 no usan esa API ni esa base temporal**: levantan `docker-compose.prod.yml` entero con el proyecto `syc-verify-07`, un puerto alternativo (`VERIFY_HTTP_PORT`, 18087 por defecto), una carpeta de backups temporal y secretos de prueba, y lo bajan con `down -v` al terminar (`--spec 07` tarda varios minutos por el build de las imágenes; `--keep-db` conserva ese stack para mirarlo). **Para un SPEC nuevo**: crear `scripts/verify/specs/NN-nombre.mjs` con `defineSpec` (ver `lib/spec.mjs`; los fixtures de `lib/fixtures.mjs` se reutilizan) y agregarlo a `specs/index.mjs`.
 

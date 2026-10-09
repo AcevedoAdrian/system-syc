@@ -51,3 +51,8 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Datos del seed con nombres de personas y de áreas: no se versionan (ver seed-data/README.md)
+/seed-data/areas.json
+/seed-data/agentes.json
+/static/

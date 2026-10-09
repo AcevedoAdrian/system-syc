@@ -11,3 +11,6 @@
 **/.env.*
 !**/.env.example
 !**/.env.*.example
+
+# Datos del seed: se montan al correr, no entran a una imagen
+seed-data
