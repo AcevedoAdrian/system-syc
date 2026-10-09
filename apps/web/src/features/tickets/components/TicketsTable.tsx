@@ -15,21 +15,18 @@ import { formatDay } from "../ticket-format";
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, TicketSummary>();
 
-const linkClassName = "hover:underline";
+const linkClassName = "hover:underline focus-visible:underline";
 
-// El número y el título abren el ticket. El orden es el que manda la API (fecha de recepción y número
-// descendentes): la tabla solo renderiza la página recibida, no ordena ni filtra.
+// El título abre el ticket; el número es solo texto, para no repetir el mismo enlace dos veces por fila
+// (dos paradas de Tab y dos enlaces iguales para un lector de pantalla). El orden es el que manda la API
+// (fecha de recepción y número descendentes): la tabla solo renderiza la página recibida, no ordena ni filtra.
 const columns = column.columns([
   column.accessor("numero", {
     header: "Número",
     cell: ({ row }) => (
-      <Link
-        to="/tickets/$ticketId"
-        params={{ ticketId: row.original.id }}
-        className={`${linkClassName} font-medium whitespace-nowrap tabular-nums`}
-      >
+      <span className="font-medium whitespace-nowrap tabular-nums">
         {formatTicketNumber(row.original.numero)}
-      </Link>
+      </span>
     ),
   }),
   column.accessor("titulo", {

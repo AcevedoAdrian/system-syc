@@ -268,7 +268,7 @@ describe("TicketsList", () => {
       renderList();
 
       const rows = screen.getAllByRole("row").slice(1); // sin el encabezado
-      expect(rows.map((row) => within(row).getAllByRole("link")[0]?.textContent)).toEqual([
+      expect(rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent)).toEqual([
         "TE-000013",
         "TE-1000000",
         "TE-000002",
@@ -307,7 +307,7 @@ describe("TicketsList", () => {
       expect(fecha.tagName).toBe("TIME");
       expect(fecha).toHaveAttribute("datetime", "2026-10-01");
       expect(fecha).toHaveClass("tabular-nums");
-      expect(within(row).getByRole("link", { name: "TE-000013" })).toHaveClass("tabular-nums");
+      expect(within(row).getByText("TE-000013")).toHaveClass("tabular-nums");
     });
 
     it("un título largo se parte en líneas dentro de su celda y no ensancha la tabla", () => {
@@ -319,17 +319,33 @@ describe("TicketsList", () => {
       expect(enlace).toHaveClass("whitespace-normal", "wrap-break-word", "max-w-md");
     });
 
-    it("el número y el título abren el ticket", () => {
+    it("el título abre el ticket, y es el único enlace de la fila", () => {
       ready(page([ticket(13)]));
       renderList();
 
-      expect(screen.getByRole("link", { name: "TE-000013" })).toHaveAttribute(
-        "href",
-        "/tickets/t-13",
-      );
-      expect(screen.getByRole("link", { name: "Ticket 13" })).toHaveAttribute(
-        "href",
-        "/tickets/t-13",
+      const enlaces = within(screen.getByTestId("ticket-row-13")).getAllByRole("link");
+      expect(enlaces).toHaveLength(1);
+      expect(enlaces[0]).toHaveAccessibleName("Ticket 13");
+      expect(enlaces[0]).toHaveAttribute("href", "/tickets/t-13");
+    });
+
+    it("el número se lee como texto de la fila, no como un segundo enlace al mismo destino", () => {
+      ready(page([ticket(13)]));
+      renderList();
+
+      expect(screen.queryByRole("link", { name: "TE-000013" })).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("ticket-row-13")).getByText("TE-000013"),
+      ).toBeInTheDocument();
+    });
+
+    it("el título también se subraya al enfocarlo con el teclado, no solo al pasar el mouse", () => {
+      ready(page([ticket(13)]));
+      renderList();
+
+      expect(screen.getByRole("link", { name: "Ticket 13" })).toHaveClass(
+        "hover:underline",
+        "focus-visible:underline",
       );
     });
   });
