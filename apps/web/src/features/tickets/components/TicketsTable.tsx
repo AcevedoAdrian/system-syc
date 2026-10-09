@@ -15,21 +15,18 @@ import { formatDay } from "../ticket-format";
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, TicketSummary>();
 
-const linkClassName = "hover:underline";
+const linkClassName = "hover:underline focus-visible:underline";
 
-// El número y el título abren el ticket. El orden es el que manda la API (fecha de recepción y número
-// descendentes): la tabla solo renderiza la página recibida, no ordena ni filtra.
+// El título abre el ticket; el número es solo texto, para no repetir el mismo enlace dos veces por fila
+// (dos paradas de Tab y dos enlaces iguales para un lector de pantalla). El orden es el que manda la API
+// (fecha de recepción y número descendentes): la tabla solo renderiza la página recibida, no ordena ni filtra.
 const columns = column.columns([
   column.accessor("numero", {
     header: "Número",
     cell: ({ row }) => (
-      <Link
-        to="/tickets/$ticketId"
-        params={{ ticketId: row.original.id }}
-        className={`${linkClassName} font-medium whitespace-nowrap`}
-      >
+      <span className="font-medium whitespace-nowrap tabular-nums">
         {formatTicketNumber(row.original.numero)}
-      </Link>
+      </span>
     ),
   }),
   column.accessor("titulo", {
@@ -38,7 +35,8 @@ const columns = column.columns([
       <Link
         to="/tickets/$ticketId"
         params={{ ticketId: row.original.id }}
-        className={linkClassName}
+        // La celda no corta líneas; el título sí, hasta un ancho razonable, para que uno largo no ensanche la tabla.
+        className={`${linkClassName} inline-block max-w-md align-top whitespace-normal wrap-break-word`}
       >
         {row.original.titulo}
       </Link>
@@ -57,7 +55,11 @@ const columns = column.columns([
   column.accessor((ticket) => ticket.area?.nombre ?? "—", { id: "area", header: "Área" }),
   column.accessor("fechaRecepcion", {
     header: "Fecha de recepción",
-    cell: ({ row }) => formatDay(row.original.fechaRecepcion),
+    cell: ({ row }) => (
+      <time dateTime={row.original.fechaRecepcion} className="tabular-nums">
+        {formatDay(row.original.fechaRecepcion)}
+      </time>
+    ),
   }),
 ]);
 

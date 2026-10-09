@@ -28,15 +28,25 @@ vi.mock("@/features/users/components/DepartmentSelect", () => ({
     value,
     onChange,
     departments,
+    "aria-describedby": describedBy,
+    "aria-required": required,
   }: {
     id: string;
     value: string;
     onChange: (v: string) => void;
     departments: { id: string; nombre: string }[];
+    "aria-describedby"?: string;
+    "aria-required"?: boolean;
   }) => {
     mocks.offered = departments.map((d) => d.id);
     return (
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={describedBy}
+        aria-required={required}
+      >
         <option value="">Elegí un departamento</option>
         {departments.map((d) => (
           <option key={d.id} value={d.id}>
@@ -102,6 +112,18 @@ describe("ChangeDepartmentDialog", () => {
     expect(mocks.change).not.toHaveBeenCalled();
   });
 
+  it("el departamento nuevo es obligatorio y su error queda ligado al campo", async () => {
+    renderDialog();
+    const select = screen.getByLabelText("Nuevo departamento");
+    expect(select).toHaveAttribute("aria-required", "true");
+    expect(select).not.toHaveAccessibleDescription();
+
+    await confirmar();
+
+    expect(await screen.findByText("Elegí un departamento.")).toBeInTheDocument();
+    expect(select).toHaveAccessibleDescription("Elegí un departamento.");
+  });
+
   it("un departamento desactivado (409) muestra el mensaje, sin «Recargar», y deja el diálogo abierto", async () => {
     mocks.change.mockRejectedValue(
       new ORPCError("CONFLICT", {
@@ -133,5 +155,40 @@ describe("ChangeDepartmentDialog", () => {
 
     await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("mientras cambia, el botón dice «Cambiando…» y no deja confirmar otra vez", async () => {
+    let finish: () => void = () => undefined;
+    mocks.change.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+    renderDialog();
+
+    await userEvent.selectOptions(screen.getByLabelText("Nuevo departamento"), "red");
+    await confirmar();
+
+    expect(await screen.findByRole("button", { name: "Cambiando…" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Cambiar departamento" })).not.toBeInTheDocument();
+    finish();
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("«Recargar» dice «Recargando…» mientras lee, y si falla muestra el error sin cerrar", async () => {
+    mocks.change.mockRejectedValue(
+      new ORPCError("CONFLICT", { status: 409, message: STALE_TICKET_MESSAGE }),
+    );
+    let fail: (error: Error) => void = () => undefined;
+    onReload.mockImplementation(() => new Promise<void>((_, reject) => (fail = reject)));
+    renderDialog();
+    await userEvent.selectOptions(screen.getByLabelText("Nuevo departamento"), "red");
+    await confirmar();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Recargar" }));
+    expect(await screen.findByRole("button", { name: "Recargando…" })).toBeDisabled();
+    fail(new Error("sin red"));
+
+    expect(await screen.findByRole("button", { name: "Recargar" })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "No se pudo completar la operación. Intentá de nuevo.",
+    );
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 });

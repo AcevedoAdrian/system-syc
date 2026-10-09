@@ -2,7 +2,7 @@ import { ORPCError } from "@orpc/client";
 import { hoyArgentina, type User } from "@syc/contracts";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   user: undefined as unknown,
@@ -63,6 +63,7 @@ vi.mock("./CatalogOptionSelect", () => ({
     onChange,
     emptyLabel,
     placeholder,
+    ...aria
   }: {
     id: string;
     ruta: string;
@@ -71,7 +72,7 @@ vi.mock("./CatalogOptionSelect", () => ({
     emptyLabel?: string;
     placeholder?: string;
   }) => (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} {...aria}>
       <option value="">{emptyLabel ?? placeholder}</option>
       {(mocks.options[ruta] ?? []).map((o) => (
         <option key={o.id} value={o.id}>
@@ -147,7 +148,10 @@ describe("CreateTicketForm", () => {
     it("ve su departamento como texto, sin poder elegir otro", () => {
       render(<CreateTicketForm />);
 
-      expect(screen.getByText("Técnico")).toBeInTheDocument();
+      // Es un campo de solo lectura con su etiqueta, no un texto suelto que ningún lector asocie.
+      const departamento = screen.getByLabelText("Departamento");
+      expect(departamento).toHaveValue("Técnico");
+      expect(departamento).toHaveAttribute("readonly");
       expect(screen.queryByRole("combobox", { name: "Departamento" })).not.toBeInTheDocument();
       expect(screen.queryByText("Redes")).not.toBeInTheDocument();
     });
@@ -208,6 +212,103 @@ describe("CreateTicketForm", () => {
 
       expect(await screen.findByText("Elegí un departamento.")).toBeInTheDocument();
       expect(mocks.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("accesibilidad de los campos", () => {
+    it("el agente ve su departamento como dato fijo, sin marcarlo como obligatorio", () => {
+      render(<CreateTicketForm />);
+
+      expect(screen.getByLabelText("Departamento")).not.toHaveAttribute("aria-required");
+    });
+
+    it("marca como obligatorios título, prioridad y fecha de recepción", () => {
+      render(<CreateTicketForm />);
+
+      for (const label of ["Título", "Prioridad", "Fecha de recepción"]) {
+        expect(screen.getByLabelText(label)).toHaveAttribute("aria-required", "true");
+      }
+      expect(screen.getByLabelText("Descripción")).not.toHaveAttribute("aria-required");
+    });
+
+    it("un error de validación queda ligado a su campo", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "   ");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      const titulo = screen.getByLabelText("Título");
+      await waitFor(() => expect(titulo).toHaveAttribute("aria-invalid", "true"));
+      expect(titulo).toHaveAccessibleDescription(
+        "El título es obligatorio (hasta 200 caracteres).",
+      );
+    });
+
+    it("la referencia dice por qué está deshabilitada hasta elegir un proveedor", async () => {
+      render(<CreateTicketForm />);
+
+      const referencia = screen.getByLabelText("Referencia externa");
+      expect(referencia).toBeDisabled();
+      expect(referencia).toHaveAccessibleDescription(
+        "Elegí un proveedor para cargar la referencia.",
+      );
+
+      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      expect(referencia).toBeEnabled();
+      expect(referencia).not.toHaveAccessibleDescription();
+    });
+
+    describe("foco inicial en el título", () => {
+      const original = window.matchMedia;
+      afterEach(() => {
+        window.matchMedia = original;
+      });
+      const withPointer = (pointer: "fine" | "coarse") => {
+        window.matchMedia = ((query: string) => ({
+          matches: query === `(pointer: ${pointer})`,
+        })) as typeof window.matchMedia;
+      };
+
+      it("con mouse el título arranca enfocado", () => {
+        withPointer("fine");
+        render(<CreateTicketForm />);
+
+        expect(screen.getByLabelText("Título")).toHaveFocus();
+      });
+
+      it("con pantalla táctil no se enfoca, para no abrir el teclado de golpe", () => {
+        withPointer("coarse");
+        render(<CreateTicketForm />);
+
+        expect(screen.getByLabelText("Título")).not.toHaveFocus();
+      });
+
+      it("sin `matchMedia` (jsdom) no se enfoca y no falla", () => {
+        window.matchMedia = undefined as unknown as typeof window.matchMedia;
+        render(<CreateTicketForm />);
+
+        expect(screen.getByLabelText("Título")).not.toHaveFocus();
+      });
+    });
+  });
+
+  describe("mientras crea", () => {
+    it("el botón dice «Creando…» y no deja enviar otra vez", async () => {
+      let finish: (ticket: typeof created) => void = () => undefined;
+      mocks.create.mockImplementation(
+        () => new Promise<typeof created>((resolve) => (finish = resolve)),
+      );
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Sin red");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByRole("button", { name: "Creando…" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Crear ticket" })).not.toBeInTheDocument();
+
+      finish(created);
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalled());
     });
   });
 

@@ -9,11 +9,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useOrganizations } from "@/features/organizations/hooks/useOrganizations";
 import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
+import { useReloadTicket } from "../hooks/useReloadTicket";
 import { useChangeTicketDepartment } from "../hooks/useTicketMutations";
+import { Field } from "./Field";
 
 interface ChangeDepartmentDialogProps {
   ticket: Ticket;
@@ -33,6 +34,7 @@ function DepartmentForm({
   const [departamentoId, setDepartamentoId] = useState("");
   const [serverError, setServerError] = useState<string>();
   const [stale, setStale] = useState(false);
+  const { reloading, reload } = useReloadTicket(onReload, onDone, setServerError);
   const [pending, setPending] = useState(false);
   const [missing, setMissing] = useState(false);
 
@@ -63,39 +65,40 @@ function DepartmentForm({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="departamentoId">Nuevo departamento</Label>
-        <DepartmentSelect
-          id="departamentoId"
-          value={departamentoId}
-          onChange={setDepartamentoId}
-          // El actual no se ofrece; los desactivados tampoco (DepartmentSelect filtra por `activo`).
-          departments={departments.filter((department) => department.id !== ticket.departamento.id)}
-          invalid={missing}
-        />
-        {missing && <p className="text-sm text-destructive">Elegí un departamento.</p>}
-      </div>
+      <Field
+        id="departamentoId"
+        label="Nuevo departamento"
+        required
+        error={missing ? "Elegí un departamento." : undefined}
+      >
+        {(aria) => (
+          <DepartmentSelect
+            id="departamentoId"
+            value={departamentoId}
+            onChange={setDepartamentoId}
+            // El actual no se ofrece; los desactivados tampoco (DepartmentSelect filtra por `activo`).
+            departments={departments.filter(
+              (department) => department.id !== ticket.departamento.id,
+            )}
+            invalid={missing}
+            aria-describedby={aria["aria-describedby"]}
+            aria-required={aria["aria-required"]}
+          />
+        )}
+      </Field>
       {serverError && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
           <p>{serverError}</p>
           {stale && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await onReload();
-                onDone();
-              }}
-            >
-              Recargar
+            <Button type="button" variant="outline" size="sm" onClick={reload} disabled={reloading}>
+              {reloading ? "Recargando…" : "Recargar"}
             </Button>
           )}
         </div>
       )}
       <DialogFooter>
         <Button type="submit" disabled={pending}>
-          Cambiar departamento
+          {pending ? "Cambiando…" : "Cambiar departamento"}
         </Button>
       </DialogFooter>
     </form>

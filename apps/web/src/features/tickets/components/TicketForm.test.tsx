@@ -36,6 +36,7 @@ vi.mock("./CatalogOptionSelect", () => ({
     onChange,
     emptyLabel,
     current,
+    ...aria
   }: {
     id: string;
     ruta: string;
@@ -46,7 +47,7 @@ vi.mock("./CatalogOptionSelect", () => ({
   }) => {
     const options = mocks.options[ruta] ?? [];
     return (
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} {...aria}>
         {emptyLabel && <option value="">{emptyLabel}</option>}
         {options.map((o) => (
           <option key={o.id} value={o.id}>
@@ -168,6 +169,77 @@ describe("TicketForm", () => {
         await screen.findByText("Ingresá una fecha válida, de hoy o anterior."),
       ).toBeInTheDocument();
       expect(mocks.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("accesibilidad de los campos", () => {
+    it("marca como obligatorios título, prioridad y fecha de recepción, y solo esos", () => {
+      renderForm();
+
+      for (const label of ["Título", "Prioridad", "Fecha de recepción"]) {
+        expect(screen.getByLabelText(label)).toHaveAttribute("aria-required", "true");
+      }
+      for (const label of ["Descripción", "Actuación simple", "Solución"]) {
+        expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-required");
+      }
+    });
+
+    it("un error de validación queda ligado a su campo", async () => {
+      renderForm();
+
+      await userEvent.clear(screen.getByLabelText("Título"));
+      await save();
+
+      const titulo = screen.getByLabelText("Título");
+      await waitFor(() => expect(titulo).toHaveAttribute("aria-invalid", "true"));
+      expect(titulo).toHaveAccessibleDescription(
+        "El título es obligatorio (hasta 200 caracteres).",
+      );
+    });
+
+    it("sin proveedor la referencia está deshabilitada y dice por qué", () => {
+      renderForm({ proveedor: null });
+
+      const referencia = screen.getByLabelText("Referencia externa");
+      expect(referencia).toBeDisabled();
+      expect(referencia).toHaveAccessibleDescription(
+        "Elegí un proveedor para cargar la referencia.",
+      );
+    });
+
+    it("con proveedor la referencia se habilita y la explicación desaparece", () => {
+      renderForm({ proveedor: { id: "acme", nombre: "Acme" }, referenciaExterna: "19092/2026" });
+
+      expect(screen.getByLabelText("Referencia externa")).toBeEnabled();
+      expect(
+        screen.queryByText("Elegí un proveedor para cargar la referencia."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("los campos de texto libre no ofrecen autocompletar del navegador", () => {
+      renderForm();
+
+      for (const label of ["Título", "Actuación simple", "Referencia externa"]) {
+        expect(screen.getByLabelText(label)).toHaveAttribute("autocomplete", "off");
+      }
+    });
+  });
+
+  describe("mientras guarda", () => {
+    it("el botón dice «Guardando…» y no deja enviar otra vez, y al terminar vuelve a su texto", async () => {
+      let finish: () => void = () => undefined;
+      mocks.update.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderForm();
+
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+      await save();
+
+      const guardando = await screen.findByRole("button", { name: "Guardando…" });
+      expect(guardando).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+
+      finish();
+      expect(await screen.findByRole("button", { name: "Guardar cambios" })).toBeEnabled();
     });
   });
 
