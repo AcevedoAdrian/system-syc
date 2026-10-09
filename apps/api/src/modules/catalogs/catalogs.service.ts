@@ -16,7 +16,7 @@ import {
   type SeedEntry,
 } from "./catalogs.repository";
 
-// Lo que devuelve cualquiera de los 7 catálogos; cada controller lo ajusta a su esquema de salida.
+// Lo que devuelve cualquiera de los 8 catálogos; cada controller lo ajusta a su esquema de salida.
 export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket;
 
 // Entrada de alta y edición: el service solo lee los campos de `def.inputFields`, así que un campo
@@ -142,6 +142,13 @@ export class CatalogsService {
     }
     if (def.rules.lastActive && this.isLastActive(all, current)) {
       throw new ORPCError("CONFLICT", { message: def.rules.lastActive.remove });
+    }
+    const usedBy = def.rules.usedBy;
+    if (
+      usedBy &&
+      (await this.repository.countReferencing(usedBy.model, usedBy.field, itemId)) > 0
+    ) {
+      throw new ORPCError("CONFLICT", { message: usedBy.message });
     }
     if ((await this.tickets.countByCatalogItem(def.ruta, itemId)) > 0) {
       throw new ORPCError("CONFLICT", {

@@ -14,6 +14,7 @@ import type {
 import { CatalogsService } from "./catalogs.service";
 
 const areas = CATALOG_DEFINITIONS.areas;
+const tiposArea = CATALOG_DEFINITIONS.tiposArea;
 const edificios = CATALOG_DEFINITIONS.edificios;
 const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
@@ -65,6 +66,11 @@ function buildService(
   const find = (ruta: string, id: string) => table(ruta).find((r) => r.id === id) as CatalogRow;
 
   const repository = {
+    // Regla `usedBy`: filas no eliminadas de otro catálogo cuya FK apunta al ítem.
+    countReferencing: async (model: string, field: string, id: string) => {
+      const def = Object.values(CATALOG_DEFINITIONS).find((d) => d.model === model);
+      return live(def?.ruta ?? "").filter((r) => r[field] === id).length;
+    },
     findAll: async (def: { ruta: string }) => live(def.ruta).map((r) => ({ ...r })),
     create: async (
       def: { ruta: string },
@@ -479,6 +485,16 @@ describe("CatalogsService.remove", () => {
       }
     });
 
+    it("rige para los 8 catálogos: Tipos de área también pregunta con su ruta", async () => {
+      const { service, countByCatalogItem } = buildService({
+        tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+      });
+
+      await service.remove(tiposArea, "t2", admin);
+
+      expect(countByCatalogItem).toHaveBeenCalledWith("tiposArea", "t2");
+    });
+
     it("un estado de sistema sigue sin poder eliminarse: la regla de la clave va primero", async () => {
       const { service, countByCatalogItem } = buildService(
         {
@@ -504,6 +520,60 @@ describe("CatalogsService.remove", () => {
         message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
       });
     });
+  });
+});
+
+describe("CatalogsService.remove: Tipos de área", () => {
+  const unTipoConArea = () => ({
+    tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+    areas: [row("a1", "Acosta", 1, { tipoId: "t1" })],
+  });
+
+  it("un tipo con un área no eliminada: 409 y no se elimina", async () => {
+    const { service, audits } = buildService(unTipoConArea());
+
+    await expect(service.remove(tiposArea, "t1", admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "Lo usa al menos un área: desactivalo en lugar de eliminarlo",
+    });
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1", "t2"]);
+    expect(audits).toEqual([]);
+  });
+
+  it("un tipo sin áreas se elimina", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    await service.remove(tiposArea, "t2", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1"]);
+  });
+
+  it("con su única área eliminada, el tipo se elimina", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    await service.remove(areas, "a1", admin);
+    await service.remove(tiposArea, "t1", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+  });
+
+  it("las áreas de otro tipo no cuentan", async () => {
+    const { service } = buildService({
+      tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+      areas: [row("a1", "Acosta", 1, { tipoId: "t2" })],
+    });
+
+    await service.remove(tiposArea, "t1", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+  });
+
+  it("desactivar un tipo con áreas está permitido", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    const item = await service.setActive(tiposArea, "t1", false, admin);
+
+    expect(item).toMatchObject({ id: "t1", activo: false });
   });
 });
 

@@ -5,11 +5,11 @@ import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { type AuditEntry, type AuditTransaction, writeAuditEntry } from "../audit/audit.repository";
-import type { CatalogDefinition } from "./catalog-definitions";
+import type { CatalogDefinition, CatalogModel } from "./catalog-definitions";
 
 type CatalogValue = string | number | boolean | null;
 
-// Fila de cualquiera de los 7 catálogos: la base más los campos extra de su definición
+// Fila de cualquiera de los 8 catálogos: la base más los campos extra de su definición
 // (`contacto`, `clave`, ...), que dependen del catálogo.
 export interface CatalogRow {
   id: string;
@@ -77,6 +77,12 @@ export class CatalogsRepository {
 
   private delegate(def: CatalogDefinition, client: AuditTransaction | typeof this.db) {
     return client[def.model] as unknown as CatalogDelegate;
+  }
+
+  // Filas no eliminadas de `model` cuya FK `field` apunta a `id` (regla `usedBy` de la definición).
+  async countReferencing(model: CatalogModel, field: string, id: string): Promise<number> {
+    const delegate = this.db[model] as unknown as CatalogDelegate;
+    return delegate.count({ where: { [field]: id, ...notDeleted } });
   }
 
   // No eliminados, activos e inactivos, en el orden de `list`.

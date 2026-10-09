@@ -219,6 +219,8 @@ function toRow(row: DbTicket): TicketRow {
 // La columna del ticket que referencia a cada catálogo, para contar el uso de un ítem.
 const CATALOG_COLUMN: Record<CatalogRuta, (itemId: string) => object> = {
   areas: (id) => ({ areaId: id }),
+  // Ningún ticket guarda un tipo de área: lo tiene por su área (SPEC 08).
+  tiposArea: (id) => ({ area: { tipoId: id } }),
   edificios: (id) => ({ edificioId: id }),
   tipos: (id) => ({ tipoId: id }),
   prioridades: (id) => ({ prioridadId: id }),
