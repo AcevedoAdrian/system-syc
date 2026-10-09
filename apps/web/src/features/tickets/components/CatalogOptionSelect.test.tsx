@@ -1,15 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const options = vi.hoisted(() => ({
+  // Mientras el catálogo carga, `useQuery` no trae datos y `isPending` es verdadero.
+  pending: false,
   data: [
     { id: "a1", nombre: "Sistemas", activo: true, orden: 1 },
     { id: "a2", nombre: "Archivo", activo: true, orden: 2 },
   ],
 }));
 vi.mock("@/features/catalogs/hooks/useCatalogOptions", () => ({
-  useCatalogOptions: () => ({ data: options.data }),
+  useCatalogOptions: () => ({
+    data: options.pending ? undefined : options.data,
+    isPending: options.pending,
+  }),
 }));
 
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
@@ -22,6 +27,10 @@ beforeAll(() => {
     releasePointerCapture: () => undefined,
     scrollIntoView: () => undefined,
   });
+});
+
+afterEach(() => {
+  options.pending = false;
 });
 
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
@@ -101,6 +110,40 @@ describe("CatalogOptionSelect", () => {
       expect(optionNames()).toEqual(["Sistemas", "Archivo", "Mantenimiento (inactivo)"]);
     });
 
+    it("mientras carga el catálogo lo muestra sin marca: todavía no se sabe si sigue activo", () => {
+      options.pending = true;
+      render(
+        <CatalogOptionSelect
+          id="area"
+          ruta="areas"
+          value="a1"
+          onChange={() => undefined}
+          current={{ id: "a1", nombre: "Sistemas" }}
+        />,
+      );
+
+      expect(screen.getByRole("combobox")).toHaveTextContent("Sistemas");
+      expect(screen.getByRole("combobox")).not.toHaveTextContent("(inactivo)");
+    });
+
+    it("al llegar el catálogo, un valor que ya no está activo pasa a mostrarse marcado", () => {
+      options.pending = true;
+      const props = {
+        id: "area",
+        ruta: "areas" as const,
+        value: "viejo",
+        onChange: () => undefined,
+        current: { id: "viejo", nombre: "Mantenimiento" },
+      };
+      const { rerender } = render(<CatalogOptionSelect {...props} />);
+      expect(screen.getByRole("combobox")).toHaveTextContent(/^Mantenimiento$/);
+
+      options.pending = false;
+      rerender(<CatalogOptionSelect {...props} />);
+
+      expect(screen.getByRole("combobox")).toHaveTextContent("Mantenimiento (inactivo)");
+    });
+
     it("no lo repite si todavía está activo", async () => {
       render(
         <CatalogOptionSelect
@@ -132,6 +175,36 @@ describe("CatalogOptionSelect", () => {
     await userEvent.click(screen.getByRole("combobox"));
 
     expect(optionNames()).toEqual(["Archivo"]);
+  });
+
+  it("pasa al botón del selector lo que entrega `Field`: error, ayuda y campo obligatorio", () => {
+    render(
+      <>
+        <p id="prio-error">Elegí una prioridad.</p>
+        <CatalogOptionSelect
+          id="prio"
+          ruta="prioridades"
+          value=""
+          onChange={() => undefined}
+          aria-invalid
+          aria-describedby="prio-error"
+          aria-required
+        />
+      </>,
+    );
+
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).toHaveAttribute("aria-invalid", "true");
+    expect(combobox).toHaveAttribute("aria-required", "true");
+    expect(combobox).toHaveAccessibleDescription("Elegí una prioridad.");
+  });
+
+  it("sin esos atributos el botón no los lleva", () => {
+    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+
+    const combobox = screen.getByRole("combobox");
+    expect(combobox).not.toHaveAttribute("aria-invalid");
+    expect(combobox).not.toHaveAttribute("aria-describedby");
   });
 
   it("deshabilitado no se abre", async () => {

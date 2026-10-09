@@ -157,8 +157,10 @@ function SearchField({ filters, onChange }: { filters: TicketsSearch; onChange: 
         id="filtro-q"
         type="search"
         value={text}
+        name="q"
+        autoComplete="off"
         maxLength={200}
-        placeholder="Título, descripción, solución o comentarios"
+        placeholder="Título, descripción, solución o comentarios…"
         onChange={(event) => setText(event.target.value)}
       />
     </div>

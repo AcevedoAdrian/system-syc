@@ -57,6 +57,15 @@ const renderFilters = (filters: TicketsSearch = {}, isAdmin = false) => {
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
 
 describe("TicketsFilters", () => {
+  it("el buscador no ofrece autocompletar del navegador y su placeholder indica que hay más por escribir", () => {
+    renderFilters();
+
+    const buscador = screen.getByRole("searchbox", { name: "Buscar" });
+    expect(buscador).toHaveAttribute("autocomplete", "off");
+    expect(buscador).toHaveAttribute("name", "q");
+    expect(buscador).toHaveAttribute("placeholder", expect.stringMatching(/…$/));
+  });
+
   describe("selectores", () => {
     it("cambiar un filtro avisa con el filtro nuevo y vuelve a la página 1", async () => {
       const { onChange } = renderFilters({ q: "impresora", page: 3 });

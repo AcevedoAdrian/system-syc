@@ -82,15 +82,21 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
             <li key={comment.id} className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-muted-foreground">
-                  {comment.autor.nombre} · {formatTimestamp(comment.createdAt)}
+                  {comment.autor.nombre} ·{" "}
+                  <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
                 </p>
                 {isAdmin && (
-                  <Button variant="ghost" size="sm" onClick={() => setRemoving(comment)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Eliminar comentario de ${comment.autor.nombre}`}
+                    onClick={() => setRemoving(comment)}
+                  >
                     Eliminar
                   </Button>
                 )}
               </div>
-              <p className="whitespace-pre-wrap">{comment.texto}</p>
+              <p className="whitespace-pre-wrap wrap-break-word">{comment.texto}</p>
             </li>
           ))}
         </ol>
@@ -107,12 +113,13 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
         </Label>
         <Textarea
           id="comentario-texto"
-          placeholder="Escribí un comentario"
+          placeholder="Escribí un comentario…"
           aria-invalid={errors.texto ? true : undefined}
+          aria-describedby={errors.texto ? "comentario-texto-error" : undefined}
           {...register("texto")}
         />
         {errors.texto && (
-          <p className="text-sm text-destructive">
+          <p id="comentario-texto-error" className="text-sm text-destructive">
             El comentario es obligatorio (hasta 2000 caracteres).
           </p>
         )}
@@ -123,7 +130,7 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
         )}
         <div>
           <Button type="submit" disabled={isSubmitting}>
-            Comentar
+            {isSubmitting ? "Comentando…" : "Comentar"}
           </Button>
         </div>
       </form>

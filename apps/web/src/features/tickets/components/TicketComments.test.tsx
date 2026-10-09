@@ -101,6 +101,20 @@ describe("TicketComments", () => {
 
       expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
     });
+
+    it("un comentario con una palabra larguísima se parte y conserva sus saltos de línea", () => {
+      show([comment("c1", `${"a".repeat(500)}\nsegunda línea`)]);
+
+      expect(screen.getByText(/^a{500}/)).toHaveClass("whitespace-pre-wrap", "wrap-break-word");
+    });
+
+    it("la fecha del comentario va en un <time> con su valor ISO", () => {
+      show([comment("c1", "Hola")]);
+
+      const fecha = within(screen.getByRole("listitem")).getByText("06/10/2026 14:32");
+      expect(fecha.tagName).toBe("TIME");
+      expect(fecha).toHaveAttribute("datetime", "2026-10-06T17:32:00.000Z");
+    });
   });
 
   describe("comentar", () => {
@@ -125,6 +139,28 @@ describe("TicketComments", () => {
 
       expect(screen.getByText(/El comentario es obligatorio/)).toBeInTheDocument();
       expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it("mientras comenta el botón dice «Comentando…» y no deja enviar otra vez", async () => {
+      let finish: () => void = () => undefined;
+      mocks.create.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      show([]);
+
+      await write("Hola");
+
+      expect(await screen.findByRole("button", { name: "Comentando…" })).toBeDisabled();
+      finish();
+      expect(await screen.findByRole("button", { name: "Comentar" })).toBeEnabled();
+    });
+
+    it("el error de validación queda ligado al campo", async () => {
+      show([]);
+
+      await write("");
+
+      const textbox = screen.getByRole("textbox", { name: "Nuevo comentario" });
+      expect(textbox).toHaveAttribute("aria-invalid", "true");
+      expect(textbox).toHaveAccessibleDescription(/El comentario es obligatorio/);
     });
 
     it("rechaza más de 2000 caracteres y no pierde lo escrito", async () => {
@@ -165,14 +201,26 @@ describe("TicketComments", () => {
       mocks.role = "agente";
       show([comment("c1", "Hola", { autor: { id: "u1", nombre: "Ana" } })]);
 
-      expect(screen.queryByRole("button", { name: "Eliminar" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Eliminar/ })).not.toBeInTheDocument();
     });
 
     it("el admin ve «Eliminar» en cada comentario", () => {
       mocks.role = "admin";
       show([comment("c1", "Uno"), comment("c2", "Dos")]);
 
-      expect(screen.getAllByRole("button", { name: "Eliminar" })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /^Eliminar comentario/ })).toHaveLength(2);
+    });
+
+    it("cada botón dice de quién es el comentario, para distinguirlos sin ver la pantalla", () => {
+      mocks.role = "admin";
+      show([
+        comment("c1", "Uno", { autor: { id: "u1", nombre: "Ana" } }),
+        comment("c2", "Dos", { autor: { id: "u2", nombre: "Luis" } }),
+      ]);
+
+      expect(
+        screen.getAllByRole("button", { name: /^Eliminar comentario/ }).map((b) => b.ariaLabel),
+      ).toEqual(["Eliminar comentario de Ana", "Eliminar comentario de Luis"]);
     });
 
     it("pide confirmación y elimina el comentario elegido", async () => {
@@ -180,7 +228,9 @@ describe("TicketComments", () => {
       show([comment("c1", "Uno"), comment("c2", "Dos")]);
 
       const second = screen.getAllByRole("listitem")[1] as HTMLElement;
-      await userEvent.click(within(second).getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(
+        within(second).getByRole("button", { name: "Eliminar comentario de Ana" }),
+      );
       expect(mocks.remove).not.toHaveBeenCalled();
       const dialog = await screen.findByRole("alertdialog");
       expect(dialog).toHaveTextContent("Eliminar comentario");
@@ -193,7 +243,7 @@ describe("TicketComments", () => {
       mocks.role = "admin";
       show([comment("c1", "Uno")]);
 
-      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar comentario de Ana" }));
       await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
 
       expect(mocks.remove).not.toHaveBeenCalled();
@@ -206,7 +256,7 @@ describe("TicketComments", () => {
         new ORPCError("NOT_FOUND", { status: 404, message: "El comentario no existe" }),
       );
 
-      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar comentario de Ana" }));
       const dialog = await screen.findByRole("alertdialog");
       await userEvent.click(within(dialog).getByRole("button", { name: "Eliminar" }));
 

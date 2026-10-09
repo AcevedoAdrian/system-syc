@@ -26,7 +26,7 @@ const columns = column.columns([
       <Link
         to="/tickets/$ticketId"
         params={{ ticketId: row.original.id }}
-        className={`${linkClassName} font-medium whitespace-nowrap`}
+        className={`${linkClassName} font-medium whitespace-nowrap tabular-nums`}
       >
         {formatTicketNumber(row.original.numero)}
       </Link>
@@ -38,7 +38,8 @@ const columns = column.columns([
       <Link
         to="/tickets/$ticketId"
         params={{ ticketId: row.original.id }}
-        className={linkClassName}
+        // La celda no corta líneas; el título sí, hasta un ancho razonable, para que uno largo no ensanche la tabla.
+        className={`${linkClassName} inline-block max-w-md align-top whitespace-normal wrap-break-word`}
       >
         {row.original.titulo}
       </Link>
@@ -57,7 +58,11 @@ const columns = column.columns([
   column.accessor((ticket) => ticket.area?.nombre ?? "—", { id: "area", header: "Área" }),
   column.accessor("fechaRecepcion", {
     header: "Fecha de recepción",
-    cell: ({ row }) => formatDay(row.original.fechaRecepcion),
+    cell: ({ row }) => (
+      <time dateTime={row.original.fechaRecepcion} className="tabular-nums">
+        {formatDay(row.original.fechaRecepcion)}
+      </time>
+    ),
   }),
 ]);
 

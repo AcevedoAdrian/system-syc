@@ -14,6 +14,9 @@ interface DepartmentSelectProps {
   departments: Organization[];
   placeholder?: string;
   invalid?: boolean;
+  // Los que entrega el `Field` de los formularios de ticket: error, ayuda y campo obligatorio.
+  "aria-describedby"?: string;
+  "aria-required"?: boolean;
 }
 
 // Ofrece solo los departamentos activos: a uno desactivado no se le pueden asignar agentes nuevos.
@@ -24,10 +27,18 @@ export function DepartmentSelect({
   departments,
   placeholder = "Elegí un departamento",
   invalid,
+  "aria-describedby": describedBy,
+  "aria-required": required,
 }: DepartmentSelectProps) {
   return (
     <Select value={value ?? ""} onValueChange={onChange}>
-      <SelectTrigger id={id} className="w-full" aria-invalid={invalid ? true : undefined}>
+      <SelectTrigger
+        id={id}
+        className="w-full"
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
+        aria-required={required}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

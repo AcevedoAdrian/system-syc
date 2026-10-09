@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { useTickets } from "../hooks/useTickets";
@@ -16,13 +17,20 @@ interface TicketsListProps {
 // usuario. La tabla solo muestra la página recibida; no ordena ni filtra en el navegador.
 export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
   const { data: user } = useCurrentUser();
-  const { data, isPending, isError, isPlaceholderData } = useTickets(filters);
+  const { data, isPending, isError, isPlaceholderData, isFetching, refetch } = useTickets(filters);
   const filtered = hasActiveFilters(filters);
 
   const goToPage = (page: number) =>
     onFiltersChange({ ...filters, page: page === 1 ? undefined : page });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const resumen = isPlaceholderData
+    ? "Actualizando tickets…"
+    : data
+      ? data.total === 0
+        ? "Sin resultados."
+        : `${data.total} ${data.total === 1 ? "ticket encontrado" : "tickets encontrados"}, página ${data.page} de ${totalPages}.`
+      : "";
 
   return (
     <section className="flex flex-col gap-4">
@@ -39,11 +47,20 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
         isAdmin={user?.role === "admin"}
       />
 
-      {isPending && <p>Cargando tickets…</p>}
+      {/* Siempre montada y solo para lectores de pantalla: al filtrar o paginar, lo visible cambia sin
+          que nada se lo anuncie. */}
+      <p role="status" className="sr-only">
+        {resumen}
+      </p>
+
+      {isPending && <p role="status">Cargando tickets…</p>}
       {isError && (
-        <p role="alert" className="text-destructive">
-          No se pudieron cargar los tickets. Intentá de nuevo.
-        </p>
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-destructive">
+          <p>No se pudieron cargar los tickets. Intentá de nuevo.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+            {isFetching ? "Reintentando…" : "Reintentar"}
+          </Button>
+        </div>
       )}
 
       {data && data.items.length === 0 && data.total > 0 && (
@@ -70,10 +87,13 @@ export function TicketsList({ filters, onFiltersChange }: TicketsListProps) {
       )}
 
       {data && data.items.length > 0 && (
-        <div className="flex flex-col gap-3" aria-busy={isPlaceholderData}>
+        <div
+          className={cn("flex flex-col gap-3", isPlaceholderData && "opacity-60")}
+          aria-busy={isPlaceholderData}
+        >
           <TicketsTable tickets={data.items} />
           <nav aria-label="Paginación" className="flex items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground tabular-nums">
               Página {data.page} de {totalPages} · {data.total}{" "}
               {data.total === 1 ? "ticket" : "tickets"}
             </p>

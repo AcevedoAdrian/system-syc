@@ -36,7 +36,8 @@ export function TicketHistory({ ticketId }: { ticketId: string }) {
             return (
               <li key={entry.id} className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
                 <p className="text-muted-foreground">
-                  {formatTimestamp(entry.createdAt)} · {entry.actor?.name ?? "Sistema"}
+                  <time dateTime={entry.createdAt}>{formatTimestamp(entry.createdAt)}</time> ·{" "}
+                  {entry.actor?.name ?? "Sistema"}
                 </p>
                 {entry.action === "create" && <p>Ticket creado</p>}
                 {entry.action === "delete" && <p>Ticket eliminado</p>}
@@ -44,7 +45,7 @@ export function TicketHistory({ ticketId }: { ticketId: string }) {
                 {entry.action === "comment_create" && <p>Comentario agregado</p>}
                 {entry.action === "comment_delete" && <p>Comentario eliminado</p>}
                 {changes.map((change) => (
-                  <p key={change.field}>
+                  <p key={change.field} className="wrap-break-word">
                     <span className="font-medium">{change.label}:</span> {change.before} →{" "}
                     {change.after}
                   </p>

@@ -103,6 +103,82 @@ describe("ChangeStatusDialog", () => {
     expect(mocks.change).not.toHaveBeenCalled();
   });
 
+  describe("ids junto al formulario del ticket", () => {
+    // `TicketForm` sigue montado detrás del modal con estos mismos campos. Si el diálogo repitiera un
+    // id, el `<label htmlFor>` resolvería al control del formulario y no al del diálogo.
+    const idsDelFormulario = ["fechaCierre", "fechaReabierto", "solucionDescripcion"];
+
+    function renderJuntoAlFormulario() {
+      render(
+        <>
+          {idsDelFormulario.map((id) => (
+            <input key={id} id={id} aria-label={`formulario ${id}`} />
+          ))}
+          <ChangeStatusDialog
+            ticket={makeTicket()}
+            open
+            onOpenChange={onOpenChange}
+            onReload={onReload}
+          />
+        </>,
+      );
+    }
+
+    const idsRepetidos = () => {
+      const ids = [...document.body.querySelectorAll("[id]")].map((node) => node.id);
+      return ids.filter((id, index) => ids.indexOf(id) !== index);
+    };
+
+    it.each([
+      ["fin", ["Fecha de cierre", "Solución (opcional)"]],
+      ["rea", ["Fecha de reapertura"]],
+    ])(
+      "al elegir %s ningún id se repite y cada etiqueta lleva a su control",
+      async (estadoId, etiquetas) => {
+        renderJuntoAlFormulario();
+
+        await elegir(estadoId);
+
+        expect(idsRepetidos()).toEqual([]);
+        for (const etiqueta of etiquetas) {
+          const control = screen.getByLabelText(etiqueta);
+          expect(control.closest("[role=dialog]")).not.toBeNull();
+        }
+      },
+    );
+  });
+
+  describe("accesibilidad de los campos", () => {
+    it("el estado y la fecha de cierre son obligatorios; la solución, no", async () => {
+      renderDialog();
+
+      await elegir("fin");
+
+      expect(screen.getByLabelText("Fecha de cierre")).toHaveAttribute("aria-required", "true");
+      expect(screen.getByLabelText("Solución (opcional)")).not.toHaveAttribute("aria-required");
+    });
+
+    it("el error de la fecha queda ligado al campo", async () => {
+      renderDialog();
+      await elegir("fin");
+
+      await userEvent.clear(screen.getByLabelText("Fecha de cierre"));
+      await confirmar();
+
+      const fecha = screen.getByLabelText("Fecha de cierre");
+      await waitFor(() => expect(fecha).toHaveAttribute("aria-invalid", "true"));
+      expect(fecha).toHaveAccessibleDescription("Ingresá una fecha válida, de hoy o anterior.");
+    });
+
+    it("la fecha de reapertura es obligatoria", async () => {
+      renderDialog();
+
+      await elegir("rea");
+
+      expect(screen.getByLabelText("Fecha de reapertura")).toHaveAttribute("aria-required", "true");
+    });
+  });
+
   describe("estado sin clave", () => {
     it("no pide ni manda fechas ni solución: solo cambia el estado", async () => {
       const ticket = renderDialog();
@@ -260,6 +336,60 @@ describe("ChangeStatusDialog", () => {
       await confirmar();
       await waitFor(() => expect(mocks.change).toHaveBeenCalledTimes(1));
       expect(mocks.change.mock.calls[0]?.[0]).not.toHaveProperty("fechaReabierto");
+    });
+  });
+
+  describe("mientras cambia", () => {
+    it("el botón dice «Cambiando…» y no deja confirmar otra vez", async () => {
+      let finish: () => void = () => undefined;
+      mocks.change.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderDialog();
+
+      await elegir("prog");
+      await confirmar();
+
+      expect(await screen.findByRole("button", { name: "Cambiando…" })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "Cambiar estado" })).not.toBeInTheDocument();
+      finish();
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+  });
+
+  describe("«Recargar» tras un 409", () => {
+    const stale = () => new ORPCError("CONFLICT", { status: 409, message: STALE_TICKET_MESSAGE });
+
+    it("mientras lee dice «Recargando…», no se puede volver a pulsar, y al terminar cierra", async () => {
+      mocks.change.mockRejectedValue(stale());
+      let finish: () => void = () => undefined;
+      onReload.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+      renderDialog();
+      await elegir("prog");
+      await confirmar();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Recargar" }));
+
+      expect(await screen.findByRole("button", { name: "Recargando…" })).toBeDisabled();
+      expect(onOpenChange).not.toHaveBeenCalled();
+      finish();
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    });
+
+    it("si no puede leer el ticket muestra el error, no cierra y deja reintentar", async () => {
+      mocks.change.mockRejectedValue(stale());
+      onReload.mockRejectedValueOnce(new Error("sin red"));
+      renderDialog();
+      await elegir("prog");
+      await confirmar();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Recargar" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No se pudo completar la operación. Intentá de nuevo.",
+      );
+      expect(onOpenChange).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Recargar" }));
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+      expect(onReload).toHaveBeenCalledTimes(2);
     });
   });
 
