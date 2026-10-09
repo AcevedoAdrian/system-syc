@@ -299,6 +299,28 @@ describe("TicketDetail", () => {
       expect(screen.queryByText(/Guardá o descartá los cambios/)).not.toBeInTheDocument();
     });
 
+    it("cada botón deshabilitado queda ligado al texto que explica por qué", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+      const explicacion = "Guardá o descartá los cambios para cambiar el estado o el departamento.";
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveAccessibleDescription();
+      }
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).toHaveAccessibleDescription(explicacion);
+      }
+      // «Eliminar» sigue disponible: no tiene nada que explicar.
+      expect(screen.getByRole("button", { name: "Eliminar" })).not.toHaveAccessibleDescription();
+
+      await userEvent.click(screen.getByRole("button", { name: "limpiar" }));
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveAccessibleDescription();
+      }
+    });
+
     it("eliminar sigue disponible: no depende de lo que haya en el formulario", async () => {
       mocks.user = admin;
       show(makeTicket());

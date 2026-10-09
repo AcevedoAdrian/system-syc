@@ -1,6 +1,6 @@
 import { formatTicketNumber } from "@syc/contracts";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
   const [removeError, setRemoveError] = useState<string>();
   // Eliminar sale de la pantalla a propósito, aunque el formulario tenga cambios: no debe frenarse.
   const leaving = useRef(false);
+  // El texto que explica por qué «Cambiar estado» y «Cambiar departamento» están deshabilitados.
+  const dirtyHintId = useId();
 
   // Con cambios sin guardar, salir de la pantalla (otro link, atrás) o cerrar la pestaña pide confirmar.
   // Las funciones son estables: `useBlocker` vuelve a registrar el bloqueo cada vez que cambian.
@@ -86,12 +88,22 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
           {ticket.departamento.nombre}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setStatusOpen(true)} disabled={dirty}>
+          <Button
+            variant="outline"
+            onClick={() => setStatusOpen(true)}
+            disabled={dirty}
+            aria-describedby={dirty ? dirtyHintId : undefined}
+          >
             Cambiar estado
           </Button>
           {isAdmin && (
             <>
-              <Button variant="outline" onClick={() => setDepartmentOpen(true)} disabled={dirty}>
+              <Button
+                variant="outline"
+                onClick={() => setDepartmentOpen(true)}
+                disabled={dirty}
+                aria-describedby={dirty ? dirtyHintId : undefined}
+              >
                 Cambiar departamento
               </Button>
               {/* Se distingue como destructivo con texto y borde rojos sobre el botón `outline`. La variante
@@ -108,7 +120,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
           )}
         </div>
         {dirty && (
-          <p className="text-sm text-muted-foreground">
+          <p id={dirtyHintId} className="text-sm text-muted-foreground">
             Guardá o descartá los cambios para cambiar el estado o el departamento.
           </p>
         )}
