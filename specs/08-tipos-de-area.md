@@ -1,6 +1,6 @@
 # SPEC 08 — Tipos de área
 
-> **Status:** Draft
+> **Status:** Approved
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo), SPEC 06 (comentarios y bandeja)
 > **Date:** 2026-10-09
 > **Objective:** separar el tipo del nombre de cada área con un catálogo nuevo "Tipos de área" (Diputado, Dirección, Bloque…), para elegir el área en un selector agrupado por tipo, verla como «Diputado · Acosta» y filtrar la bandeja por tipo.

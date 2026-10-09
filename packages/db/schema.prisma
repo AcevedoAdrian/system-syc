@@ -28,6 +28,8 @@ model User {
   auditLogs             AuditLog[]
   areasCreadas          Area[]             @relation("AreaCreador")
   areasEditadas         Area[]             @relation("AreaEditor")
+  tiposAreaCreadas      TipoArea[]         @relation("TipoAreaCreador")
+  tiposAreaEditadas     TipoArea[]         @relation("TipoAreaEditor")
   edificiosCreadas      Edificio[]         @relation("EdificioCreador")
   edificiosEditadas     Edificio[]         @relation("EdificioEditor")
   tiposTicketCreadas    TipoTicket[]       @relation("TipoTicketCreador")
@@ -186,9 +188,32 @@ model Area {
   updatedBy         String
   editor            User      @relation("AreaEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  tipoId            String // SPEC 08: obligatorio; el nombre es único dentro del tipo (índice parcial en el SQL de `tipos_area`)
+  tipo              TipoArea  @relation(fields: [tipoId], references: [id], onDelete: Restrict)
   tickets           Ticket[]
 
+  @@index([tipoId])
   @@map("area")
+}
+
+// SPEC 08: el tipo de un área (Diputado, Dirección, Bloque…). Catálogo administrable; su índice único
+// parcial sobre "nombreNormalizado" vive en el SQL de la migración `tipos_area`.
+model TipoArea {
+  id                String    @id @default(cuid())
+  nombre            String
+  nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
+  orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  creador           User      @relation("TipoAreaCreador", fields: [createdBy], references: [id], onDelete: Restrict)
+  updatedBy         String
+  editor            User      @relation("TipoAreaEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
+  deletedAt         DateTime?
+  areas             Area[]
+
+  @@map("tipo_area")
 }
 
 model Edificio {
