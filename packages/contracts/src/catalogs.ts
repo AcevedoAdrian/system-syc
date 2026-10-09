@@ -7,6 +7,9 @@ const nombreSchema = z.string().trim().min(1).max(120);
 
 export const catalogItemInputSchema = z.object({ nombre: nombreSchema });
 
+// SPEC 08: el tipo es obligatorio; el service valida que exista y esté activo.
+export const areaInputSchema = catalogItemInputSchema.extend({ tipoId: z.string().min(1) });
+
 export const proveedorInputSchema = z.object({
   nombre: nombreSchema,
   contacto: blankToNull(z.string().max(120)),
@@ -21,6 +24,14 @@ export const catalogItemSchema = z.object({
   orden: z.number().int(),
   activo: z.boolean(),
 });
+
+export const areaSchema = catalogItemSchema.extend({
+  tipo: z.object({ id: z.string(), nombre: z.string() }),
+});
+
+// «Diputado · Acosta»: lo comparten la API (foto auditable del ticket) y la web.
+export const areaLabel = (area: { nombre: string; tipo: { nombre: string } }) =>
+  `${area.tipo.nombre} · ${area.nombre}`;
 
 export const proveedorSchema = catalogItemSchema.extend({
   contacto: z.string().nullable(),
@@ -46,9 +57,10 @@ export const setCatalogItemActiveInputSchema = z.object({
   activo: z.boolean(),
 });
 
-// Rutas de los 7 catálogos, en el orden de las pestañas de la pantalla de administración.
+// Rutas de los 8 catálogos, en el orden de las pestañas de la pantalla de administración.
 export const catalogRutas = [
   "areas",
+  "tiposArea",
   "edificios",
   "tipos",
   "prioridades",
@@ -62,6 +74,8 @@ export const catalogRutaSchema = z.enum(catalogRutas);
 export type CatalogRuta = z.infer<typeof catalogRutaSchema>;
 export type CatalogItem = z.infer<typeof catalogItemSchema>;
 export type CatalogItemInput = z.infer<typeof catalogItemInputSchema>;
+export type Area = z.infer<typeof areaSchema>;
+export type AreaInput = z.infer<typeof areaInputSchema>;
 export type Proveedor = z.infer<typeof proveedorSchema>;
 export type ProveedorInput = z.infer<typeof proveedorInputSchema>;
 export type ClaveEstado = z.infer<typeof claveEstadoSchema>;
@@ -104,7 +118,8 @@ const catalogContract = <TShape extends z.ZodRawShape, TItem extends z.ZodType>(
 });
 
 export const catalogsContract = {
-  areas: catalogContract("areas", catalogItemInputSchema, catalogItemSchema),
+  areas: catalogContract("areas", areaInputSchema, areaSchema),
+  tiposArea: catalogContract("tiposArea", catalogItemInputSchema, catalogItemSchema),
   edificios: catalogContract("edificios", catalogItemInputSchema, catalogItemSchema),
   tipos: catalogContract("tipos", catalogItemInputSchema, catalogItemSchema),
   prioridades: catalogContract("prioridades", catalogItemInputSchema, catalogItemSchema),
