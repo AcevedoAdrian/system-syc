@@ -63,6 +63,11 @@ services:
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-}
+      SEED_AGENTS_PASSWORD: ${SEED_AGENTS_PASSWORD:-}
+      SEED_DATA_DIR: /seed-data
+    # Los datos del seed se leen en el momento (no van dentro de la imagen: áreas y agentes no están en git).
+    volumes:
+      - ./seed-data:/seed-data:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

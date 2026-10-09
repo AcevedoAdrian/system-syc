@@ -1,0 +1,27 @@
+[
+  {
+    "nombre": "Pendiente"
+  },
+  {
+    "nombre": "En progreso"
+  },
+  {
+    "nombre": "En espera"
+  },
+  {
+    "nombre": "Finalizado",
+    "clave": "FINALIZADO"
+  },
+  {
+    "nombre": "Cerrado",
+    "clave": "CERRADO"
+  },
+  {
+    "nombre": "Cancelado",
+    "clave": "CANCELADO"
+  },
+  {
+    "nombre": "Reabierto",
+    "clave": "REABIERTO"
+  }
+]

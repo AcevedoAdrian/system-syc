@@ -1,0 +1,12 @@
+[
+  {
+    "nombre": "Ana María",
+    "apellido": "Pérez",
+    "departamento": "Técnico"
+  },
+  {
+    "nombre": "Luis",
+    "apellido": "Gómez",
+    "departamento": "Redes"
+  }
+]

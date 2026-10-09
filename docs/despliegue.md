@@ -68,6 +68,7 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
 
    - `PUBLIC_URL`: la URL exacta con la que se entra, por ejemplo `http://10.0.0.5`. Si `HTTP_PORT` no es 80, va con el puerto: `http://10.0.0.5:8080`.
    - `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME`: el administrador raíz. Se usan una sola vez, en el paso 4.
+   - `SEED_AGENTS_PASSWORD`: la contraseña temporal de los agentes de `seed-data/agentes.json` (mínimo 8 caracteres; sin ella el seed no los carga). Todos entran con ella y la cambian desde la interfaz.
    - `BACKUP_DIR`, solo si no es `/srv/syc/backups`.
 
    Si falta `PUBLIC_URL`, `POSTGRES_PASSWORD` o `BETTER_AUTH_SECRET`, `docker compose` no arranca y nombra la que falta.
@@ -86,7 +87,7 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
 
    Tiene que verse `migrate` en `Exited (0)` y `postgres`, `api`, `web` y `backup` en `running`, con `api` en `healthy`. Si `up` termina con error, mirá "Si algo falla".
 
-4. **Correr el seed y borrar las variables del admin.** El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades. Es idempotente.
+4. **Correr el seed y borrar las variables.** Antes, copiá `areas.json` y `agentes.json` a la carpeta `seed-data/` del clon (con `scp`): no están en git porque tienen nombres de personas y de áreas, y sin ellos el seed los saltea y lo avisa (`seed-data/README.md` explica el formato). El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades, las áreas y los edificios iniciales y los agentes. Es idempotente.
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm api node dist/seed.mjs
@@ -95,7 +96,7 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
    Después, borrá la contraseña del `.env` y recreá `api` para que tampoco quede en su entorno:
 
    ```bash
-   sed -i '/^SEED_ADMIN_/d' .env
+   sed -i '/^SEED_/d' .env
    docker compose -f docker-compose.prod.yml up -d
    ```
 
