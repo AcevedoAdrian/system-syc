@@ -240,6 +240,29 @@ describe("TicketDetail", () => {
       expect(screen.getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
     });
 
+    it("«Eliminar» se distingue de las otras acciones con texto y borde rojos", () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      const eliminar = screen.getByRole("button", { name: "Eliminar" });
+      expect(eliminar).toHaveClass("text-destructive", "border-destructive/50");
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveClass("text-destructive");
+      }
+    });
+
+    it("el hover de «Eliminar» no rellena el fondo: el texto rojo mantiene su contraste", () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      const eliminar = screen.getByRole("button", { name: "Eliminar" });
+      expect(eliminar).toHaveClass("hover:bg-background", "hover:text-destructive");
+      expect(eliminar).not.toHaveClass("hover:bg-destructive/10");
+      // Las clases del `outline` que chocan con las de arriba se descartan: si no, ganaría el estilo viejo.
+      expect(eliminar).not.toHaveClass("border-border");
+      expect(eliminar).not.toHaveClass("hover:bg-muted");
+    });
+
     it("abre el diálogo de estado, y el de departamento solo para el admin", async () => {
       mocks.user = admin;
       show(makeTicket());

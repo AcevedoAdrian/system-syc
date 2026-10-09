@@ -94,7 +94,14 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
               <Button variant="outline" onClick={() => setDepartmentOpen(true)} disabled={dirty}>
                 Cambiar departamento
               </Button>
-              <Button variant="outline" onClick={() => setRemoveOpen(true)}>
+              {/* Se distingue como destructivo con texto y borde rojos sobre el botón `outline`. La variante
+                  `destructive` rellena el fondo con el rojo al 10%: da 4,0:1 en claro (AA pide 4,5:1) y
+                  3,3:1 al pasar el mouse. Acá: 4,8:1, y el hover refuerza el borde en vez del fondo. */}
+              <Button
+                variant="outline"
+                className="border-destructive/50 text-destructive hover:border-destructive hover:bg-background hover:text-destructive"
+                onClick={() => setRemoveOpen(true)}
+              >
                 Eliminar
               </Button>
             </>
