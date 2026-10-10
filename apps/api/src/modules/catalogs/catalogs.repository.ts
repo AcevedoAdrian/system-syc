@@ -211,6 +211,11 @@ export class CatalogsRepository {
     }
   }
 
+  // Sin ninguna fila, ni siquiera eliminada (la misma condición que `seedIfEmpty`).
+  async isEmpty(def: CatalogDefinition): Promise<boolean> {
+    return (await this.delegate(def, this.db).count({})) === 0;
+  }
+
   // Carga las filas solo si la tabla no tiene ninguna, ni siquiera eliminada: así el seed no recrea
   // un nombre que el admin cambió. El conteo, las altas y su auditoría van en una transacción.
   // Devuelve cuántas filas creó.

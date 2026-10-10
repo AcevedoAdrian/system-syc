@@ -167,6 +167,11 @@ export class CatalogsService {
     });
   }
 
+  // Lo usa el seed para validar antes de cargar; `seedIfEmpty` vuelve a comprobarlo en su transacción.
+  async isEmpty(def: CatalogDefinition): Promise<boolean> {
+    return this.repository.isEmpty(def);
+  }
+
   // Carga `items` con `orden` 1..N solo si la tabla del catálogo está vacía (Feature 4.5). Lo que
   // crea queda como `create` con `actorId: null` (null = sistema); `adminId` es solo el
   // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.

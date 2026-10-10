@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { normalizeName } from "./common/text";
 
 // Lectura de los archivos de `seed-data/` (en la raíz del repo). Son datos, no código: el bundle del
 // seed no los incluye, así que algunos (áreas y agentes) pueden no estar en git y copiarse aparte.
@@ -10,7 +11,16 @@ const nombres = z.array(z.string().trim().min(1).max(120)).min(1);
 export const departamentosSchema = nombres;
 export const prioridadesSchema = nombres;
 export const edificiosSchema = nombres;
-export const areasSchema = nombres;
+export const tiposAreaSchema = nombres;
+// Cada área nombra su tipo (SPEC 08); el tipo tiene que existir en `tipos-area.json` o en la base.
+export const areasSchema = z
+  .array(
+    z.object({
+      tipo: z.string().trim().min(1).max(120),
+      nombre: z.string().trim().min(1).max(120),
+    }),
+  )
+  .min(1);
 export const estadosSchema = z
   .array(z.object({ nombre: z.string().trim().min(1).max(120), clave: z.string().optional() }))
   .min(1);
@@ -25,6 +35,42 @@ export const agentesSchema = z
   .min(1);
 
 export type SeedAgent = z.infer<typeof agentesSchema>[number];
+export type SeedArea = z.infer<typeof areasSchema>[number];
+
+// Resuelve el `tipo` de cada área contra los tipos que ya están en la base. Aborta antes de crear
+// nada si algún tipo no existe o si dos áreas comparten nombre normalizado dentro de un mismo tipo
+// (el índice único las rechazaría a mitad de la carga), nombrando los valores.
+export function resolveSeedAreas(
+  areas: readonly SeedArea[],
+  tipos: readonly { id: string; nombre: string }[],
+): { nombre: string; tipo: { id: string; nombre: string } }[] {
+  const byName = new Map(tipos.map((tipo) => [normalizeName(tipo.nombre), tipo]));
+
+  const missing = [
+    ...new Set(areas.filter((a) => !byName.has(normalizeName(a.tipo))).map((a) => a.tipo)),
+  ];
+  if (missing.length > 0) {
+    throw new Error(
+      `areas.json pide tipos de área que no existen: ${missing.map((m) => `"${m}"`).join(", ")}`,
+    );
+  }
+
+  const seen = new Set<string>();
+  const repeated: string[] = [];
+  for (const area of areas) {
+    const key = `${normalizeName(area.tipo)}|${normalizeName(area.nombre)}`;
+    if (seen.has(key)) repeated.push(`"${area.nombre}" en "${area.tipo}"`);
+    seen.add(key);
+  }
+  if (repeated.length > 0) {
+    throw new Error(`areas.json repite áreas dentro de un mismo tipo: ${repeated.join(", ")}`);
+  }
+
+  return areas.map((area) => ({
+    nombre: area.nombre,
+    tipo: byName.get(normalizeName(area.tipo)) as { id: string; nombre: string },
+  }));
+}
 
 // `SEED_DATA_DIR` si está definida (producción: `/seed-data`); si no, la primera carpeta `seed-data`
 // que haya subiendo desde el directorio actual (`apps/api` con `pnpm seed`, la raíz con `pnpm verify`).

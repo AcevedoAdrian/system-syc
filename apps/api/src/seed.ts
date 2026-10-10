@@ -23,18 +23,22 @@ import {
   prioridadesSchema,
   readSeedFile,
   requireSeedFile,
+  resolveSeedAreas,
   type SeedAgent,
+  type SeedArea,
   seedUsername,
+  tiposAreaSchema,
 } from "./seed-data";
 
-// Los datos iniciales (departamentos, estados, prioridades, edificios, áreas y agentes) son archivos
+// Los datos iniciales (departamentos, estados, prioridades, tipos de área, edificios, áreas y agentes) son archivos
 // de `seed-data/`, no constantes: ver `seed-data/README.md`.
 interface SeedData {
   departamentos: string[];
   estados: { nombre: string; clave?: string | undefined }[];
   prioridades: { nombre: string }[];
   edificios: { nombre: string }[] | null;
-  areas: { nombre: string }[] | null;
+  tiposArea: { nombre: string }[] | null;
+  areas: SeedArea[] | null;
   agentes: SeedAgent[] | null;
 }
 
@@ -48,7 +52,8 @@ function loadSeedData(dir: string): SeedData {
     estados: requireSeedFile(dir, "estados.json", estadosSchema),
     prioridades: toItems(requireSeedFile(dir, "prioridades.json", prioridadesSchema)) ?? [],
     edificios: toItems(readSeedFile(dir, "edificios.json", edificiosSchema)),
-    areas: toItems(readSeedFile(dir, "areas.json", areasSchema)),
+    tiposArea: toItems(readSeedFile(dir, "tipos-area.json", tiposAreaSchema)),
+    areas: readSeedFile(dir, "areas.json", areasSchema),
     agentes: readSeedFile(dir, "agentes.json", agentesSchema),
   };
 }
@@ -186,6 +191,21 @@ async function findAdminId(auth: Auth, username: string): Promise<string> {
   return admin.id;
 }
 
+// Las áreas se cargan solo si la tabla está vacía. Antes se resuelve el tipo de cada una contra la
+// base ya cargada, y cualquier tipo inexistente o área repetida dentro de un tipo aborta sin crear
+// ninguna. Con la tabla ya cargada no se mira el archivo: re-correr el seed no depende de él.
+async function seedAreas(
+  catalogs: CatalogsService,
+  areas: SeedArea[] | null,
+  adminId: string,
+): Promise<number | null> {
+  if (!areas) return null;
+  if (!(await catalogs.isEmpty(CATALOG_DEFINITIONS.areas))) return 0;
+  const tipos = await catalogs.list(CATALOG_DEFINITIONS.tiposArea);
+  const items = resolveSeedAreas(areas, tipos);
+  return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.areas, items, adminId);
+}
+
 // Cada catálogo se carga solo si su tabla no tiene ninguna fila; correrlo otra vez no crea nada y
 // no deshace un renombre del admin. `null` = no había archivo, no se intentó.
 async function seedCatalogs(
@@ -195,19 +215,25 @@ async function seedCatalogs(
 ): Promise<{
   estados: number;
   prioridades: number;
+  tiposArea: number | null;
   areas: number | null;
   edificios: number | null;
 }> {
   const load = async (def: CatalogDefinition, items: { nombre: string }[] | null) =>
     items ? await catalogs.seedIfEmpty(def, items, adminId) : null;
+  const estados = await catalogs.seedIfEmpty(CATALOG_DEFINITIONS.estados, data.estados, adminId);
+  const prioridades = await catalogs.seedIfEmpty(
+    CATALOG_DEFINITIONS.prioridades,
+    data.prioridades,
+    adminId,
+  );
+  // Los tipos de área van antes que las áreas: cada área se carga con su tipo (SPEC 08).
+  const tiposArea = await load(CATALOG_DEFINITIONS.tiposArea, data.tiposArea);
   return {
-    estados: await catalogs.seedIfEmpty(CATALOG_DEFINITIONS.estados, data.estados, adminId),
-    prioridades: await catalogs.seedIfEmpty(
-      CATALOG_DEFINITIONS.prioridades,
-      data.prioridades,
-      adminId,
-    ),
-    areas: await load(CATALOG_DEFINITIONS.areas, data.areas),
+    estados,
+    prioridades,
+    tiposArea,
+    areas: await seedAreas(catalogs, data.areas, adminId),
     edificios: await load(CATALOG_DEFINITIONS.edificios, data.edificios),
   };
 }
@@ -332,6 +358,7 @@ async function main() {
   );
   report("Estados", "creados", catalogs.estados, "estados.json");
   report("Prioridades", "creadas", catalogs.prioridades, "prioridades.json");
+  report("Tipos de área", "creados", catalogs.tiposArea, "tipos-area.json");
   report("Áreas", "creadas", catalogs.areas, "areas.json");
   report("Edificios", "creados", catalogs.edificios, "edificios.json");
   if (!data.agentes) console.log("Agentes: no hay seed-data/agentes.json, no se cargaron.");
