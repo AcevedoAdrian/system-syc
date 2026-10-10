@@ -27,12 +27,26 @@ export interface CatalogRules {
   usedBy?: { model: CatalogModel; field: string; message: string };
 }
 
+// Una FK obligatoria a otro catálogo (SPEC 08: Área → Tipo de área). `field` es la columna que el
+// cliente escribe, `as` la relación que se lee y se audita como `{ id, nombre }` (debe figurar en
+// `snapshotFields`). `invalid` es el 400 si el destino no existe o está desactivado.
+export interface CatalogReference {
+  field: string;
+  as: string;
+  model: CatalogModel;
+  invalid: string;
+}
+
 export interface CatalogDefinition {
   ruta: CatalogRuta;
   entityType: string; // `AuditLog.entityType`
   model: CatalogModel;
   messages: { notFound: string; duplicate: string };
   rules: CatalogRules;
+  // El nombre es único dentro de lo que comparte este campo (SPEC 08: el tipo), no en todo el
+  // catálogo. El índice único parcial de la migración aplica la misma regla.
+  uniqueWithin?: string;
+  reference?: CatalogReference;
   // Campos que el cliente puede escribir en el alta y la edición. Todo lo demás (`orden`,
   // `nombreNormalizado`, `clave`, `createdBy`, `updatedBy`) lo decide el servidor.
   inputFields: readonly string[];
@@ -62,10 +76,21 @@ function simple(
 }
 
 export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
-  areas: simple("areas", "Area", "area", {
-    notFound: "El área no existe",
-    duplicate: "Ya existe un área con ese nombre",
-  }),
+  areas: {
+    ...simple("areas", "Area", "area", {
+      notFound: "El área no existe",
+      duplicate: "Ya existe un área con ese nombre en ese tipo",
+    }),
+    uniqueWithin: "tipoId",
+    reference: {
+      field: "tipoId",
+      as: "tipo",
+      model: "tipoArea",
+      invalid: "El tipo de área no existe o está desactivado",
+    },
+    inputFields: ["nombre", "tipoId"],
+    snapshotFields: [...BASE_FIELDS, "tipo"],
+  },
   tiposArea: {
     ...simple("tiposArea", "TipoArea", "tipoArea", {
       notFound: "El tipo de área no existe",
