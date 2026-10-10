@@ -1,4 +1,4 @@
-import type { Ticket } from "@syc/contracts";
+import { areaLabel, type Ticket } from "@syc/contracts";
 import type { AuditSnapshot } from "../audit/audit-diff";
 
 type Ref = { id: string; nombre: string };
@@ -7,6 +7,12 @@ type Ref = { id: string; nombre: string };
 // se elimine después. La `clave` del estado no entra: es un detalle interno, no un dato del ticket.
 function ref(value: Ref | null): AuditSnapshot[string] {
   return value ? { id: value.id, nombre: value.nombre } : null;
+}
+
+// El área guarda «Tipo · Nombre» en `nombre`: el historial muestra cómo se veía al guardar, y la
+// referencia mantiene su forma `{ id, nombre }` (SPEC 08).
+function areaRef(area: Ticket["area"]): AuditSnapshot[string] {
+  return area ? { id: area.id, nombre: areaLabel(area) } : null;
 }
 
 // Foto auditable (SPEC 03, SPEC 05 "Foto auditable"): solo estos campos entran en el diff. Las
@@ -24,7 +30,7 @@ export function snapshotOf(ticket: Ticket): AuditSnapshot {
     fechaCierre: ticket.fechaCierre,
     fechaReabierto: ticket.fechaReabierto,
     departamento: ref(ticket.departamento),
-    area: ref(ticket.area),
+    area: areaRef(ticket.area),
     edificio: ref(ticket.edificio),
     tipo: ref(ticket.tipo),
     prioridad: ref(ticket.prioridad),

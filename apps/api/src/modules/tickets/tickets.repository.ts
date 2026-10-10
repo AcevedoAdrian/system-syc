@@ -28,19 +28,18 @@ export interface ReferenceRow {
   activo: boolean;
 }
 
+// Un área con su tipo: el ticket la devuelve completa para mostrarse como «Tipo · Nombre».
+export interface AreaRow extends ReferenceRow {
+  tipo: { id: string; nombre: string };
+}
+
 export interface EstadoRow extends ReferenceRow {
   clave: ClaveEstado | null;
 }
 
 // Los catálogos que un ticket puede referenciar de forma opcional u obligatoria, salvo `estado`,
 // que se lee aparte porque trae la `clave`.
-export type TicketCatalog =
-  | "area"
-  | "edificio"
-  | "tipoTicket"
-  | "prioridad"
-  | "modulo"
-  | "proveedor";
+export type TicketCatalog = "edificio" | "tipoTicket" | "prioridad" | "modulo" | "proveedor";
 
 export interface ReferenceMatch {
   id: string;
@@ -94,13 +93,14 @@ export interface TicketStatusData {
 type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string; departamentoId?: string };
 
 const ref = { select: { id: true, nombre: true } } as const;
+const area = { select: { id: true, nombre: true, tipo: ref } } as const;
 const user = { select: { id: true, name: true } } as const;
 
 const detailSelect = {
   id: true,
   numero: true,
   departamento: { select: { id: true, name: true } },
-  area: ref,
+  area,
   edificio: ref,
   tipo: ref,
   modulo: ref,
@@ -129,7 +129,7 @@ const summarySelect = {
   departamento: { select: { id: true, name: true } },
   estado: { select: { id: true, nombre: true, clave: true } },
   prioridad: ref,
-  area: ref,
+  area,
   fechaRecepcion: true,
 } as const;
 
@@ -140,6 +140,9 @@ interface DbRef {
 interface DbUser {
   id: string;
   name: string;
+}
+interface DbArea extends DbRef {
+  tipo: DbRef;
 }
 interface DbEstado extends DbRef {
   clave: string | null;
@@ -152,7 +155,7 @@ interface DbTicketSummary {
   departamento: DbUser;
   estado: DbEstado;
   prioridad: DbRef;
-  area: DbRef | null;
+  area: DbArea | null;
   fechaRecepcion: Date;
 }
 
@@ -282,6 +285,7 @@ export class TicketsRepository implements TicketUsageReader {
       departamentoId: departmentId ?? undefined,
       estadoId: filters.estadoId,
       areaId: filters.areaId,
+      area: filters.tipoAreaId ? { tipoId: filters.tipoAreaId } : undefined,
       edificioId: filters.edificioId,
       tipoId: filters.tipoId,
       prioridadId: filters.prioridadId,
@@ -360,13 +364,19 @@ export class TicketsRepository implements TicketUsageReader {
     return row && { id: row.id, nombre: row.name, activo: row.activo };
   }
 
+  // Un área no eliminada con su tipo, o `null`.
+  async findArea(id: string): Promise<AreaRow | null> {
+    return this.db.area.findFirst({
+      where: { id, ...notDeleted },
+      select: { id: true, nombre: true, activo: true, tipo: ref },
+    });
+  }
+
   // Un ítem de catálogo no eliminado, o `null`.
   async findCatalogItem(catalog: TicketCatalog, id: string): Promise<ReferenceRow | null> {
     const where = { id, ...notDeleted };
     const select = { id: true, nombre: true, activo: true } as const;
     switch (catalog) {
-      case "area":
-        return this.db.area.findFirst({ where, select });
       case "edificio":
         return this.db.edificio.findFirst({ where, select });
       case "tipoTicket":

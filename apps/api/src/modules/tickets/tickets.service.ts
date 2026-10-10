@@ -38,6 +38,7 @@ function scopeOf(actor: AuthenticatedUser): UserScope {
 }
 
 type Ref = { id: string; nombre: string };
+type AreaRef = Ref & { tipo: Ref };
 
 // "Referencia válida" de un valor nuevo: existe (no eliminado) y está activo.
 function assertUsable(row: ReferenceRow | null, message: string): asserts row is ReferenceRow {
@@ -155,7 +156,7 @@ export class TicketsService {
       current.prioridad,
       MESSAGES.prioridad,
     );
-    const area = await this.resolveOptional("area", input.areaId, current.area, MESSAGES.area);
+    const area = await this.resolveArea(input.areaId, current.area);
     const edificio = await this.resolveOptional(
       "edificio",
       input.edificioId,
@@ -380,6 +381,16 @@ export class TicketsService {
     const row = await this.repository.findCatalogItem(catalog, id);
     assertUsable(row, message);
     return { id: row.id, nombre: row.nombre };
+  }
+
+  // Igual que `resolveReference`, pero el área viaja con su tipo (el ticket la muestra como «Tipo ·
+  // Nombre»).
+  private async resolveArea(id: string | null, current: AreaRef | null): Promise<AreaRef | null> {
+    if (id === null) return null;
+    if (current?.id === id) return current;
+    const row = await this.repository.findArea(id);
+    assertUsable(row, MESSAGES.area);
+    return { id: row.id, nombre: row.nombre, tipo: row.tipo };
   }
 
   private async resolveOptional(
