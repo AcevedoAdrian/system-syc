@@ -5,6 +5,7 @@ import { teardownInfra } from "./verify/lib/infra.mjs";
 // Uso:
 //   pnpm verify                      # todo
 //   pnpm verify --spec 02            # solo un SPEC (el id de `scripts/verify/specs/index.mjs`)
+//   pnpm verify --spec 04,05,06      # varios SPEC, separados por coma
 //   pnpm verify --only 02.7,02.19    # solo algunos criterios (ids "<spec>.<n>", n = posición en el SPEC)
 //   pnpm verify --skip-turbo         # omite `pnpm turbo lint typecheck test build` (el más lento)
 //   pnpm verify --keep-db            # no borra la base temporal al terminar

@@ -3,6 +3,7 @@ import path from "node:path";
 import { adminId, auditRows, same } from "../lib/audit.mjs";
 import {
   admin,
+  createItem,
   departmentNamed,
   loggedIn,
   newDepartment,
@@ -34,15 +35,6 @@ const catalog = async (ruta) => {
   assertStatus(res, 200, `catalogs.${ruta}.list`);
   return res.body;
 };
-
-async function createItem(ruta, extra = {}) {
-  const res = await (await admin()).post(`/catalogs/${ruta}`, {
-    nombre: `${ruta} ${uniq()}`,
-    ...extra,
-  });
-  assertStatus(res, 200, `crear en ${ruta}`);
-  return res.body;
-}
 
 // Los estados de sistema se buscan por `clave`: el nombre puede haberlo cambiado el admin.
 async function estadoDe(clave) {
@@ -854,7 +846,11 @@ export default defineSpec({
         sql(`UPDATE proveedor SET "deletedAt" = now() WHERE id = '${proveedorItem.id}'`);
 
         const detalle = await get(a, t.id);
-        same(detalle.area, { id: area.id, nombre: area.nombre }, "área eliminada en el detalle");
+        same(
+          detalle.area,
+          { id: area.id, nombre: area.nombre, tipo: area.tipo },
+          "área eliminada en el detalle",
+        );
         same(
           detalle.proveedor,
           { id: proveedorItem.id, nombre: proveedorItem.nombre },
@@ -864,7 +860,7 @@ export default defineSpec({
         const update1 = history.body.find((e) => e.action === "update");
         same(
           update1.payload.after.area,
-          { id: area.id, nombre: area.nombre },
+          { id: area.id, nombre: `${area.tipo.nombre} · ${area.nombre}` },
           "área en el historial",
         );
         // Editar sin tocar el área sigue funcionando: el valor que ya tenía se acepta aunque esté eliminado.

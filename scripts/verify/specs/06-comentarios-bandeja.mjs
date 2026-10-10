@@ -1,5 +1,13 @@
 import { adminId, auditRows, same } from "../lib/audit.mjs";
-import { admin, loggedIn, newDepartment, newTicket, newUser, uniq } from "../lib/fixtures.mjs";
+import {
+  admin,
+  createItem,
+  loggedIn,
+  newDepartment,
+  newTicket,
+  newUser,
+  uniq,
+} from "../lib/fixtures.mjs";
 import { scalar } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
@@ -53,12 +61,6 @@ async function estadoLibre(exceptId) {
   const found = res.body.find((e) => e.clave === null && e.activo && e.id !== exceptId);
   assert(found, "no hay un estado sin clave activo");
   return found;
-}
-
-async function createItem(ruta) {
-  const res = await (await admin()).post(`/catalogs/${ruta}`, { nombre: `${ruta} ${uniq()}` });
-  assertStatus(res, 200, `crear en ${ruta}`);
-  return res.body;
 }
 
 // La edición que no cambia nada: reenvía los valores actuales; cada criterio pisa lo que prueba.

@@ -7,7 +7,8 @@ const option = (name) => {
 };
 
 export const OPTIONS = {
-  spec: option("spec") ?? "all",
+  // Uno o varios SPEC separados por coma (`--spec 04,05,06`), o "all".
+  spec: new Set((option("spec") ?? "all").split(",").filter(Boolean)),
   only: new Set((option("only") ?? "").split(",").filter(Boolean)),
   skipTurbo: flag("skip-turbo"),
   keepDb: flag("keep-db"),
