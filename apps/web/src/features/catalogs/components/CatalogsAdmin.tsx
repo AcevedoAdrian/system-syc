@@ -91,6 +91,7 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
       ) : (
         <>
           <CatalogItemFormDialog
+            ruta={ruta}
             open={creating}
             onOpenChange={setCreating}
             title={kind.newLabel}
@@ -102,7 +103,9 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
             onOpenChange={(open) => !open && setEditing(null)}
             title={kind.editLabel}
             submitLabel="Guardar"
+            ruta={ruta}
             initialName={editing?.nombre}
+            initialTipoId={editing?.tipo?.id}
             onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
           />
         </>
