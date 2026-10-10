@@ -1,4 +1,4 @@
-import { formatTicketNumber, type TicketSummary } from "@syc/contracts";
+import { areaLabel, formatTicketNumber, type TicketSummary } from "@syc/contracts";
 import { Link } from "@tanstack/react-router";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,10 @@ const columns = column.columns([
     cell: ({ row }) => <Badge variant="secondary">{row.original.estado.nombre}</Badge>,
   }),
   column.accessor((ticket) => ticket.prioridad.nombre, { id: "prioridad", header: "Prioridad" }),
-  column.accessor((ticket) => ticket.area?.nombre ?? "—", { id: "area", header: "Área" }),
+  column.accessor((ticket) => (ticket.area ? areaLabel(ticket.area) : "—"), {
+    id: "area",
+    header: "Área",
+  }),
   column.accessor("fechaRecepcion", {
     header: "Fecha de recepción",
     cell: ({ row }) => (

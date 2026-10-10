@@ -224,6 +224,7 @@ export function TicketsFilters({
     <search aria-label="Búsqueda y filtros" className="flex flex-wrap items-end gap-3">
       <SearchField filters={filters} onChange={onChange} />
       {catalog("estados", "estadoId", "Estado")}
+      {catalog("tiposArea", "tipoAreaId", "Tipo de área")}
       {catalog("areas", "areaId", "Área")}
       {catalog("edificios", "edificioId", "Edificio")}
       {catalog("tipos", "tipoId", "Tipo")}

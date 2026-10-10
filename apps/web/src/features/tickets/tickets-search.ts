@@ -18,6 +18,7 @@ const day = z.iso.date().optional().catch(undefined);
 export const ticketsSearchSchema = z.object({
   q: text(200),
   estadoId: text(100),
+  tipoAreaId: text(100),
   areaId: text(100),
   edificioId: text(100),
   tipoId: text(100),

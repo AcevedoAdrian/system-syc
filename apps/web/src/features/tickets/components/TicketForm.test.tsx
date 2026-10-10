@@ -94,7 +94,7 @@ describe("TicketForm", () => {
     renderForm({
       titulo: "Impresora rota",
       descripcion: "Piso 2",
-      area: { id: "sist", nombre: "Sistemas" },
+      area: { id: "sist", nombre: "Sistemas", tipo: { id: "dip", nombre: "Diputado" } },
       proveedor: { id: "acme", nombre: "Acme" },
       referenciaExterna: "19092/2026",
       solucionDescripcion: "Se reinició",
@@ -312,7 +312,10 @@ describe("TicketForm", () => {
     });
 
     it("dejar un campo opcional en blanco lo borra (se manda null)", async () => {
-      renderForm({ descripcion: "Piso 2", area: { id: "sist", nombre: "Sistemas" } });
+      renderForm({
+        descripcion: "Piso 2",
+        area: { id: "sist", nombre: "Sistemas", tipo: { id: "dip", nombre: "Diputado" } },
+      });
 
       await userEvent.clear(screen.getByLabelText("Descripción"));
       await userEvent.selectOptions(screen.getByLabelText("Área"), "");
@@ -347,7 +350,9 @@ describe("TicketForm", () => {
 
   describe("valor actual desactivado o eliminado", () => {
     it("lo sigue mostrando, marcado como inactivo, y guardar sin tocarlo no lo borra", async () => {
-      renderForm({ area: { id: "vieja", nombre: "Mantenimiento" } });
+      renderForm({
+        area: { id: "vieja", nombre: "Mantenimiento", tipo: { id: "dip", nombre: "Diputado" } },
+      });
 
       expect(screen.getByLabelText("Área")).toHaveValue("vieja");
       expect(screen.getByRole("option", { name: "Mantenimiento (inactivo)" })).toBeInTheDocument();
