@@ -1,6 +1,8 @@
 import type { AnyContractRouter, InferContractRouterInputs } from "@orpc/contract";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  areaInputSchema,
+  areaLabel,
   catalogItemInputSchema,
   catalogRutas,
   catalogsContract,
@@ -91,6 +93,23 @@ describe("catalogItemInputSchema", () => {
   });
 });
 
+describe("areaInputSchema", () => {
+  it("exige el tipo", () => {
+    expect(areaInputSchema.safeParse({ nombre: "Acosta" }).success).toBe(false);
+    expect(areaInputSchema.safeParse({ nombre: "Acosta", tipoId: "" }).success).toBe(false);
+    expect(areaInputSchema.parse({ nombre: " Acosta ", tipoId: "t1" })).toEqual({
+      nombre: "Acosta",
+      tipoId: "t1",
+    });
+  });
+});
+
+describe("areaLabel", () => {
+  it("formatea «Tipo · Nombre»", () => {
+    expect(areaLabel({ nombre: "Acosta", tipo: { nombre: "Diputado" } })).toBe("Diputado · Acosta");
+  });
+});
+
 describe("catalogsContract", () => {
   it("tiene un contrato por cada ruta, en el orden de las pestañas", () => {
     expect(Object.keys(catalogsContract)).toEqual([...catalogRutas]);
@@ -105,6 +124,7 @@ describe("tipos del contrato", () => {
 
     expectTypeOf<Inputs<typeof catalogsContract.areas.update>>().toEqualTypeOf<{
       nombre: string;
+      tipoId: string;
       itemId: string;
     }>();
     expectTypeOf<Inputs<typeof catalogsContract.proveedores.update>>().toHaveProperty("itemId");

@@ -1,9 +1,10 @@
 import type { CatalogRuta } from "@syc/contracts";
 
 // Clave del cliente Prisma (`db.area`, `db.tipoTicket`, ...). Cada catálogo sigue siendo su propio
-// modelo: este registro solo evita copiar siete veces el mismo ABM.
+// modelo: este registro solo evita copiar ocho veces el mismo ABM.
 export type CatalogModel =
   | "area"
+  | "tipoArea"
   | "edificio"
   | "tipoTicket"
   | "prioridad"
@@ -20,6 +21,20 @@ export interface CatalogRules {
   // Un ítem con `clave` (estado de sistema, D1) nunca se elimina, esté o no en uso. Es el mensaje
   // del 409.
   keyedNotRemovable?: string;
+  // El ítem no se elimina mientras otra tabla lo referencie con filas no eliminadas (SPEC 08: un
+  // tipo de área con áreas). `model` y `field` son la tabla y la FK que apuntan a este catálogo;
+  // `message` es el del 409. Se desactiva en lugar de eliminar.
+  usedBy?: { model: CatalogModel; field: string; message: string };
+}
+
+// Una FK obligatoria a otro catálogo (SPEC 08: Área → Tipo de área). `field` es la columna que el
+// cliente escribe, `as` la relación que se lee y se audita como `{ id, nombre }` (debe figurar en
+// `snapshotFields`). `invalid` es el 400 si el destino no existe o está desactivado.
+export interface CatalogReference {
+  field: string;
+  as: string;
+  model: CatalogModel;
+  invalid: string;
 }
 
 export interface CatalogDefinition {
@@ -28,6 +43,10 @@ export interface CatalogDefinition {
   model: CatalogModel;
   messages: { notFound: string; duplicate: string };
   rules: CatalogRules;
+  // El nombre es único dentro de lo que comparte este campo (SPEC 08: el tipo), no en todo el
+  // catálogo. El índice único parcial de la migración aplica la misma regla.
+  uniqueWithin?: string;
+  reference?: CatalogReference;
   // Campos que el cliente puede escribir en el alta y la edición. Todo lo demás (`orden`,
   // `nombreNormalizado`, `clave`, `createdBy`, `updatedBy`) lo decide el servidor.
   inputFields: readonly string[];
@@ -57,10 +76,34 @@ function simple(
 }
 
 export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
-  areas: simple("areas", "Area", "area", {
-    notFound: "El área no existe",
-    duplicate: "Ya existe un área con ese nombre",
-  }),
+  areas: {
+    ...simple("areas", "Area", "area", {
+      notFound: "El área no existe",
+      duplicate: "Ya existe un área con ese nombre en ese tipo",
+    }),
+    uniqueWithin: "tipoId",
+    reference: {
+      field: "tipoId",
+      as: "tipo",
+      model: "tipoArea",
+      invalid: "El tipo de área no existe o está desactivado",
+    },
+    inputFields: ["nombre", "tipoId"],
+    snapshotFields: [...BASE_FIELDS, "tipo"],
+  },
+  tiposArea: {
+    ...simple("tiposArea", "TipoArea", "tipoArea", {
+      notFound: "El tipo de área no existe",
+      duplicate: "Ya existe un tipo de área con ese nombre",
+    }),
+    rules: {
+      usedBy: {
+        model: "area",
+        field: "tipoId",
+        message: "Lo usa al menos un área: desactivalo en lugar de eliminarlo",
+      },
+    },
+  },
   edificios: simple("edificios", "Edificio", "edificio", {
     notFound: "El edificio no existe",
     duplicate: "Ya existe un edificio con ese nombre",

@@ -14,6 +14,7 @@ params:query {
   ~q: impresora
   ~page: 2
   ~estadoId: {{listedItemId}}
+  ~tipoAreaId:
   ~areaId:
   ~edificioId:
   ~tipoId:
@@ -49,7 +50,7 @@ docs {
   - `q`: texto libre, sin distinguir mayúsculas ni acentos ("tecnico" encuentra "Técnico"). Es
     "contiene" sobre título, descripción, solución y comentarios del ticket (no sobre catálogos, número
     ni historial). Hasta 200 caracteres; en blanco equivale a no buscar.
-  - `estadoId`, `areaId`, `edificioId`, `tipoId`, `prioridadId`, `proveedorId`, `moduloId`: igualdad.
+  - `estadoId`, `tipoAreaId`, `areaId`, `edificioId`, `tipoId`, `prioridadId`, `proveedorId`, `moduloId`: igualdad.
     Un ítem de catálogo inactivo o eliminado se puede filtrar; un id que no existe da una página vacía.
   - `departamentoId`: igualdad, pero solo la aplica el admin. Un agente que lo manda lo ve ignorado:
     su departamento siempre gana.
@@ -59,7 +60,7 @@ docs {
   Orden fijo: fecha de recepción descendente y, si empata, número descendente.
 
   Respuesta 200: { items, total, page, pageSize }. `items` es un arreglo de { id, numero, titulo,
-  departamento, estado, prioridad, area, fechaRecepcion }; `total` cuenta todos los que cumplen los
+  departamento, estado, prioridad, area, fechaRecepcion }; `area` es { id, nombre, tipo: { id, nombre } }; `total` cuenta todos los que cumplen los
   filtros, no solo los de la página. Una página posterior a la última devuelve `items: []`.
   Errores: 400 si `fechaRecepcionDesde` es posterior a `fechaRecepcionHasta`, o `page` no es un
   entero mayor o igual a 1; 401 sin sesión.

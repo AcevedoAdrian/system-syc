@@ -14,6 +14,7 @@ import type {
 import { CatalogsService } from "./catalogs.service";
 
 const areas = CATALOG_DEFINITIONS.areas;
+const tiposArea = CATALOG_DEFINITIONS.tiposArea;
 const edificios = CATALOG_DEFINITIONS.edificios;
 const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
@@ -62,9 +63,30 @@ function buildService(
     table(ruta)
       .filter((r) => !deleted.has(r.id))
       .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
+  // Como la base: la relación `tipo` de un área sale del tipo al que apunta `tipoId`.
+  const withRelation = (def: { ruta: string }, r: CatalogRow): CatalogRow => {
+    const reference = Object.values(CATALOG_DEFINITIONS).find(
+      (d) => d.ruta === def.ruta,
+    )?.reference;
+    if (!reference) return r;
+    const target = Object.values(CATALOG_DEFINITIONS).find((d) => d.model === reference.model);
+    const found = table(target?.ruta ?? "").find((t) => t.id === r[reference.field]);
+    r[reference.as] = found ? { id: found.id, nombre: found.nombre } : null;
+    return r;
+  };
   const find = (ruta: string, id: string) => table(ruta).find((r) => r.id === id) as CatalogRow;
 
   const repository = {
+    // Regla `usedBy`: filas no eliminadas de otro catálogo cuya FK apunta al ítem.
+    countReferencing: async (model: string, field: string, id: string) => {
+      const def = Object.values(CATALOG_DEFINITIONS).find((d) => d.model === model);
+      return live(def?.ruta ?? "").filter((r) => r[field] === id).length;
+    },
+    findReference: async (model: string, id: string) => {
+      const def = Object.values(CATALOG_DEFINITIONS).find((d) => d.model === model);
+      const found = live(def?.ruta ?? "").find((r) => r.id === id);
+      return found ? { id: found.id, nombre: found.nombre, activo: found.activo } : null;
+    },
     findAll: async (def: { ruta: string }) => live(def.ruta).map((r) => ({ ...r })),
     create: async (
       def: { ruta: string },
@@ -73,7 +95,10 @@ function buildService(
       audit: Omit<AuditEntry, "entityId">,
     ) => {
       creates.push(data);
-      const created = { id: `${def.ruta}-${table(def.ruta).length + 1}`, ...data } as CatalogRow;
+      const created = withRelation(def, {
+        id: `${def.ruta}-${table(def.ruta).length + 1}`,
+        ...data,
+      } as CatalogRow);
       table(def.ruta).push(created);
       actors.push(actorId);
       audits.push({ ...audit, entityId: created.id });
@@ -88,7 +113,7 @@ function buildService(
     ) => {
       actors.push(actorId);
       audits.push(audit);
-      return { ...Object.assign(find(def.ruta, id), data) };
+      return { ...withRelation(def, Object.assign(find(def.ruta, id), data)) };
     },
     setActive: async (
       def: { ruta: string },
@@ -134,14 +159,34 @@ const threeAreas = () => ({
   areas: [row("a1", "Sistemas", 1), row("a2", "Redes", 2), row("a3", "Soporte", 3)],
 });
 
+const threeEdificios = () => ({
+  edificios: [row("a1", "Sistemas", 1), row("a2", "Redes", 2), row("a3", "Soporte", 3)],
+});
+
 describe("CatalogsService.list", () => {
   it("devuelve solo id, nombre, orden y activo de un catálogo simple", async () => {
-    const { service } = buildService(threeAreas());
+    const { service } = buildService(threeEdificios());
 
-    expect(await service.list(areas)).toEqual([
+    expect(await service.list(edificios)).toEqual([
       { id: "a1", nombre: "Sistemas", orden: 1, activo: true },
       { id: "a2", nombre: "Redes", orden: 2, activo: true },
       { id: "a3", nombre: "Soporte", orden: 3, activo: true },
+    ]);
+  });
+
+  it("devuelve cada área con su tipo { id, nombre }", async () => {
+    const { service } = buildService({
+      areas: [row("a1", "Acosta", 1, { tipoId: "t1", tipo: { id: "t1", nombre: "Diputado" } })],
+    });
+
+    expect(await service.list(areas)).toEqual([
+      {
+        id: "a1",
+        nombre: "Acosta",
+        orden: 1,
+        activo: true,
+        tipo: { id: "t1", nombre: "Diputado" },
+      },
     ]);
   });
 
@@ -162,15 +207,15 @@ describe("CatalogsService.list", () => {
 
 describe("CatalogsService.create", () => {
   it("crea el ítem activo con orden máximo + 1 y audita el alta", async () => {
-    const { service, audits, actors } = buildService(threeAreas());
+    const { service, audits, actors } = buildService(threeEdificios());
 
-    const created = await service.create(areas, { nombre: "Mesa de ayuda" }, admin);
+    const created = await service.create(edificios, { nombre: "Mesa de ayuda" }, admin);
 
     expect(created).toMatchObject({ nombre: "Mesa de ayuda", orden: 4, activo: true });
     expect(actors).toEqual(["admin-1"]);
     expect(audits).toEqual([
       {
-        entityType: "Area",
+        entityType: "Edificio",
         entityId: created.id,
         action: "create",
         actorId: "admin-1",
@@ -182,13 +227,15 @@ describe("CatalogsService.create", () => {
   it("asigna orden 1 en un catálogo vacío", async () => {
     const { service } = buildService();
 
-    expect(await service.create(areas, { nombre: "Sistemas" }, admin)).toMatchObject({ orden: 1 });
+    expect(await service.create(edificios, { nombre: "Sistemas" }, admin)).toMatchObject({
+      orden: 1,
+    });
   });
 
   it("guarda nombreNormalizado a partir del nombre", async () => {
     const { service, creates } = buildService();
 
-    await service.create(areas, { nombre: "Área  Técnica" }, admin);
+    await service.create(edificios, { nombre: "Área  Técnica" }, admin);
 
     expect(creates[0]).toMatchObject({
       nombre: "Área  Técnica",
@@ -198,40 +245,42 @@ describe("CatalogsService.create", () => {
 
   it("rechaza con 409 un nombre repetido sin importar mayúsculas, acentos ni espacios", async () => {
     const { service } = buildService();
-    await service.create(areas, { nombre: "Área Técnica" }, admin);
+    await service.create(edificios, { nombre: "Área Técnica" }, admin);
 
-    await expect(service.create(areas, { nombre: "area  tecnica" }, admin)).rejects.toMatchObject({
+    await expect(
+      service.create(edificios, { nombre: "area  tecnica" }, admin),
+    ).rejects.toMatchObject({
       code: "CONFLICT",
-      message: "Ya existe un área con ese nombre",
+      message: "Ya existe un edificio con ese nombre",
     });
   });
 
   it("cuenta los ítems inactivos para la unicidad", async () => {
-    const { service } = buildService({ areas: [row("a1", "Sistemas", 1, { activo: false })] });
+    const { service } = buildService({ edificios: [row("a1", "Sistemas", 1, { activo: false })] });
 
-    await expect(service.create(areas, { nombre: "sistemas" }, admin)).rejects.toMatchObject({
+    await expect(service.create(edificios, { nombre: "sistemas" }, admin)).rejects.toMatchObject({
       code: "CONFLICT",
     });
   });
 
   it("permite el mismo nombre en otro catálogo", async () => {
     const { service } = buildService();
-    await service.create(areas, { nombre: "Área Técnica" }, admin);
+    await service.create(edificios, { nombre: "Área Técnica" }, admin);
 
     await expect(
-      service.create(edificios, { nombre: "Área Técnica" }, admin),
+      service.create(CATALOG_DEFINITIONS.tipos, { nombre: "Área Técnica" }, admin),
     ).resolves.toMatchObject({ nombre: "Área Técnica", orden: 1 });
   });
 
   it("permite recrear un nombre después de eliminar el ítem", async () => {
     const { service } = buildService();
-    const first = await service.create(areas, { nombre: "Sistemas" }, admin);
-    await service.remove(areas, first.id, admin);
+    const first = await service.create(edificios, { nombre: "Sistemas" }, admin);
+    await service.remove(edificios, first.id, admin);
 
-    const again = await service.create(areas, { nombre: "Sistemas" }, admin);
+    const again = await service.create(edificios, { nombre: "Sistemas" }, admin);
 
     expect(again.id).not.toBe(first.id);
-    expect(await service.list(areas)).toHaveLength(1);
+    expect(await service.list(edificios)).toHaveLength(1);
   });
 
   it("en Proveedores guarda los campos de contacto y los audita", async () => {
@@ -273,14 +322,14 @@ describe("CatalogsService.create", () => {
 
 describe("CatalogsService.update", () => {
   it("cambia el nombre y audita solo lo que cambió", async () => {
-    const { service, audits } = buildService(threeAreas());
+    const { service, audits } = buildService(threeEdificios());
 
-    const updated = await service.update(areas, "a1", { nombre: "Informática" }, admin);
+    const updated = await service.update(edificios, "a1", { nombre: "Informática" }, admin);
 
     expect(updated).toMatchObject({ id: "a1", nombre: "Informática" });
     expect(audits).toEqual([
       {
-        entityType: "Area",
+        entityType: "Edificio",
         entityId: "a1",
         action: "update",
         actorId: "admin-1",
@@ -290,9 +339,9 @@ describe("CatalogsService.update", () => {
   });
 
   it("sin cambios efectivos responde el ítem y no audita ni escribe", async () => {
-    const { service, audits, actors } = buildService(threeAreas());
+    const { service, audits, actors } = buildService(threeEdificios());
 
-    const result = await service.update(areas, "a1", { nombre: "Sistemas" }, admin);
+    const result = await service.update(edificios, "a1", { nombre: "Sistemas" }, admin);
 
     expect(result).toMatchObject({ id: "a1", nombre: "Sistemas" });
     expect(audits).toEqual([]);
@@ -300,19 +349,23 @@ describe("CatalogsService.update", () => {
   });
 
   it("permite cambiar solo mayúsculas o acentos del propio nombre", async () => {
-    const { service } = buildService({ areas: [row("a1", "Area", 1)] });
+    const { service } = buildService({ edificios: [row("a1", "Area", 1)] });
 
-    await expect(service.update(areas, "a1", { nombre: "Área" }, admin)).resolves.toMatchObject({
-      nombre: "Área",
-    });
+    await expect(service.update(edificios, "a1", { nombre: "Área" }, admin)).resolves.toMatchObject(
+      {
+        nombre: "Área",
+      },
+    );
   });
 
   it("rechaza con 409 el nombre de otro ítem del mismo catálogo", async () => {
-    const { service } = buildService(threeAreas());
+    const { service } = buildService(threeEdificios());
 
-    await expect(service.update(areas, "a1", { nombre: "REDES" }, admin)).rejects.toMatchObject({
-      code: "CONFLICT",
-    });
+    await expect(service.update(edificios, "a1", { nombre: "REDES" }, admin)).rejects.toMatchObject(
+      {
+        code: "CONFLICT",
+      },
+    );
   });
 
   it("reemplaza los campos opcionales de un proveedor: en null borra el dato", async () => {
@@ -479,6 +532,16 @@ describe("CatalogsService.remove", () => {
       }
     });
 
+    it("rige para los 8 catálogos: Tipos de área también pregunta con su ruta", async () => {
+      const { service, countByCatalogItem } = buildService({
+        tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+      });
+
+      await service.remove(tiposArea, "t2", admin);
+
+      expect(countByCatalogItem).toHaveBeenCalledWith("tiposArea", "t2");
+    });
+
     it("un estado de sistema sigue sin poder eliminarse: la regla de la clave va primero", async () => {
       const { service, countByCatalogItem } = buildService(
         {
@@ -504,6 +567,163 @@ describe("CatalogsService.remove", () => {
         message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
       });
     });
+  });
+});
+
+describe("CatalogsService: Áreas con tipo", () => {
+  const diputado = { id: "t1", nombre: "Diputado" };
+  const bloque = { id: "t2", nombre: "Bloque" };
+  const tipos = () => [
+    row("t1", "Diputado", 1),
+    row("t2", "Bloque", 2),
+    row("t3", "Comisión", 3, { activo: false }),
+  ];
+  const acosta = (extra: Partial<CatalogRow> = {}) =>
+    row("a1", "Acosta", 1, { tipoId: "t1", tipo: diputado, ...extra });
+
+  it("el alta guarda el tipo y lo audita como { id, nombre }", async () => {
+    const { service, audits, creates } = buildService({ tiposArea: tipos() });
+
+    const created = await service.create(areas, { nombre: "Acosta", tipoId: "t1" }, admin);
+
+    expect(creates[0]).toMatchObject({ tipoId: "t1" });
+    expect(created).toMatchObject({ nombre: "Acosta", tipo: diputado });
+    expect(audits[0]?.payload).toEqual({
+      after: { nombre: "Acosta", orden: 1, activo: true, tipo: diputado },
+    });
+  });
+
+  it("el mismo nombre en dos tipos convive; en el mismo tipo, 409", async () => {
+    const { service } = buildService({ tiposArea: tipos() });
+    await service.create(areas, { nombre: "Gonzalez", tipoId: "t1" }, admin);
+
+    await expect(
+      service.create(areas, { nombre: "Gonzalez", tipoId: "t2" }, admin),
+    ).resolves.toMatchObject({ tipo: bloque });
+    await expect(
+      service.create(areas, { nombre: "gonzález", tipoId: "t1" }, admin),
+    ).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "Ya existe un área con ese nombre en ese tipo",
+    });
+  });
+
+  it("un tipo inexistente, eliminado o desactivado en el alta: 400", async () => {
+    const { service } = buildService({ tiposArea: tipos() });
+
+    for (const tipoId of ["nada", "t3"]) {
+      await expect(
+        service.create(areas, { nombre: "Acosta", tipoId }, admin),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El tipo de área no existe o está desactivado",
+      });
+    }
+  });
+
+  it("renombrar un área cuyo tipo está desactivado, sin cambiarle el tipo, se permite", async () => {
+    const { service, audits } = buildService({
+      tiposArea: tipos(),
+      areas: [acosta({ tipoId: "t3", tipo: { id: "t3", nombre: "Comisión" } })],
+    });
+
+    await expect(
+      service.update(areas, "a1", { nombre: "Acosta M.", tipoId: "t3" }, admin),
+    ).resolves.toMatchObject({ nombre: "Acosta M." });
+    expect(audits[0]?.payload).toEqual({
+      before: { nombre: "Acosta" },
+      after: { nombre: "Acosta M." },
+    });
+  });
+
+  it("pasar a un tipo desactivado en la edición: 400", async () => {
+    const { service } = buildService({ tiposArea: tipos(), areas: [acosta()] });
+
+    await expect(
+      service.update(areas, "a1", { nombre: "Acosta", tipoId: "t3" }, admin),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("cambiar el tipo deja un update con tipo antes y después", async () => {
+    const { service, audits } = buildService({ tiposArea: tipos(), areas: [acosta()] });
+
+    const updated = await service.update(areas, "a1", { nombre: "Acosta", tipoId: "t2" }, admin);
+
+    expect(updated).toMatchObject({ tipo: bloque });
+    expect(audits).toEqual([
+      {
+        entityType: "Area",
+        entityId: "a1",
+        action: "update",
+        actorId: "admin-1",
+        payload: { before: { tipo: diputado }, after: { tipo: bloque } },
+      },
+    ]);
+  });
+
+  it("la unicidad en la edición se mide en el tipo de destino", async () => {
+    const { service } = buildService({
+      tiposArea: tipos(),
+      areas: [acosta(), row("a2", "Acosta", 2, { tipoId: "t2", tipo: bloque })],
+    });
+
+    await expect(
+      service.update(areas, "a1", { nombre: "Acosta", tipoId: "t2" }, admin),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("CatalogsService.remove: Tipos de área", () => {
+  const unTipoConArea = () => ({
+    tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+    areas: [row("a1", "Acosta", 1, { tipoId: "t1" })],
+  });
+
+  it("un tipo con un área no eliminada: 409 y no se elimina", async () => {
+    const { service, audits } = buildService(unTipoConArea());
+
+    await expect(service.remove(tiposArea, "t1", admin)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: "Lo usa al menos un área: desactivalo en lugar de eliminarlo",
+    });
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1", "t2"]);
+    expect(audits).toEqual([]);
+  });
+
+  it("un tipo sin áreas se elimina", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    await service.remove(tiposArea, "t2", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1"]);
+  });
+
+  it("con su única área eliminada, el tipo se elimina", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    await service.remove(areas, "a1", admin);
+    await service.remove(tiposArea, "t1", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+  });
+
+  it("las áreas de otro tipo no cuentan", async () => {
+    const { service } = buildService({
+      tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
+      areas: [row("a1", "Acosta", 1, { tipoId: "t2" })],
+    });
+
+    await service.remove(tiposArea, "t1", admin);
+
+    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+  });
+
+  it("desactivar un tipo con áreas está permitido", async () => {
+    const { service } = buildService(unTipoConArea());
+
+    const item = await service.setActive(tiposArea, "t1", false, admin);
+
+    expect(item).toMatchObject({ id: "t1", activo: false });
   });
 });
 

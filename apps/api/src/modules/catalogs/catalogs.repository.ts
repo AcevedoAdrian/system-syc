@@ -5,11 +5,12 @@ import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { type AuditEntry, type AuditTransaction, writeAuditEntry } from "../audit/audit.repository";
-import type { CatalogDefinition } from "./catalog-definitions";
+import type { CatalogDefinition, CatalogModel } from "./catalog-definitions";
 
-type CatalogValue = string | number | boolean | null;
+// `{ id, nombre }` es la relación de una referencia (`tipo` de un área).
+type CatalogValue = string | number | boolean | null | { id: string; nombre: string };
 
-// Fila de cualquiera de los 7 catálogos: la base más los campos extra de su definición
+// Fila de cualquiera de los 8 catálogos: la base más los campos extra de su definición
 // (`contacto`, `clave`, ...), que dependen del catálogo.
 export interface CatalogRow {
   id: string;
@@ -18,6 +19,13 @@ export interface CatalogRow {
   orden: number;
   activo: boolean;
   [campo: string]: CatalogValue;
+}
+
+// El destino de una referencia, para validar que exista y esté activo.
+export interface ReferenceRow {
+  id: string;
+  nombre: string;
+  activo: boolean;
 }
 
 // Campos que el service decide escribir (los de `inputFields` más `nombreNormalizado` y `orden`).
@@ -39,15 +47,21 @@ export interface OrdenChange {
 // unifica. Esta interfaz es el único punto donde se afloja el tipado: los datos que entran ya los
 // armó el service a partir de los campos de la definición.
 interface CatalogDelegate {
+  findFirst(args: { where: object; select: object }): Promise<ReferenceRow | null>;
   findMany(args: { where: object; orderBy: object[]; select: object }): Promise<CatalogRow[]>;
   count(args: { where?: object }): Promise<number>;
   create(args: { data: object; select: object }): Promise<CatalogRow>;
   update(args: { where: object; data: object; select: object }): Promise<CatalogRow>;
 }
 
-function selectOf(def: CatalogDefinition): Record<string, true> {
-  const select: Record<string, true> = { id: true, nombreNormalizado: true };
+function selectOf(def: CatalogDefinition): Record<string, unknown> {
+  const select: Record<string, unknown> = { id: true, nombreNormalizado: true };
   for (const field of def.snapshotFields) select[field] = true;
+  // La FK se lee siempre (el service compara contra ella) y la relación sale como `{ id, nombre }`.
+  if (def.reference) {
+    select[def.reference.field] = true;
+    select[def.reference.as] = { select: { id: true, nombre: true } };
+  }
   return select;
 }
 
@@ -77,6 +91,21 @@ export class CatalogsRepository {
 
   private delegate(def: CatalogDefinition, client: AuditTransaction | typeof this.db) {
     return client[def.model] as unknown as CatalogDelegate;
+  }
+
+  // Filas no eliminadas de `model` cuya FK `field` apunta a `id` (regla `usedBy` de la definición).
+  async countReferencing(model: CatalogModel, field: string, id: string): Promise<number> {
+    const delegate = this.db[model] as unknown as CatalogDelegate;
+    return delegate.count({ where: { [field]: id, ...notDeleted } });
+  }
+
+  // El destino no eliminado de una referencia (`null` si no existe), activo o no.
+  async findReference(model: CatalogModel, id: string): Promise<ReferenceRow | null> {
+    const delegate = this.db[model] as unknown as CatalogDelegate;
+    return delegate.findFirst({
+      where: { id, ...notDeleted },
+      select: { id: true, nombre: true, activo: true },
+    });
   }
 
   // No eliminados, activos e inactivos, en el orden de `list`.
@@ -180,6 +209,11 @@ export class CatalogsRepository {
     } catch (error) {
       translate(def, error);
     }
+  }
+
+  // Sin ninguna fila, ni siquiera eliminada (la misma condición que `seedIfEmpty`).
+  async isEmpty(def: CatalogDefinition): Promise<boolean> {
+    return (await this.delegate(def, this.db).count({})) === 0;
   }
 
   // Carga las filas solo si la tabla no tiene ninguna, ni siquiera eliminada: así el seed no recrea

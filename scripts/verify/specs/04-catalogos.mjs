@@ -1,14 +1,15 @@
 import { adminId, auditCount, auditRows, q, same } from "../lib/audit.mjs";
 import { ADMIN, cleanEnv } from "../lib/env.mjs";
-import { admin, loggedIn, newUser, uniq } from "../lib/fixtures.mjs";
+import { admin, loggedIn, newUser, tipoAreaId, uniq } from "../lib/fixtures.mjs";
 import { scalar, sql } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
 import { assert, assertStatus, run, tail } from "../lib/util.mjs";
 
-// Los 7 catálogos: ruta de la API y `entityType` con el que se audita.
+// Los 8 catálogos: ruta de la API y `entityType` con el que se audita.
 const CATALOGOS = [
   { ruta: "areas", entityType: "Area" },
+  { ruta: "tiposArea", entityType: "TipoArea" },
   { ruta: "edificios", entityType: "Edificio" },
   { ruta: "tipos", entityType: "TipoTicket" },
   { ruta: "prioridades", entityType: "Prioridad" },
@@ -21,8 +22,12 @@ const SYSTEM_STATES = ["FINALIZADO", "CERRADO", "CANCELADO", "REABIERTO"];
 
 const path = (ruta, id = "", suffix = "") => `/catalogs/${ruta}${id ? `/${id}` : ""}${suffix}`;
 
+// SPEC 08: un área exige `tipoId`; los demás catálogos solo el nombre.
+const withTipo = async (ruta, body) =>
+  ruta === "areas" && body.tipoId === undefined ? { ...body, tipoId: await tipoAreaId() } : body;
+
 async function create(ruta, nombre) {
-  const res = await (await admin()).post(path(ruta), { nombre });
+  const res = await (await admin()).post(path(ruta), await withTipo(ruta, { nombre }));
   assertStatus(res, 200, `crear "${nombre}" en ${ruta}`);
   return res.body;
 }
@@ -34,7 +39,7 @@ async function list(ruta, client) {
 }
 
 async function patch(ruta, id, body) {
-  return (await admin()).patch(path(ruta, id), body);
+  return (await admin()).patch(path(ruta, id), await withTipo(ruta, body));
 }
 
 async function setActive(ruta, id, activo) {
@@ -63,7 +68,7 @@ export default defineSpec({
   criteria: [
     criterion(
       1,
-      "En cada uno de los 7 catálogos, el admin crea, edita, sube, baja, desactiva, reactiva y elimina un ítem por la API. Cada paso deja un `AuditLog` con el `entityType` del catálogo, el admin como actor y el `payload` de la convención. Subir o bajar deja dos `update` con solo `orden`",
+      "En cada uno de los 8 catálogos, el admin crea, edita, sube, baja, desactiva, reactiva y elimina un ítem por la API. Cada paso deja un `AuditLog` con el `entityType` del catálogo, el admin como actor y el `payload` de la convención. Subir o bajar deja dos `update` con solo `orden`",
       async () => {
         const me = await adminId();
         for (const { ruta, entityType } of CATALOGOS) {
@@ -160,9 +165,12 @@ export default defineSpec({
         const suffix = uniq();
         await create("areas", `Área Técnica ${suffix}`);
 
-        const dup = await a.post(path("areas"), { nombre: `area  tecnica ${suffix}` });
+        const dup = await a.post(path("areas"), {
+          nombre: `area  tecnica ${suffix}`,
+          tipoId: await tipoAreaId(),
+        });
         assertStatus(dup, 409, "nombre repetido con otro formato");
-        assert(dup.body.message === "Ya existe un área con ese nombre", dup.text);
+        assert(dup.body.message === "Ya existe un área con ese nombre en ese tipo", dup.text);
         await create("edificios", `Área Técnica ${suffix}`);
         assertStatus(await a.post(path("areas"), { nombre: "   " }), 400, "nombre en blanco");
       },

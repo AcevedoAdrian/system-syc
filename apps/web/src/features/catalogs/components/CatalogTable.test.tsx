@@ -93,12 +93,32 @@ describe("CatalogTable: proveedores", () => {
   });
 
   it("los catálogos simples solo tienen Nombre y Estado", () => {
-    render(<CatalogTable ruta="areas" items={estados} {...handlers} />);
+    render(<CatalogTable ruta="edificios" items={estados} {...handlers} />);
 
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
       "Nombre",
       "Estado",
       "Acciones",
     ]);
+  });
+});
+
+describe("CatalogTable: áreas", () => {
+  const areas: CatalogEntry[] = [
+    { id: "a1", nombre: "Acosta", orden: 1, activo: true, tipo: { id: "t1", nombre: "Diputado" } },
+    { id: "a2", nombre: "Sin tipo", orden: 2, activo: true },
+  ];
+
+  it("suma la columna Tipo antes del nombre y muestra — si falta", () => {
+    render(<CatalogTable ruta="areas" items={areas} {...handlers} />);
+
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Tipo",
+      "Nombre",
+      "Estado",
+      "Acciones",
+    ]);
+    expect(within(row("Acosta")).getByText("Diputado")).toBeInTheDocument();
+    expect(within(row("Sin tipo")).getByText("—")).toBeInTheDocument();
   });
 });

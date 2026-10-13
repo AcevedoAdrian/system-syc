@@ -22,6 +22,7 @@ function withoutList<T extends { list: unknown }>(catalog: T): Omit<T, "list"> {
 
 const mutationsContract = {
   areas: withoutList(c.areas),
+  tiposArea: withoutList(c.tiposArea),
   edificios: withoutList(c.edificios),
   tipos: withoutList(c.tipos),
   prioridades: withoutList(c.prioridades),
@@ -37,7 +38,7 @@ export class CatalogsController {
   constructor(private readonly service: CatalogsService) {}
 
   // Se implementa el router completo (menos `list`) para que el compilador marque cualquier
-  // procedimiento faltante. El permiso `manage` aplica a los 7 catálogos y a todos sus
+  // procedimiento faltante. El permiso `manage` aplica a los 8 catálogos y a todos sus
   // procedimientos, también `history`.
   @RequirePermission(PERMISSIONS.MANAGE)
   @Implement(mutationsContract)
@@ -45,6 +46,7 @@ export class CatalogsController {
     const d = CATALOG_DEFINITIONS;
     return {
       areas: this.mutations(d.areas, mutationsContract.areas, actor),
+      tiposArea: this.mutations(d.tiposArea, mutationsContract.tiposArea, actor),
       edificios: this.mutations(d.edificios, mutationsContract.edificios, actor),
       tipos: this.mutations(d.tipos, mutationsContract.tipos, actor),
       prioridades: this.mutations(d.prioridades, mutationsContract.prioridades, actor),

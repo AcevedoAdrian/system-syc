@@ -2,19 +2,40 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+type OptionItem = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  orden: number;
+  tipo?: { id: string; nombre: string };
+};
+
 const options = vi.hoisted(() => ({
   // Mientras el catálogo carga, `useQuery` no trae datos y `isPending` es verdadero.
   pending: false,
   data: [
     { id: "a1", nombre: "Sistemas", activo: true, orden: 1 },
     { id: "a2", nombre: "Archivo", activo: true, orden: 2 },
-  ],
+  ] as OptionItem[],
 }));
 vi.mock("@/features/catalogs/hooks/useCatalogOptions", () => ({
   useCatalogOptions: () => ({
     data: options.pending ? undefined : options.data,
     isPending: options.pending,
   }),
+}));
+
+// Los tipos de área, en el orden de la administración (el 3.º está desactivado).
+const tipos = vi.hoisted(() => ({
+  data: [
+    { id: "dip", nombre: "Diputado", activo: true, orden: 1 },
+    { id: "blo", nombre: "Bloque", activo: true, orden: 2 },
+    { id: "com", nombre: "Comisión", activo: false, orden: 3 },
+    { id: "ofi", nombre: "Oficina", activo: true, orden: 4 },
+  ],
+}));
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({
+  useCatalog: () => ({ data: tipos.data }),
 }));
 
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
@@ -29,15 +50,18 @@ beforeAll(() => {
   });
 });
 
+const initialOptions = [...options.data];
+
 afterEach(() => {
   options.pending = false;
+  options.data = [...initialOptions];
 });
 
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
 
 describe("CatalogOptionSelect", () => {
   it("ofrece los ítems activos que le da useCatalogOptions, en su orden", async () => {
-    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+    render(<CatalogOptionSelect id="area" ruta="edificios" value="" onChange={() => undefined} />);
 
     await userEvent.click(screen.getByRole("combobox"));
 
@@ -46,7 +70,7 @@ describe("CatalogOptionSelect", () => {
 
   it("elegir una opción avisa con su id", async () => {
     const onChange = vi.fn();
-    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={onChange} />);
+    render(<CatalogOptionSelect id="area" ruta="edificios" value="" onChange={onChange} />);
 
     await userEvent.click(screen.getByRole("combobox"));
     await userEvent.click(screen.getByRole("option", { name: "Archivo" }));
@@ -55,7 +79,9 @@ describe("CatalogOptionSelect", () => {
   });
 
   it("muestra el valor elegido en el botón", () => {
-    render(<CatalogOptionSelect id="area" ruta="areas" value="a1" onChange={() => undefined} />);
+    render(
+      <CatalogOptionSelect id="area" ruta="edificios" value="a1" onChange={() => undefined} />,
+    );
 
     expect(screen.getByRole("combobox")).toHaveTextContent("Sistemas");
   });
@@ -98,7 +124,7 @@ describe("CatalogOptionSelect", () => {
       render(
         <CatalogOptionSelect
           id="area"
-          ruta="areas"
+          ruta="edificios"
           value="viejo"
           onChange={() => undefined}
           current={{ id: "viejo", nombre: "Mantenimiento" }}
@@ -115,7 +141,7 @@ describe("CatalogOptionSelect", () => {
       render(
         <CatalogOptionSelect
           id="area"
-          ruta="areas"
+          ruta="edificios"
           value="a1"
           onChange={() => undefined}
           current={{ id: "a1", nombre: "Sistemas" }}
@@ -130,7 +156,7 @@ describe("CatalogOptionSelect", () => {
       options.pending = true;
       const props = {
         id: "area",
-        ruta: "areas" as const,
+        ruta: "edificios" as const,
         value: "viejo",
         onChange: () => undefined,
         current: { id: "viejo", nombre: "Mantenimiento" },
@@ -148,7 +174,7 @@ describe("CatalogOptionSelect", () => {
       render(
         <CatalogOptionSelect
           id="area"
-          ruta="areas"
+          ruta="edificios"
           value="a1"
           onChange={() => undefined}
           current={{ id: "a1", nombre: "Sistemas" }}
@@ -200,7 +226,7 @@ describe("CatalogOptionSelect", () => {
   });
 
   it("sin esos atributos el botón no los lleva", () => {
-    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+    render(<CatalogOptionSelect id="area" ruta="edificios" value="" onChange={() => undefined} />);
 
     const combobox = screen.getByRole("combobox");
     expect(combobox).not.toHaveAttribute("aria-invalid");
@@ -209,9 +235,99 @@ describe("CatalogOptionSelect", () => {
 
   it("deshabilitado no se abre", async () => {
     render(
-      <CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} disabled />,
+      <CatalogOptionSelect
+        id="area"
+        ruta="edificios"
+        value=""
+        onChange={() => undefined}
+        disabled
+      />,
     );
 
     expect(screen.getByRole("combobox")).toBeDisabled();
+  });
+});
+
+describe("CatalogOptionSelect: áreas agrupadas por tipo", () => {
+  const diputado = { id: "dip", nombre: "Diputado" };
+  const bloque = { id: "blo", nombre: "Bloque" };
+  const comision = { id: "com", nombre: "Comisión" };
+
+  // El orden de Áreas es uno solo para todo el catálogo: las del mismo tipo no son contiguas.
+  const areasActivas = () => [
+    { id: "a1", nombre: "UCR", activo: true, orden: 1, tipo: bloque },
+    { id: "a2", nombre: "Acosta", activo: true, orden: 2, tipo: diputado },
+    { id: "a3", nombre: "Salud", activo: true, orden: 3, tipo: comision },
+    { id: "a4", nombre: "Benitez", activo: true, orden: 4, tipo: diputado },
+  ];
+
+  it("muestra un título por tipo, en el orden de los tipos, con las áreas en su orden", async () => {
+    options.data = areasActivas();
+    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    const groups = screen.getAllByRole("group").map((g) => g.textContent);
+    expect(groups).toEqual(["DiputadoAcostaBenitez", "BloqueUCR", "ComisiónSalud"]);
+  });
+
+  it("no muestra un grupo sin áreas activas, pero un tipo desactivado conserva sus áreas", async () => {
+    options.data = [{ id: "a3", nombre: "Salud", activo: true, orden: 1, tipo: comision }];
+    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={() => undefined} />);
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(screen.getAllByRole("group").map((g) => g.textContent)).toEqual(["ComisiónSalud"]);
+  });
+
+  it("el valor elegido se ve como «Tipo · Nombre» y elegir avisa con el id", async () => {
+    options.data = areasActivas();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <CatalogOptionSelect id="area" ruta="areas" value="" onChange={onChange} />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+    await userEvent.click(screen.getByRole("option", { name: "Acosta" }));
+    expect(onChange).toHaveBeenCalledWith("a2");
+
+    rerender(<CatalogOptionSelect id="area" ruta="areas" value="a2" onChange={onChange} />);
+    expect(screen.getByRole("combobox")).toHaveTextContent("Diputado · Acosta");
+  });
+
+  it("con `emptyLabel` ofrece «sin valor» antes de los grupos", async () => {
+    options.data = areasActivas();
+    render(
+      <CatalogOptionSelect
+        id="area"
+        ruta="areas"
+        value=""
+        onChange={() => undefined}
+        emptyLabel="Sin asignar"
+      />,
+    );
+
+    // Abierto, Radix oculta el botón del árbol de accesibilidad: se lee antes.
+    expect(screen.getByRole("combobox")).toHaveTextContent("Sin asignar");
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(optionNames()[0]).toBe("Sin asignar");
+  });
+
+  it("un área actual desactivada se sigue mostrando, con su tipo y marcada", async () => {
+    options.data = areasActivas();
+    render(
+      <CatalogOptionSelect
+        id="area"
+        ruta="areas"
+        value="vieja"
+        onChange={() => undefined}
+        current={{ id: "vieja", nombre: "Archivo", tipo: diputado }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveTextContent("Diputado · Archivo (inactivo)");
+    await userEvent.click(screen.getByRole("combobox"));
+    expect(optionNames()).toContain("Diputado · Archivo (inactivo)");
   });
 });

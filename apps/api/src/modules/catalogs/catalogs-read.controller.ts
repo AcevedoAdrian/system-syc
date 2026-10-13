@@ -11,6 +11,7 @@ const c = contract.catalogs;
 // ya exige sesión. El resto de cada catálogo es del admin y vive en `CatalogsController`.
 const listContract = {
   areas: { list: c.areas.list },
+  tiposArea: { list: c.tiposArea.list },
   edificios: { list: c.edificios.list },
   tipos: { list: c.tipos.list },
   prioridades: { list: c.prioridades.list },
@@ -23,13 +24,16 @@ const listContract = {
 export class CatalogsReadController {
   constructor(private readonly service: CatalogsService) {}
 
-  // El service devuelve la unión de los 7 catálogos; el esquema de salida de cada procedimiento es
+  // El service devuelve la unión de los 8 catálogos; el esquema de salida de cada procedimiento es
   // el que describe la forma exacta.
   @Implement(listContract)
   lists() {
     const d = CATALOG_DEFINITIONS;
     return {
       areas: { list: implement(c.areas.list).handler(() => this.service.list(d.areas) as never) },
+      tiposArea: {
+        list: implement(c.tiposArea.list).handler(() => this.service.list(d.tiposArea) as never),
+      },
       edificios: {
         list: implement(c.edificios.list).handler(() => this.service.list(d.edificios) as never),
       },

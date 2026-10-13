@@ -13,6 +13,18 @@ describe("ticketsSearchSchema", () => {
     expect(ticketsSearchSchema.parse(search)).toEqual(search);
   });
 
+  it("conserva el tipo de área de la URL (?tipoAreaId=…) y lo cuenta como filtro activo", () => {
+    const parsed = ticketsSearchSchema.parse({ tipoAreaId: "dip", areaId: "a1" });
+
+    expect(parsed).toMatchObject({ tipoAreaId: "dip", areaId: "a1" });
+    expect(hasActiveFilters(parsed)).toBe(true);
+    expect(withFilter({ ...parsed, page: 3 }, "tipoAreaId", "blo")).toMatchObject({
+      tipoAreaId: "blo",
+      areaId: "a1",
+      page: undefined,
+    });
+  });
+
   it("un número en la búsqueda (el router parsea ?q=123 como número) sigue siendo texto", () => {
     expect(ticketsSearchSchema.parse({ q: 123 }).q).toBe("123");
   });

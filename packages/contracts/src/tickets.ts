@@ -131,6 +131,7 @@ export const listTicketsInputSchema = z
       .transform((v) => v || undefined),
     estadoId: filtroId,
     areaId: filtroId,
+    tipoAreaId: filtroId,
     edificioId: filtroId,
     tipoId: filtroId,
     prioridadId: filtroId,
@@ -153,11 +154,14 @@ export const listTicketsInputSchema = z
 
 const refSchema = z.object({ id: z.string(), nombre: z.string() });
 
+// SPEC 08: el área trae su tipo para mostrarse como «Tipo · Nombre» (`areaLabel`).
+const areaRefSchema = refSchema.extend({ tipo: refSchema });
+
 export const ticketSchema = z.object({
   id: z.string(),
   numero: z.number().int(),
   departamento: refSchema,
-  area: refSchema.nullable(),
+  area: areaRefSchema.nullable(),
   edificio: refSchema.nullable(),
   tipo: refSchema.nullable(),
   modulo: refSchema.nullable(),

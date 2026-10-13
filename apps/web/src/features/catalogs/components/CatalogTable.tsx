@@ -46,6 +46,10 @@ export function CatalogTable({
   const columns = useMemo(
     () =>
       column.columns([
+        // Las áreas se agrupan a la vista por su tipo: la primera columna (SPEC 08).
+        ...(ruta === "areas"
+          ? [column.accessor((item) => item.tipo?.nombre ?? "—", { id: "tipo", header: "Tipo" })]
+          : []),
         // Los estados de sistema (los que tienen `clave`) se marcan, pero la clave no se muestra.
         column.accessor("nombre", {
           header: "Nombre",

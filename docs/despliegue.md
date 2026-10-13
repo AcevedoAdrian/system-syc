@@ -87,7 +87,7 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
 
    Tiene que verse `migrate` en `Exited (0)` y `postgres`, `api`, `web` y `backup` en `running`, con `api` en `healthy`. Si `up` termina con error, mirá "Si algo falla".
 
-4. **Correr el seed y borrar las variables.** Antes, copiá `areas.json` y `agentes.json` a la carpeta `seed-data/` del clon (con `scp`): no están en git porque tienen nombres de personas y de áreas, y sin ellos el seed los saltea y lo avisa (`seed-data/README.md` explica el formato). El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades, las áreas y los edificios iniciales y los agentes. Es idempotente.
+4. **Correr el seed y borrar las variables.** Antes, copiá `areas.json` y `agentes.json` a la carpeta `seed-data/` del clon (con `scp`): no están en git porque tienen nombres de personas y de áreas, y sin ellos el seed los saltea y lo avisa (`seed-data/README.md` explica el formato). El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades, las áreas y los edificios iniciales y los agentes. Es idempotente. En una base que ya tiene áreas (por ejemplo, la que migra a la versión con tipos de área) el seed no carga tipos ni áreas: ver «Deploy regular» para ese caso.
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm api node dist/seed.mjs
@@ -166,6 +166,17 @@ Si `restore.sh` dice que hay conexiones abiertas, la API sigue corriendo: repet�
    ```
 
    Tiene que responder con `"status":"ok"`. Si usás otro puerto, ponelo en la URL. Después entrá a la web con un usuario.
+
+### Deploy que trae los tipos de área (SPEC 08)
+
+Este deploy migra una base que ya tiene áreas, y la migración `tipos_area` las deja **todas en un único tipo, «Otro»**: no deduce el tipo del nombre. Después del paso 4:
+
+1. El seed **no** carga los tipos de `tipos-area.json` ni reclasifica nada, porque `tipo_area` ya tiene «Otro» y `area` ya tiene filas (la regla de «solo si la tabla está vacía»). Correrlo no rompe nada, pero tampoco ayuda.
+2. Entrá como admin a **Administración → Catálogos → Tipos de área** y creá los tipos que hagan falta (Diputado, Bloque, Dirección, Secretaría, Prosecretaría…).
+3. En **Catálogos → Áreas**, editá cada área para elegirle su tipo. Son unas 120 y hoy no hay reclasificación masiva (queda para otro spec). Hasta que lo hagas, todas se ven como «Otro · Nombre» en los tickets y en la bandeja.
+4. Si el nombre quedó con el prefijo (`Dip. Acosta`), podés dejarlo así o renombrarlo a `Acosta` al reclasificar: el tipo ya se muestra aparte.
+
+La base de un entorno nuevo (sin áreas) no pasa por esto: el seed carga los tipos y las áreas con su tipo.
 
 ## Volver atrás
 

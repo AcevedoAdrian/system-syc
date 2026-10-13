@@ -77,6 +77,24 @@ describe("TicketsFilters", () => {
       expect(onChange).toHaveBeenCalledWith({ q: "impresora", estadoId: "prog", page: undefined });
     });
 
+    it("elegir un tipo de área filtra por tipoAreaId y vuelve a la página 1", async () => {
+      data.catalogs.tiposArea = [
+        { id: "dip", nombre: "Diputado", activo: true },
+        { id: "com", nombre: "Comisión", activo: false },
+      ];
+      const { onChange } = renderFilters({ areaId: "sis", page: 4 });
+
+      await userEvent.click(screen.getByRole("combobox", { name: "Tipo de área" }));
+      expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Todos",
+        "Diputado",
+        "Comisión (inactivo)",
+      ]);
+      await userEvent.click(screen.getByRole("option", { name: "Diputado" }));
+
+      expect(onChange).toHaveBeenCalledWith({ areaId: "sis", tipoAreaId: "dip", page: undefined });
+    });
+
     it("elegir «Todos» quita el filtro", async () => {
       const { onChange } = renderFilters({ estadoId: "prog", page: 2 });
 
@@ -107,6 +125,7 @@ describe("TicketsFilters", () => {
       const names = screen.getAllByRole("combobox").map((c) => c.getAttribute("id"));
       expect(names).toEqual([
         "filtro-estadoId",
+        "filtro-tipoAreaId",
         "filtro-areaId",
         "filtro-edificioId",
         "filtro-tipoId",

@@ -66,6 +66,31 @@ export async function loggedIn(user) {
   return client;
 }
 
+let tipoAreaCache = null;
+
+// Id de un tipo de área propio de la corrida (SPEC 08: toda área exige `tipoId`). Se crea la primera
+// vez y se reutiliza; nunca se elimina, así las áreas de los fixtures siempre lo tienen vivo.
+export async function tipoAreaId() {
+  if (!tipoAreaCache) {
+    const res = await (await admin()).post("/catalogs/tiposArea", {
+      nombre: `Tipo verify ${uniq()}`,
+    });
+    assertStatus(res, 200, "crear el tipo de área de los fixtures");
+    tipoAreaCache = res.body.id;
+  }
+  return tipoAreaCache;
+}
+
+// Crea un ítem de catálogo con nombre único; `extra` pisa o suma campos. Un área sin `tipoId` recibe
+// el tipo de los fixtures.
+export async function createItem(ruta, extra = {}) {
+  const body = { nombre: `${ruta} ${uniq()}`, ...extra };
+  if (ruta === "areas" && body.tipoId === undefined) body.tipoId = await tipoAreaId();
+  const res = await (await admin()).post(`/catalogs/${ruta}`, body);
+  assertStatus(res, 200, `crear en ${ruta}`);
+  return res.body;
+}
+
 let prioridadId = null;
 
 // Id de una prioridad activa del seed (la misma para todos los fixtures de tickets).

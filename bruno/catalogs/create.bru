@@ -12,7 +12,8 @@ post {
 
 body:json {
   {
-    "nombre": "Ítem de prueba"
+    "nombre": "Ítem de prueba",
+    "tipoId": "{{areaTipoId}}"
   }
 }
 
@@ -22,7 +23,11 @@ assert {
 }
 
 script:post-response {
-  if (res.status === 200) bru.setVar("catalogItemId", res.body.id);
+  if (res.status === 200) {
+    bru.setVar("catalogItemId", res.body.id);
+    // Un tipo de área recién creado es el que usan las altas de áreas (`tipoId`).
+    if (bru.getEnvVar("catalog") === "tiposArea") bru.setVar("areaTipoId", res.body.id);
+  }
 }
 
 settings {
@@ -37,8 +42,10 @@ docs {
   Método: POST
   Ruta: /catalogs/{catálogo}
   Cuerpo: nombre (1 a 120 caracteres). Proveedores suma contacto, telefono, correo y sitioWeb,
-  todos opcionales; en blanco se guardan como null.
+  todos opcionales; en blanco se guardan como null. Áreas suma `tipoId` (obligatorio): el id de un
+  tipo de área activo; los demás catálogos ignoran ese campo.
 
   El ítem nace activo y al final del orden. Guarda el id en `catalogItemId`.
-  Errores: 400 validación; 403 si no es admin; 409 si el nombre ya existe en ese catálogo.
+  Errores: 400 validación (en áreas, también un `tipoId` que no existe o está desactivado); 403 si no es admin;
+  409 si el nombre ya existe en ese catálogo (en áreas, dentro del mismo tipo).
 }

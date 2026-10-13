@@ -16,7 +16,7 @@ import {
   type SeedEntry,
 } from "./catalogs.repository";
 
-// Lo que devuelve cualquiera de los 7 catálogos; cada controller lo ajusta a su esquema de salida.
+// Lo que devuelve cualquiera de los 8 catálogos; cada controller lo ajusta a su esquema de salida.
 export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket;
 
 // Entrada de alta y edición: el service solo lee los campos de `def.inputFields`, así que un campo
@@ -58,14 +58,16 @@ export class CatalogsService {
     actor: AuthenticatedUser,
   ): Promise<CatalogItemView> {
     const all = await this.repository.findAll(def);
-    this.assertNameIsFree(def, all, input.nombre);
+    const fields = this.writableFields(def, input);
+    const relation = await this.resolveReference(def, fields);
+    this.assertNameIsFree(def, all, input.nombre, fields);
     const orden = all.reduce((max, row) => Math.max(max, row.orden), 0) + 1;
-    const data = { ...this.writableFields(def, input), orden, activo: true };
+    const data = { ...fields, orden, activo: true };
     const created = await this.repository.create(def, data, actor.id, {
       entityType: def.entityType,
       action: "create",
       actorId: actor.id,
-      payload: { after: snapshotOf(def, data) },
+      payload: { after: snapshotOf(def, { ...data, ...relation }) },
     });
     return toItem(def, created);
   }
@@ -80,9 +82,10 @@ export class CatalogsService {
   ): Promise<CatalogItemView> {
     const all = await this.repository.findAll(def);
     const current = this.requireIn(def, all, itemId);
-    this.assertNameIsFree(def, all, input.nombre, itemId);
     const data = this.writableFields(def, input);
-    const audit = this.updateEntry(def, current, { ...current, ...data }, actor);
+    const relation = await this.resolveReference(def, data, current);
+    this.assertNameIsFree(def, all, input.nombre, data, itemId);
+    const audit = this.updateEntry(def, current, { ...current, ...data, ...relation }, actor);
     if (!audit) return toItem(def, current);
     return toItem(def, await this.repository.update(def, itemId, data, actor.id, audit));
   }
@@ -143,6 +146,13 @@ export class CatalogsService {
     if (def.rules.lastActive && this.isLastActive(all, current)) {
       throw new ORPCError("CONFLICT", { message: def.rules.lastActive.remove });
     }
+    const usedBy = def.rules.usedBy;
+    if (
+      usedBy &&
+      (await this.repository.countReferencing(usedBy.model, usedBy.field, itemId)) > 0
+    ) {
+      throw new ORPCError("CONFLICT", { message: usedBy.message });
+    }
     if ((await this.tickets.countByCatalogItem(def.ruta, itemId)) > 0) {
       throw new ORPCError("CONFLICT", {
         message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
@@ -157,12 +167,17 @@ export class CatalogsService {
     });
   }
 
+  // Lo usa el seed para validar antes de cargar; `seedIfEmpty` vuelve a comprobarlo en su transacción.
+  async isEmpty(def: CatalogDefinition): Promise<boolean> {
+    return this.repository.isEmpty(def);
+  }
+
   // Carga `items` con `orden` 1..N solo si la tabla del catálogo está vacía (Feature 4.5). Lo que
   // crea queda como `create` con `actorId: null` (null = sistema); `adminId` es solo el
   // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.
   async seedIfEmpty(
     def: CatalogDefinition,
-    items: readonly { nombre: string; clave?: string }[],
+    items: readonly { nombre: string; clave?: string; tipo?: { id: string; nombre: string } }[],
     adminId: string,
   ): Promise<number> {
     const entries: SeedEntry[] = items.map((item, index) => {
@@ -173,13 +188,20 @@ export class CatalogsService {
         activo: true,
       };
       if (item.clave) data.clave = item.clave;
+      const reference = def.reference;
+      if (reference && item.tipo) data[reference.field] = item.tipo.id;
       return {
         data,
         audit: {
           entityType: def.entityType,
           action: "create",
           actorId: null,
-          payload: { after: snapshotOf(def, data) },
+          payload: {
+            after: snapshotOf(
+              def,
+              reference && item.tipo ? { ...data, [reference.as]: item.tipo } : data,
+            ),
+          },
         },
       };
     });
@@ -191,6 +213,28 @@ export class CatalogsService {
     const data: CatalogWrite = { nombreNormalizado: normalizeName(input.nombre) };
     for (const field of def.inputFields) data[field] = input[field] ?? null;
     return data;
+  }
+
+  // Valida la referencia de la definición (SPEC 08, Feature 8.2) y devuelve la relación `{ id,
+  // nombre }` para la foto auditable. El destino tiene que existir y estar activo, salvo que sea el
+  // que el ítem ya tenía: así se puede renombrar un área de un tipo desactivado (misma "referencia
+  // válida" que SPEC 05). Sin referencia en la definición no hace nada.
+  private async resolveReference(
+    def: CatalogDefinition,
+    data: CatalogWrite,
+    current?: CatalogRow,
+  ): Promise<Record<string, { id: string; nombre: string }>> {
+    const reference = def.reference;
+    if (!reference) return {};
+    const id = data[reference.field];
+    const kept = current?.[reference.as];
+    if (typeof id === "string" && kept && typeof kept === "object" && kept.id === id) {
+      return { [reference.as]: kept };
+    }
+    const target =
+      typeof id === "string" ? await this.repository.findReference(reference.model, id) : null;
+    if (!target?.activo) throw new ORPCError("BAD_REQUEST", { message: reference.invalid });
+    return { [reference.as]: { id: target.id, nombre: target.nombre } };
   }
 
   // `null` cuando la foto auditable no cambió: no hay nada que escribir ni auditar.
@@ -222,15 +266,24 @@ export class CatalogsService {
     return current.activo && all.filter((row) => row.activo).length === 1;
   }
 
-  // Cuentan activos e inactivos; los eliminados no están en `all` y liberan el nombre (Q14).
+  // Cuentan activos e inactivos; los eliminados no están en `all` y liberan el nombre (Q14). Con
+  // `uniqueWithin` solo compite con los del mismo valor de ese campo (el tipo).
   private assertNameIsFree(
     def: CatalogDefinition,
     all: CatalogRow[],
     nombre: string,
+    data: CatalogWrite,
     exceptId?: string,
   ): void {
     const key = normalizeName(nombre);
-    if (all.some((row) => row.id !== exceptId && row.nombreNormalizado === key)) {
+    const scope = def.uniqueWithin;
+    const taken = all.some(
+      (row) =>
+        row.id !== exceptId &&
+        row.nombreNormalizado === key &&
+        (!scope || row[scope] === data[scope]),
+    );
+    if (taken) {
       throw new ORPCError("CONFLICT", { message: def.messages.duplicate });
     }
   }

@@ -39,6 +39,7 @@ Entrá como `a1`.
 | 1.11 | En TA, buscar «Cambiar departamento» | No se ve. | | |
 | 1.12 | Mirar la barra lateral | No hay «Administración» (ni Departamentos, Catálogos o Usuarios). | | |
 | 1.13 | Escribir en la barra `/admin/usuarios` (y probar `/admin/departamentos` y `/admin/catalogos`) | Vuelve a `/tickets`; no se ve ninguna pantalla de administración. | | |
+| 1.14 | En `/tickets`, abrir el filtro «Tipo de área» y, en TA, abrir el selector «Área» | El filtro ofrece los tipos de área y el selector agrupa las áreas bajo el título de su tipo. No hay forma de crear o editar tipos de área desde ahí. | | |
 
 ## 2. Agente `a1`, ticket de otro departamento (TB)
 
@@ -68,6 +69,9 @@ Salí de `a1` y entrá como admin.
 | 3.7 | En el comentario de TA, «Eliminar» | El comentario desaparece. | | |
 | 3.8 | Crear un ticket de prueba y «Eliminar» | El ticket desaparece de la lista. | | |
 | 3.9 | Mirar la barra lateral | Se ve «Administración» con Departamentos, Catálogos y Usuarios, y las tres pantallas abren. | | |
+| 3.10 | En Catálogos → «Tipos de área», crear un tipo, renombrarlo, desactivarlo, reactivarlo y eliminarlo | Las cinco acciones funcionan (un tipo sin áreas se elimina). | | |
+| 3.11 | En Catálogos → «Áreas», crear un área sin elegir tipo | No se envía: pide elegir un tipo. Con tipo, se crea y la tabla muestra la columna Tipo. | | |
+| 3.12 | Intentar eliminar un tipo de área que tiene al menos un área | Se rechaza: «Lo usa al menos un área: desactivalo en lugar de eliminarlo». Desactivarlo sí funciona. | | |
 
 ## 4. Después de cambiar de departamento
 

@@ -5,7 +5,9 @@ import { dim, fail, green, red, tail, yellow } from "./util.mjs";
 
 function selected(criterion) {
   if (OPTIONS.only.size > 0) return OPTIONS.only.has(criterion.id);
-  return OPTIONS.spec === "all" || criterion.id.startsWith(`${OPTIONS.spec}.`);
+  return (
+    OPTIONS.spec.has("all") || [...OPTIONS.spec].some((id) => criterion.id.startsWith(`${id}.`))
+  );
 }
 
 // Ejecuta los criterios de los SPEC dados y devuelve el código de salida del proceso.

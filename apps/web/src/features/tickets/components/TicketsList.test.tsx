@@ -298,7 +298,14 @@ describe("TicketsList", () => {
     });
 
     it("muestra los datos del ticket, su área y la fecha como dd/mm/aaaa", () => {
-      ready(page([ticket(13, { area: { id: "a1", nombre: "Sistemas" } }), ticket(14)]));
+      ready(
+        page([
+          ticket(13, {
+            area: { id: "a1", nombre: "Sistemas", tipo: { id: "t1", nombre: "Diputado" } },
+          }),
+          ticket(14),
+        ]),
+      );
       renderList();
 
       const row = screen.getByTestId("ticket-row-13");
@@ -306,7 +313,7 @@ describe("TicketsList", () => {
       expect(within(row).getByText("Técnico")).toBeInTheDocument();
       expect(within(row).getByText("Pendiente")).toBeInTheDocument();
       expect(within(row).getByText("Alta")).toBeInTheDocument();
-      expect(within(row).getByText("Sistemas")).toBeInTheDocument();
+      expect(within(row).getByText("Diputado · Sistemas")).toBeInTheDocument();
       expect(within(row).getByText("01/10/2026")).toBeInTheDocument();
       expect(within(screen.getByTestId("ticket-row-14")).getByText("—")).toBeInTheDocument();
     });

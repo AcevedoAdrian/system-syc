@@ -11,6 +11,7 @@ import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
 import type { AuditService } from "../audit/audit.service";
 import type {
+  AreaRow,
   EstadoRow,
   ReferenceMatch,
   ReferenceRow,
@@ -54,6 +55,13 @@ const input = (extra: Partial<CreateTicketInput> = {}): CreateTicketInput => ({
 });
 
 const ref = (id: string, nombre: string, activo = true): ReferenceRow => ({ id, nombre, activo });
+const diputado = { id: "dip", nombre: "Diputado" };
+const area = (id: string, nombre: string, activo = true): AreaRow => ({
+  id,
+  nombre,
+  activo,
+  tipo: diputado,
+});
 const estado = (id: string, nombre: string, activo = true): EstadoRow => ({
   id,
   nombre,
@@ -114,6 +122,7 @@ const edit = (t: TicketRow, extra: Partial<UpdateTicketInput> = {}): UpdateTicke
 interface World {
   departamentos?: ReferenceRow[];
   catalogos?: Partial<Record<TicketCatalog, ReferenceRow[]>>;
+  areas?: AreaRow[];
   estados?: EstadoRow[];
   tickets?: TicketRow[];
   referencias?: (ReferenceMatch & { proveedorId: string; referenciaExterna: string })[];
@@ -124,8 +133,8 @@ interface World {
 // transacción (acá se arma con el callback `auditOf`, igual que en producción).
 function buildService(world: World = {}) {
   const departamentos = world.departamentos ?? [ref("tec", "Técnico"), ref("red", "Redes")];
+  const areas = world.areas ?? [];
   const catalogos: Record<TicketCatalog, ReferenceRow[]> = {
-    area: [],
     edificio: [],
     tipoTicket: [],
     prioridad: [ref("alta", "Alta"), ref("baja", "Baja", false)],
@@ -163,6 +172,7 @@ function buildService(world: World = {}) {
 
   const repository = {
     findDepartment: async (id: string) => departamentos.find((d) => d.id === id) ?? null,
+    findArea: async (id: string) => areas.find((a) => a.id === id) ?? null,
     findCatalogItem: async (catalog: TicketCatalog, id: string) =>
       catalogos[catalog].find((item) => item.id === id) ?? null,
     findEstados: async () => estados,
@@ -239,6 +249,10 @@ function buildService(world: World = {}) {
       updates.push({ id, expectedUpdatedAt, data, actorId });
       audits.push(audit);
       const current = tickets.find((t) => t.id === id) as TicketRow;
+      const areaDe = (areaId: string | null) => {
+        const found = areas.find((a) => a.id === areaId);
+        return found ? { id: found.id, nombre: found.nombre, tipo: found.tipo } : null;
+      };
       const refOf = (items: ReferenceRow[], refId: string | null) => {
         const found = refId ? items.find((i) => i.id === refId) : null;
         return found ? { id: found.id, nombre: found.nombre } : null;
@@ -247,7 +261,7 @@ function buildService(world: World = {}) {
         ...current,
         ...data,
         prioridad: refOf(catalogos.prioridad, data.prioridadId) ?? current.prioridad,
-        area: refOf(catalogos.area, data.areaId),
+        area: areaDe(data.areaId),
         edificio: refOf(catalogos.edificio, data.edificioId),
         tipo: refOf(catalogos.tipoTicket, data.tipoId),
         modulo: refOf(catalogos.modulo, data.moduloId),
@@ -608,15 +622,15 @@ describe("TicketsService.update", () => {
   });
 
   describe("área, edificio, tipo y módulo", () => {
+    const areas = [area("sist", "Sistemas"), area("arch", "Archivo", false)];
     const catalogos = {
-      area: [ref("sist", "Sistemas"), ref("arch", "Archivo", false)],
       edificio: [ref("ed1", "Edificio 1")],
       tipoTicket: [ref("inc", "Incidente")],
       modulo: [ref("mesa", "Mesa de entradas")],
     };
 
     it("se completan después del alta, con su nombre en la auditoría", async () => {
-      const { service, updates, audits } = buildService({ tickets: [ticket], catalogos });
+      const { service, updates, audits } = buildService({ tickets: [ticket], catalogos, areas });
 
       await service.update(
         edit(ticket, { areaId: "sist", edificioId: "ed1", tipoId: "inc", moduloId: "mesa" }),
@@ -632,7 +646,7 @@ describe("TicketsService.update", () => {
       expect(audits[0]?.payload).toEqual({
         before: { area: null, edificio: null, tipo: null, modulo: null },
         after: {
-          area: { id: "sist", nombre: "Sistemas" },
+          area: { id: "sist", nombre: "Diputado · Sistemas" },
           edificio: { id: "ed1", nombre: "Edificio 1" },
           tipo: { id: "inc", nombre: "Incidente" },
           modulo: { id: "mesa", nombre: "Mesa de entradas" },
@@ -640,15 +654,32 @@ describe("TicketsService.update", () => {
       });
     });
 
+    it("cambiar de área deja «Tipo · Nombre» antes y después en el historial", async () => {
+      const bloque = { id: "blo", nombre: "Bloque" };
+      const conArea = unTicket({ area: { id: "sist", nombre: "Sistemas", tipo: diputado } });
+      const { service, audits } = buildService({
+        tickets: [conArea],
+        areas: [area("sist", "Sistemas"), { ...area("uce", "UCR"), tipo: bloque }],
+      });
+
+      const updated = await service.update(edit(conArea, { areaId: "uce" }), admin);
+
+      expect(updated.area).toEqual({ id: "uce", nombre: "UCR", tipo: bloque });
+      expect(audits[0]?.payload).toEqual({
+        before: { area: { id: "sist", nombre: "Diputado · Sistemas" } },
+        after: { area: { id: "uce", nombre: "Bloque · UCR" } },
+      });
+    });
+
     it("null borra el valor y el historial conserva el anterior", async () => {
-      const conArea = unTicket({ area: { id: "sist", nombre: "Sistemas" } });
-      const { service, updates, audits } = buildService({ tickets: [conArea], catalogos });
+      const conArea = unTicket({ area: { id: "sist", nombre: "Sistemas", tipo: diputado } });
+      const { service, updates, audits } = buildService({ tickets: [conArea], catalogos, areas });
 
       await service.update(edit(conArea, { areaId: null }), admin);
 
       expect(updates[0]?.data.areaId).toBeNull();
       expect(audits[0]?.payload).toEqual({
-        before: { area: { id: "sist", nombre: "Sistemas" } },
+        before: { area: { id: "sist", nombre: "Diputado · Sistemas" } },
         after: { area: null },
       });
     });
@@ -657,7 +688,7 @@ describe("TicketsService.update", () => {
       ["desactivada", "arch"],
       ["inexistente o eliminada", "nada"],
     ])("un área nueva %s: 400 y no guarda", async (_caso, areaId) => {
-      const { service, updates } = buildService({ tickets: [ticket], catalogos });
+      const { service, updates } = buildService({ tickets: [ticket], catalogos, areas });
 
       await expect(service.update(edit(ticket, { areaId }), admin)).rejects.toMatchObject({
         code: "BAD_REQUEST",
@@ -668,12 +699,13 @@ describe("TicketsService.update", () => {
     });
 
     it("un área que ya tenía se acepta aunque hoy esté desactivada o eliminada", async () => {
-      const conArea = unTicket({ area: { id: "arch", nombre: "Archivo" } });
-      const { service, updates } = buildService({ tickets: [conArea], catalogos });
-      const eliminada = unTicket({ area: { id: "borrada", nombre: "Vieja" } });
+      const conArea = unTicket({ area: { id: "arch", nombre: "Archivo", tipo: diputado } });
+      const { service, updates } = buildService({ tickets: [conArea], catalogos, areas });
+      const eliminada = unTicket({ area: { id: "borrada", nombre: "Vieja", tipo: diputado } });
       const { service: otro, updates: otrosUpdates } = buildService({
         tickets: [eliminada],
         catalogos,
+        areas,
       });
 
       await service.update(edit(conArea, { titulo: "Otro título" }), admin);
@@ -1547,7 +1579,12 @@ describe("TicketsService.list", () => {
 
   it("pasa los filtros y la búsqueda tal cual al repository", async () => {
     const { service, pageCalls } = buildService();
-    const pedido = filters({ q: "tecnico", estadoId: "pend", fechaRecepcionDesde: "2026-10-01" });
+    const pedido = filters({
+      q: "tecnico",
+      estadoId: "pend",
+      tipoAreaId: "dip",
+      fechaRecepcionDesde: "2026-10-01",
+    });
 
     await service.list(admin, pedido);
 

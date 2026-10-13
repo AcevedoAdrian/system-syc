@@ -3,7 +3,7 @@ import type { CatalogRuta } from "@syc/contracts";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Cliente oRPC en memoria: una lista por catálogo y los mismos procedimientos que el contrato.
 const fake = vi.hoisted(() => {
@@ -16,12 +16,19 @@ const fake = vi.hoisted(() => {
     nextId: 1,
     createError: null as Error | null,
     updates: [] as Record<string, unknown>[],
+    creates: [] as Record<string, unknown>[],
   };
   const table = (ruta: string) => {
     if (!state.tables.has(ruta)) state.tables.set(ruta, []);
     return state.tables.get(ruta) as Item[];
   };
   const sorted = (ruta: string) => [...table(ruta)].sort((a, b) => a.orden - b.orden);
+  // Como la API: un área sale con su tipo `{ id, nombre }` según `tipoId`.
+  const withTipo = (item: Item, tipoId: unknown): Item => {
+    const tipo = table("tiposArea").find((t) => t.id === tipoId);
+    if (tipo) item.tipo = { id: tipo.id, nombre: tipo.nombre };
+    return item;
+  };
   const procedure = <TInput, TOutput>(fn: (input: TInput) => TOutput) => ({
     mutationOptions: (options: object = {}) => ({
       mutationFn: async (input: TInput) => fn(input),
@@ -36,19 +43,22 @@ const fake = vi.hoisted(() => {
         queryFn: async () => structuredClone(sorted(ruta)),
       }),
     },
-    create: procedure(({ nombre }: { nombre: string }) => {
+    create: procedure(({ nombre, tipoId }: { nombre: string; tipoId?: string }) => {
       if (state.createError) throw state.createError;
+      state.creates.push({ nombre, ...(tipoId === undefined ? {} : { tipoId }) });
       const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
-      const item = { id: `i${state.nextId++}`, nombre, orden, activo: true };
+      const item = withTipo({ id: `i${state.nextId++}`, nombre, orden, activo: true }, tipoId);
       table(ruta).push(item);
       return item;
     }),
-    update: procedure(({ itemId, ...fields }: { itemId: string; nombre: string }) => {
-      state.updates.push({ itemId, ...fields });
-      const item = table(ruta).find((i) => i.id === itemId) as Item;
-      Object.assign(item, fields);
-      return item;
-    }),
+    update: procedure(
+      ({ itemId, ...fields }: { itemId: string; nombre: string; tipoId?: string }) => {
+        state.updates.push({ itemId, ...fields });
+        const item = table(ruta).find((i) => i.id === itemId) as Item;
+        Object.assign(item, fields);
+        return withTipo(item, fields.tipoId);
+      },
+    ),
     move: procedure(({ itemId, direccion }: { itemId: string; direccion: string }) => {
       const list = sorted(ruta);
       const index = list.findIndex((i) => i.id === itemId);
@@ -78,6 +88,16 @@ vi.mock("@/lib/orpc-client", () => ({
 
 import { CatalogsAdmin } from "./CatalogsAdmin";
 
+// jsdom no implementa lo que Radix Select pide para abrirse.
+beforeAll(() => {
+  Object.assign(window.HTMLElement.prototype, {
+    hasPointerCapture: () => false,
+    setPointerCapture: () => undefined,
+    releasePointerCapture: () => undefined,
+    scrollIntoView: () => undefined,
+  });
+});
+
 function renderAdmin(ruta: CatalogRuta = "areas") {
   const onRutaChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -101,20 +121,31 @@ describe("CatalogsAdmin", () => {
     fake.state.nextId = 1;
     fake.state.createError = null;
     fake.state.updates = [];
+    fake.state.creates = [];
+    const diputado = { id: "t1", nombre: "Diputado" };
+    fake
+      .table("tiposArea")
+      .push(
+        { ...diputado, orden: 1, activo: true },
+        { id: "t2", nombre: "Bloque", orden: 2, activo: true },
+        { id: "t3", nombre: "Comisión", orden: 3, activo: false },
+      );
     fake
       .table("areas")
       .push(
-        { id: "a1", nombre: "Sistemas", orden: 1, activo: true },
-        { id: "a2", nombre: "Redes", orden: 2, activo: true },
+        { id: "a1", nombre: "Sistemas", orden: 1, activo: true, tipo: diputado },
+        { id: "a2", nombre: "Redes", orden: 2, activo: true, tipo: diputado },
       );
+    fake.table("edificios").push({ id: "e1", nombre: "Sistemas", orden: 1, activo: true });
   });
 
-  it("muestra las 7 pestañas en orden y avisa al cambiar de pestaña", async () => {
+  it("muestra las 8 pestañas en orden y avisa al cambiar de pestaña", async () => {
     const { onRutaChange } = renderAdmin();
 
     const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
     expect(tabs).toEqual([
       "Áreas",
+      "Tipos de área",
       "Edificios",
       "Tipos",
       "Prioridades",
@@ -124,9 +155,9 @@ describe("CatalogsAdmin", () => {
     ]);
     expect(await screen.findByRole("heading", { name: "Áreas" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: "Edificios" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Tipos de área" }));
 
-    expect(onRutaChange).toHaveBeenCalledWith("edificios");
+    expect(onRutaChange).toHaveBeenCalledWith("tiposArea");
   });
 
   it("deshabilita Subir en la primera fila y Bajar en la última", async () => {
@@ -138,73 +169,149 @@ describe("CatalogsAdmin", () => {
     expect(within(row("Redes")).getByRole("button", { name: /^Bajar/ })).toBeDisabled();
   });
 
-  it("crea, edita, mueve, desactiva, reactiva y elimina un ítem", async () => {
+  it("en Tipos de área crea, edita, mueve, desactiva, reactiva y elimina", async () => {
+    renderAdmin("tiposArea");
+    await screen.findByText("Diputado");
+
+    // Crear
+    await userEvent.click(screen.getByRole("button", { name: "Nuevo tipo de área" }));
+    await userEvent.type(screen.getByLabelText("Nombre"), "Oficina");
+    await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+    await waitFor(() => expect(rowNames()).toEqual(["Diputado", "Bloque", "Comisión", "Oficina"]));
+
+    // Editar
+    await userEvent.click(within(row("Oficina")).getByRole("button", { name: "Editar" }));
+    const input = screen.getByLabelText("Nombre");
+    expect(input).toHaveValue("Oficina");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Despacho");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(rowNames()).toEqual(["Diputado", "Bloque", "Comisión", "Despacho"]));
+
+    // Mover
+    await userEvent.click(within(row("Despacho")).getByRole("button", { name: /^Subir/ }));
+    await waitFor(() => expect(rowNames()).toEqual(["Diputado", "Bloque", "Despacho", "Comisión"]));
+    await userEvent.click(within(row("Diputado")).getByRole("button", { name: /^Bajar/ }));
+    await waitFor(() => expect(rowNames()).toEqual(["Bloque", "Diputado", "Despacho", "Comisión"]));
+
+    // Desactivar y reactivar
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Desactivar" }));
+    expect(await within(row("Bloque")).findByText("Desactivado")).toBeInTheDocument();
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Reactivar" }));
+    expect(await within(row("Bloque")).findByText("Activo")).toBeInTheDocument();
+
+    // Eliminar, con confirmación
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Eliminar" }));
+    const confirm = await screen.findByRole("alertdialog");
+    expect(confirm).toHaveTextContent(
+      "Se eliminará «Bloque». No se puede deshacer desde la pantalla; si solo querés ocultarlo, desactivalo.",
+    );
+    await userEvent.click(within(confirm).getByRole("button", { name: "Eliminar" }));
+    await waitFor(() => expect(rowNames()).toEqual(["Diputado", "Despacho", "Comisión"]));
+  });
+
+  it("en Áreas la tabla muestra el tipo en la primera columna", async () => {
     renderAdmin();
     await screen.findByText("Sistemas");
 
-    // Crear
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Tipo",
+      "Nombre",
+      "Estado",
+      "Acciones",
+    ]);
+    expect(within(row("Sistemas")).getByText("Diputado")).toBeInTheDocument();
+  });
+
+  it("en Áreas el alta sin tipo muestra el error y no se envía", async () => {
+    renderAdmin();
+    await screen.findByText("Sistemas");
+
     await userEvent.click(screen.getByRole("button", { name: "Nueva área" }));
     await userEvent.type(screen.getByLabelText("Nombre"), "Soporte");
     await userEvent.click(screen.getByRole("button", { name: "Crear" }));
-    await waitFor(() => expect(rowNames()).toEqual(["Sistemas", "Redes", "Soporte"]));
 
-    // Editar
-    await userEvent.click(within(row("Soporte")).getByRole("button", { name: "Editar" }));
-    const input = screen.getByLabelText("Nombre");
-    expect(input).toHaveValue("Soporte");
-    await userEvent.clear(input);
-    await userEvent.type(input, "Mesa de ayuda");
-    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(rowNames()).toEqual(["Sistemas", "Redes", "Mesa de ayuda"]));
-
-    // Mover
-    await userEvent.click(within(row("Mesa de ayuda")).getByRole("button", { name: /^Subir/ }));
-    await waitFor(() => expect(rowNames()).toEqual(["Sistemas", "Mesa de ayuda", "Redes"]));
-    await userEvent.click(within(row("Sistemas")).getByRole("button", { name: /^Bajar/ }));
-    await waitFor(() => expect(rowNames()).toEqual(["Mesa de ayuda", "Sistemas", "Redes"]));
-
-    // Desactivar y reactivar
-    await userEvent.click(within(row("Redes")).getByRole("button", { name: "Desactivar" }));
-    expect(await within(row("Redes")).findByText("Desactivado")).toBeInTheDocument();
-    await userEvent.click(within(row("Redes")).getByRole("button", { name: "Reactivar" }));
-    expect(await within(row("Redes")).findByText("Activo")).toBeInTheDocument();
-
-    // Eliminar, con confirmación
-    await userEvent.click(within(row("Redes")).getByRole("button", { name: "Eliminar" }));
-    const confirm = await screen.findByRole("alertdialog");
-    expect(confirm).toHaveTextContent(
-      "Se eliminará «Redes». No se puede deshacer desde la pantalla; si solo querés ocultarlo, desactivalo.",
-    );
-    await userEvent.click(within(confirm).getByRole("button", { name: "Eliminar" }));
-    await waitFor(() => expect(rowNames()).toEqual(["Mesa de ayuda", "Sistemas"]));
+    expect(await screen.findByText("Elegí un tipo.")).toBeVisible();
+    expect(fake.state.creates).toEqual([]);
+    expect(rowNames()).toEqual(["Sistemas", "Redes"]);
   });
 
-  it("no envía un nombre vacío", async () => {
+  it("en Áreas el alta manda el tipo elegido y solo ofrece los activos", async () => {
     renderAdmin();
     await screen.findByText("Sistemas");
 
     await userEvent.click(screen.getByRole("button", { name: "Nueva área" }));
+    await userEvent.type(screen.getByLabelText("Nombre"), "Soporte");
+    await userEvent.click(screen.getByRole("combobox", { name: "Tipo" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Diputado", "Bloque"]);
+    await userEvent.click(screen.getByRole("option", { name: "Bloque" }));
+    await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+    await waitFor(() => expect(rowNames()).toEqual(["Sistemas", "Redes", "Soporte"]));
+    expect(fake.state.creates).toEqual([{ nombre: "Soporte", tipoId: "t2" }]);
+    expect(within(row("Soporte")).getByText("Bloque")).toBeInTheDocument();
+  });
+
+  it("en Áreas editar cambia el tipo; el tipo actual desactivado se ofrece marcado", async () => {
+    fake.table("areas").push({
+      id: "a3",
+      nombre: "Comisión de salud",
+      orden: 3,
+      activo: true,
+      tipo: { id: "t3", nombre: "Comisión" },
+    });
+    renderAdmin();
+    await screen.findByText("Comisión de salud");
+
+    await userEvent.click(within(row("Comisión de salud")).getByRole("button", { name: "Editar" }));
+    const tipo = screen.getByRole("combobox", { name: "Tipo" });
+    expect(tipo).toHaveTextContent("Comisión (inactivo)");
+    await userEvent.click(tipo);
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Diputado",
+      "Bloque",
+      "Comisión (inactivo)",
+    ]);
+    await userEvent.click(screen.getByRole("option", { name: "Bloque" }));
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(fake.state.updates).toHaveLength(1));
+    expect(fake.state.updates[0]).toEqual({
+      itemId: "a3",
+      nombre: "Comisión de salud",
+      tipoId: "t2",
+    });
+    expect(await within(row("Comisión de salud")).findByText("Bloque")).toBeInTheDocument();
+  });
+
+  it("no envía un nombre vacío", async () => {
+    renderAdmin("edificios");
+    await screen.findByText("Sistemas");
+
+    await userEvent.click(screen.getByRole("button", { name: "Nuevo edificio" }));
     await userEvent.click(screen.getByRole("button", { name: "Crear" }));
 
     expect(
       await screen.findByText("El nombre es obligatorio (hasta 120 caracteres)."),
     ).toBeVisible();
-    expect(rowNames()).toEqual(["Sistemas", "Redes"]);
+    expect(rowNames()).toEqual(["Sistemas"]);
   });
 
   it("muestra el error 409 de la API dentro del diálogo", async () => {
     fake.state.createError = new ORPCError("CONFLICT", {
       status: 409,
-      message: "Ya existe un área con ese nombre",
+      message: "Ya existe un edificio con ese nombre",
     });
-    renderAdmin();
+    renderAdmin("edificios");
     await screen.findByText("Sistemas");
 
-    await userEvent.click(screen.getByRole("button", { name: "Nueva área" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nuevo edificio" }));
     await userEvent.type(screen.getByLabelText("Nombre"), "sistemas");
     await userEvent.click(screen.getByRole("button", { name: "Crear" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Ya existe un área con ese nombre");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Ya existe un edificio con ese nombre",
+    );
   });
 
   it("en Proveedores edita los 5 campos y manda todos en el update", async () => {

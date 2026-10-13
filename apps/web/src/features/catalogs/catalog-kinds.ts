@@ -19,6 +19,14 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadingLabel: "Cargando áreas…",
     loadErrorLabel: "No se pudieron cargar las áreas.",
   },
+  tiposArea: {
+    tab: "Tipos de área",
+    title: "Tipos de área",
+    newLabel: "Nuevo tipo de área",
+    editLabel: "Editar tipo de área",
+    loadingLabel: "Cargando tipos de área…",
+    loadErrorLabel: "No se pudieron cargar los tipos de área.",
+  },
   edificios: {
     tab: "Edificios",
     title: "Edificios",
