@@ -1,6 +1,6 @@
 # SPEC 08 — Tipos de área
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo), SPEC 06 (comentarios y bandeja)
 > **Date:** 2026-10-09
 > **Objective:** separar el tipo del nombre de cada área con un catálogo nuevo "Tipos de área" (Diputado, Dirección, Bloque…), para elegir el área en un selector agrupado por tipo, verla como «Diputado · Acosta» y filtrar la bandeja por tipo.
@@ -288,25 +288,25 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] Después de `prisma migrate deploy` sobre una base con áreas, cada área tiene `tipoId` = «Otro», sus nombres no cambiaron y existe exactamente un tipo de área.
-- [ ] Sobre una base sin áreas, la migración no crea ningún tipo de área.
-- [ ] El admin crea, edita, sube, baja, desactiva, reactiva y elimina un tipo de área por la API, y cada paso deja su `AuditLog` con `entityType: "TipoArea"`.
-- [ ] Un agente recibe 403 en `create`, `update`, `move`, `setActive`, `remove` y `history` de `tiposArea`, y 200 en `list`.
-- [ ] Eliminar un tipo con un área no eliminada devuelve 409. Después de eliminar esa área, eliminar el tipo devuelve 200.
-- [ ] Crear un área sin `tipoId` devuelve 400. Con un `tipoId` inexistente o desactivado, también 400.
-- [ ] «Gonzalez» se crea bajo Diputado y bajo Bloque. Un segundo «gonzález» bajo Diputado devuelve 409.
-- [ ] Renombrar un área cuyo tipo está desactivado, sin cambiarle el tipo, devuelve 200.
-- [ ] Cambiar el tipo de un área deja un `update` cuyo diff tiene `tipo` antes y después como `{ id, nombre }`.
-- [ ] `catalogs.areas.list` devuelve cada área con `tipo: { id, nombre }`.
-- [ ] `tickets.get` y cada fila de `tickets.list` traen `area.tipo`.
-- [ ] Asignar un área a un ticket deja en su historial el área como «Tipo · Nombre».
-- [ ] `tickets.list` con `tipoAreaId` devuelve solo los tickets cuya área es de ese tipo. Combinado con un `areaId` de otro tipo, devuelve una página vacía.
-- [ ] Desactivar un tipo no saca a sus áreas activas del selector de área del ticket.
-- [ ] En la web, el selector de área del ticket muestra las áreas agrupadas bajo títulos por tipo, y el valor elegido se ve como «Diputado · Acosta».
-- [ ] En la web, la columna Área de la bandeja muestra «Tipo · Nombre», y recargar `/tickets?tipoAreaId=<id>` conserva el filtro.
-- [ ] En la web, la pestaña Áreas muestra la columna Tipo, y el alta de un área sin tipo no se envía.
-- [ ] El seed sobre una base vacía con `tipos-area.json` y `areas.example.json` crea los tipos y las áreas con su tipo. Con un tipo que no existe en `areas.json`, aborta nombrándolo y no crea áreas.
-- [ ] `pnpm verify --spec 04,05,06,08` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] Después de `prisma migrate deploy` sobre una base con áreas, cada área tiene `tipoId` = «Otro», sus nombres no cambiaron y existe exactamente un tipo de área.
+- [X] Sobre una base sin áreas, la migración no crea ningún tipo de área.
+- [X] El admin crea, edita, sube, baja, desactiva, reactiva y elimina un tipo de área por la API, y cada paso deja su `AuditLog` con `entityType: "TipoArea"`.
+- [X] Un agente recibe 403 en `create`, `update`, `move`, `setActive`, `remove` y `history` de `tiposArea`, y 200 en `list`.
+- [X] Eliminar un tipo con un área no eliminada devuelve 409. Después de eliminar esa área, eliminar el tipo devuelve 200.
+- [X] Crear un área sin `tipoId` devuelve 400. Con un `tipoId` inexistente o desactivado, también 400.
+- [X] «Gonzalez» se crea bajo Diputado y bajo Bloque. Un segundo «gonzález» bajo Diputado devuelve 409.
+- [X] Renombrar un área cuyo tipo está desactivado, sin cambiarle el tipo, devuelve 200.
+- [X] Cambiar el tipo de un área deja un `update` cuyo diff tiene `tipo` antes y después como `{ id, nombre }`.
+- [X] `catalogs.areas.list` devuelve cada área con `tipo: { id, nombre }`.
+- [X] `tickets.get` y cada fila de `tickets.list` traen `area.tipo`.
+- [X] Asignar un área a un ticket deja en su historial el área como «Tipo · Nombre».
+- [X] `tickets.list` con `tipoAreaId` devuelve solo los tickets cuya área es de ese tipo. Combinado con un `areaId` de otro tipo, devuelve una página vacía.
+- [X] Desactivar un tipo no saca a sus áreas activas del selector de área del ticket.
+- [X] En la web, el selector de área del ticket muestra las áreas agrupadas bajo títulos por tipo, y el valor elegido se ve como «Diputado · Acosta».
+- [X] En la web, la columna Área de la bandeja muestra «Tipo · Nombre», y recargar `/tickets?tipoAreaId=<id>` conserva el filtro.
+- [X] En la web, la pestaña Áreas muestra la columna Tipo, y el alta de un área sin tipo no se envía.
+- [X] El seed sobre una base vacía con `tipos-area.json` y `areas.example.json` crea los tipos y las áreas con su tipo. Con un tipo que no existe en `areas.json`, aborta nombrándolo y no crea áreas.
+- [X] `pnpm verify --spec 04,05,06,08` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
 
