@@ -23,19 +23,53 @@ const badgeVariants = cva(
   },
 );
 
+// Los 8 tonos de insignia de la base visual (SPEC 09): son el vocabulario de color que el admin elige
+// por estado y prioridad (SPEC 10). Cada uno trae fondo, texto y borde en `index.css`.
+export const badgeTonos = [
+  "gris",
+  "rojo",
+  "naranja",
+  "amarillo",
+  "verde",
+  "azul",
+  "violeta",
+  "rosa",
+] as const;
+export type BadgeTono = (typeof badgeTonos)[number];
+
+// Clases completas, no armadas con plantilla: Tailwind solo genera las que ve escritas.
+const tonoClasses: Record<BadgeTono, string> = {
+  gris: "border-tono-gris-border bg-tono-gris text-tono-gris-foreground",
+  rojo: "border-tono-rojo-border bg-tono-rojo text-tono-rojo-foreground",
+  naranja: "border-tono-naranja-border bg-tono-naranja text-tono-naranja-foreground",
+  amarillo: "border-tono-amarillo-border bg-tono-amarillo text-tono-amarillo-foreground",
+  verde: "border-tono-verde-border bg-tono-verde text-tono-verde-foreground",
+  azul: "border-tono-azul-border bg-tono-azul text-tono-azul-foreground",
+  violeta: "border-tono-violeta-border bg-tono-violeta text-tono-violeta-foreground",
+  rosa: "border-tono-rosa-border bg-tono-rosa text-tono-rosa-foreground",
+};
+
 function Badge({
   className,
   variant = "default",
+  tono,
   asChild = false,
   ...props
-}: React.ComponentProps<"span"> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
+}: React.ComponentProps<"span"> &
+  VariantProps<typeof badgeVariants> & { tono?: BadgeTono; asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "span";
 
   return (
     <Comp
       data-slot="badge"
       data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
+      data-tono={tono}
+      // `tono` pisa a `variant`: con un tono no se aplican los colores de ninguna variante.
+      className={cn(
+        badgeVariants({ variant: tono ? null : variant }),
+        tono && tonoClasses[tono],
+        className,
+      )}
       {...props}
     />
   );
