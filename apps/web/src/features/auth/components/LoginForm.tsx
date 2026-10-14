@@ -32,7 +32,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>Iniciar sesión</CardTitle>
+        <CardTitle className="text-lg">Iniciar sesión</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -46,6 +46,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               id="username"
               autoComplete="username"
               autoFocus
+              className="h-10"
               aria-invalid={errors.username ? true : undefined}
               {...register("username")}
             />
@@ -57,6 +58,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               id="password"
               type="password"
               autoComplete="current-password"
+              className="h-10"
               aria-invalid={errors.password ? true : undefined}
               {...register("password")}
             />
@@ -67,7 +69,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
               {failureMessages[failure]}
             </p>
           )}
-          <Button type="submit" disabled={login.isPending}>
+          <Button type="submit" size="lg" disabled={login.isPending}>
             {login.isPending ? "Ingresando…" : "Ingresar"}
           </Button>
         </form>

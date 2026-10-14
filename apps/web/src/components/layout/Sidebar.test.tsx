@@ -60,6 +60,21 @@ describe("Sidebar", () => {
     }
   });
 
+  it("agrupa el menú por secciones: los módulos y, aparte, la administración", () => {
+    role = "admin";
+    render(<Sidebar />);
+
+    expect(screen.getByText("Módulos")).toBeInTheDocument();
+    expect(screen.getByText("Administración")).toBeInTheDocument();
+  });
+
+  it("avisa dónde van a aparecer los módulos nuevos", () => {
+    role = "agente";
+    render(<Sidebar />);
+
+    expect(screen.getByText("Los nuevos módulos aparecerán aquí.")).toBeInTheDocument();
+  });
+
   it("deja el estado de la API al pie del menú", () => {
     role = "agente";
     render(<Sidebar />);

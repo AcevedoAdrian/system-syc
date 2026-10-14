@@ -8,7 +8,13 @@ function LoginPage() {
   const { redirect } = Route.useSearch();
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h1 className="font-display text-[40px] leading-[1.1] font-medium tracking-[-0.02em]">
+          system-syc
+        </h1>
+        <p className="text-sm text-muted-foreground">Gestión interna y seguimiento de tickets</p>
+      </div>
       <LoginForm onSuccess={() => router.history.push(safeRedirectPath(redirect) ?? "/")} />
     </main>
   );

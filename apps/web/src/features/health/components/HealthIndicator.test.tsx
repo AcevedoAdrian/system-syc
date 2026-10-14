@@ -30,10 +30,10 @@ describe("HealthIndicator", () => {
     });
 
     expect(indicator).toHaveTextContent("API ok · base de datos up");
-    expect(indicator.firstElementChild).toHaveClass("bg-green-600");
+    expect(indicator.firstElementChild).toHaveClass("bg-success");
   });
 
-  it("avisa en ámbar cuando la API responde pero la base no", () => {
+  it("avisa con el color de aviso cuando la API responde pero la base no", () => {
     const indicator = show({
       data: { status: "degraded", database: "down", timestamp: at },
       isPending: false,
@@ -41,20 +41,24 @@ describe("HealthIndicator", () => {
     });
 
     expect(indicator).toHaveTextContent("API degraded · base de datos down");
-    expect(indicator.firstElementChild).toHaveClass("bg-amber-600");
+    expect(indicator.firstElementChild).toHaveClass("bg-warning");
   });
 
-  it("avisa en rojo cuando no hay conexión con la API", () => {
+  it("avisa con el color destructivo cuando no hay conexión con la API", () => {
     const indicator = show({ data: undefined, isPending: false, isError: true });
 
     expect(indicator).toHaveTextContent("Sin conexión con la API");
-    expect(indicator.firstElementChild).toHaveClass("bg-red-600");
+    expect(indicator.firstElementChild).toHaveClass("bg-destructive");
   });
 
   it("mientras consulta no marca ni error ni éxito", () => {
     const indicator = show({ data: undefined, isPending: true, isError: false });
 
     expect(indicator).toHaveTextContent("Consultando estado…");
-    expect(indicator.firstElementChild).not.toHaveClass("bg-red-600", "bg-green-600");
+    expect(indicator.firstElementChild).not.toHaveClass(
+      "bg-destructive",
+      "bg-success",
+      "bg-warning",
+    );
   });
 });
