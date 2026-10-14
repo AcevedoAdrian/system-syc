@@ -308,7 +308,78 @@ Convenciones:
 
 ## Dirección elegida
 
-_Se completa en el paso 3 de la implementación, con la propuesta que elija el usuario: paleta, tipografía, densidad y radio._
+Elegida por el usuario el 2026-10-14, entre cinco demos de la bandeja (claro y oscuro, 1440 × 900, 20 filas) armadas a partir de las definiciones que aportó: Claude, Cursor, Kraken, Notion y Starbucks. Gana **Claude** (`design-md/claude.md`): un lienzo crema, títulos en serif y un solo coral escaso.
+
+Antes de esta, el usuario descartó tres manos de direcciones propuestas por impeccable y pidió partir de una referencia propia.
+
+**Paleta**
+
+| Rol | Claro | Oscuro |
+|---|---|---|
+| Fondo (`background`) | `#faf9f5` | `#181715` |
+| Superficie de tarjeta y tabla (`card`) | `#faf9f5` con borde | `#1f1e1b` |
+| Cabecera de tabla y riel (`muted`) | `#f5f0e8` | `#252320` |
+| Ítem activo del menú (`accent`) | `#e8e0d2` | `#252320` |
+| Borde (`border`) | `#e6dfd8` | `#2f2d29` |
+| Texto (`foreground`) | `#141413` | `#faf9f5` |
+| Texto secundario (`muted-foreground`) | `#6c6a64` (5,1:1) | `#a09d96` |
+| Acción primaria (`primary`) | `#a9583e` con texto blanco (5,1:1) | `#cc785c` con texto `#141413` (5,6:1) |
+| Estado | teal `#5db8a6`, ámbar `#e8a55a`, verde `#5db872`, rojo `#c64545` | los mismos |
+
+El modo oscuro de Claude sale de su definición (`#181715`, `#1f1e1b`, `#252320`); los otros valores oscuros se derivan de ella.
+
+**Tipografía** (todas autoalojadas con `@fontsource`)
+
+- Títulos: Cormorant Garamond 500 con `-0.02em`, tal como la define `design-md/claude.md` (licencia SIL OFL, sin sustituto).
+- Interfaz: Inter 400 y 500 (también SIL OFL).
+- Códigos y números de ticket: JetBrains Mono.
+
+**Radio y profundidad**
+
+- 8 px en botones y campos; 12 px en la tabla y las tarjetas; píldora para las insignias.
+- Sin sombras: la profundidad la dan el color y el borde de 1 px.
+
+**Densidad**
+
+- Filas de 30 px en la bandeja (20 filas completas a 1440 × 900) y base de 4 px.
+- Es más densa que la definición, que es de marketing; el marco baja de 64 a 48 px.
+
+**Ajustes sobre la definición**
+
+- Blanco sobre `#cc785c` da 3,3:1 y no pasa AA: el botón claro usa `#a9583e`, que es el coral «activo» de la propia definición.
+- `muted-soft` (`#8e8b82`, 3,2:1) no se usa para texto. El coral `#cc785c` tampoco como color de enlace sobre crema (3,1:1): los enlaces usan `#a9583e` (4,8:1).
+- `muted` (`#6c6a64`) solo va sobre `background` y sobre la cabecera de tabla (4,8:1); sobre `#efe9de` da 4,5:1 justo y sobre `#e8e0d2`, 4,1:1, y ahí el texto es `ink`.
+- La insignia coral (12 px, mayúsculas) usa `#a9583e` con texto blanco, no `#cc785c`.
+- Teal `#5db8a6`, ámbar `#e8a55a`, verde `#5db872` y `warning` `#d4a017` dan entre 2,0:1 y 2,3:1 sobre crema: solo sirven para puntos y rellenos junto a un texto, nunca como color de texto.
+- `error` `#c64545` pasa sobre crema (4,6:1) pero no sobre `#181715` (3,7:1): en oscuro necesita una variante más clara, a definir en el paso 4.
+- Su definición pide no agregar estilos de hover más allá de oscurecer el botón primario al presionar. Los primitivos de shadcn de la app sí los traen; se decide en el paso 4 si se conservan solo en filas y enlaces.
+- Los campos y botones miden 40 px en la definición. La demo usaba filtros de 30 px: con 40 px las 20 filas siguen entrando a 900 px, pero con muy poco margen.
+- No se usa la marca de Anthropic (el asterisco ni el nombre): el nombre visible sigue siendo «system-syc».
+
+**Queda para el paso 4**
+
+- La definición no trae 8 tonos de insignia. Hay que derivarlos de su paleta (coral, teal, ámbar, verde, rojo y neutros), cumpliendo AA y sin sumar una superficie nueva, que su definición prohíbe.
+- Los estados de ticket llevan siempre texto, además del color.
+
+**Maqueta del usuario («Dashboard Tickets – Maqueta», artifact de claude.ai)**
+
+El usuario pidió sumar los estilos de su maqueta a esta dirección. Decisiones del 2026-10-14:
+
+- **Acento:** manda el coral de Claude. El azul `#1D4ED8` de la maqueta no se usa, porque la definición de Claude desaconseja el azul como acento.
+- **Densidad:** filas compactas de 30 px, no las de 60 px de la maqueta, para que entren las 20 filas por página. Los botones siguen entre 36 y 40 px.
+- **Se toma de la maqueta, dentro de este spec:**
+  - Los pares fondo/texto de las insignias como punto de partida de los 8 tonos (el azul `#E6EEFB`/`#1E3A8A`, el ámbar `#FDF0D5`/`#7A4300`, el verde `#DDF3E4`/`#14532D` y el gris `#EAECF0`/`#344054`, que hay que re-matizar hacia el crema).
+  - La sección «Módulos» de la barra lateral con un recuadro para módulos futuros.
+  - Las migas de pan «Módulos / Tickets» en el encabezado.
+  - El anillo de foco de 2 px con 2 px de separación.
+  - JetBrains Mono para el número de ticket.
+- **Queda para el SPEC 11 (rediseño de la bandeja):**
+  - Las 4 tarjetas KPI.
+  - Los chips de estado con conteo.
+  - El panel lateral de crear y editar.
+
+  Los conteos necesitan datos que la API hoy no entrega, y los estados de la maqueta (Abierto, Resuelto) no son los del catálogo real.
+- **No se usa:** la columna «Responsable», porque la asignación a agentes individuales es Fase 2 del PRD.
 
 ## Criterios de aceptación
 
