@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
+import { Route as AuthenticatedEstilosRouteImport } from './routes/_authenticated/estilos'
 import { Route as AuthenticatedAdminCatalogosRouteImport } from './routes/_authenticated/admin/catalogos'
 import { Route as AuthenticatedAdminDepartamentosRouteImport } from './routes/_authenticated/admin/departamentos'
 import { Route as AuthenticatedAdminUsuariosRouteImport } from './routes/_authenticated/admin/usuarios'
@@ -37,6 +38,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedEstilosRoute = AuthenticatedEstilosRouteImport.update({
+  id: '/estilos',
+  path: '/estilos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAdminCatalogosRoute =
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/estilos': typeof AuthenticatedEstilosRoute
   '/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
   '/admin/usuarios': typeof AuthenticatedAdminUsuariosRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/estilos': typeof AuthenticatedEstilosRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
+  '/_authenticated/estilos': typeof AuthenticatedEstilosRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/admin/catalogos': typeof AuthenticatedAdminCatalogosRoute
   '/_authenticated/admin/departamentos': typeof AuthenticatedAdminDepartamentosRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/admin'
+    | '/estilos'
     | '/admin/catalogos'
     | '/admin/departamentos'
     | '/admin/usuarios'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/admin'
+    | '/estilos'
     | '/'
     | '/admin/catalogos'
     | '/admin/departamentos'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/admin'
+    | '/_authenticated/estilos'
     | '/_authenticated/'
     | '/_authenticated/admin/catalogos'
     | '/_authenticated/admin/departamentos'
@@ -181,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/estilos': {
+      id: '/_authenticated/estilos'
+      path: '/estilos'
+      fullPath: '/estilos'
+      preLoaderRoute: typeof AuthenticatedEstilosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/catalogos': {
@@ -248,6 +267,7 @@ const AuthenticatedAdminRouteRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRouteRoute: typeof AuthenticatedAdminRouteRouteWithChildren
+  AuthenticatedEstilosRoute: typeof AuthenticatedEstilosRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedTicketsTicketIdRoute: typeof AuthenticatedTicketsTicketIdRoute
   AuthenticatedTicketsNuevoRoute: typeof AuthenticatedTicketsNuevoRoute
@@ -256,6 +276,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminRouteRoute: AuthenticatedAdminRouteRouteWithChildren,
+  AuthenticatedEstilosRoute: AuthenticatedEstilosRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedTicketsTicketIdRoute: AuthenticatedTicketsTicketIdRoute,
   AuthenticatedTicketsNuevoRoute: AuthenticatedTicketsNuevoRoute,
