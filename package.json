@@ -12,7 +12,7 @@
     "typescript": "5.9.3"
   },
   "scripts": {
-    "lint": "biome check .",
+    "lint": "biome check . && node scripts/check-design-tokens.mjs",
     "format": "biome format --write .",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
