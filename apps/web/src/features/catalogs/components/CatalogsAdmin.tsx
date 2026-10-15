@@ -106,6 +106,7 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
             ruta={ruta}
             initialName={editing?.nombre}
             initialTipoId={editing?.tipo?.id}
+            initialColor={editing?.color}
             onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
           />
         </>

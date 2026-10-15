@@ -83,8 +83,9 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
         <h1 className="text-2xl font-semibold wrap-break-word">
           {formatTicketNumber(ticket.numero)} · {ticket.titulo}
         </h1>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary">{ticket.estado.nombre}</Badge>
+        <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <Badge tono={ticket.estado.color}>{ticket.estado.nombre}</Badge>
+          <Badge tono={ticket.prioridad.color}>{ticket.prioridad.nombre}</Badge>
           {ticket.departamento.nombre}
         </p>
         <div className="flex flex-wrap gap-2">

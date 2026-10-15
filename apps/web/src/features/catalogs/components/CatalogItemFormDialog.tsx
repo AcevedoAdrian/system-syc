@@ -2,9 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   type AreaInput,
   areaInputSchema,
+  type CatalogItemConColorInput,
   type CatalogItemInput,
   type CatalogRuta,
+  catalogItemConColorInputSchema,
   catalogItemInputSchema,
+  type Tono,
 } from "@syc/contracts";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -27,10 +30,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getErrorMessage } from "@/lib/errors";
+import { catalogHasColor } from "../catalog-kinds";
 import { useCatalog } from "../hooks/useCatalog";
+import { TonoSelect } from "./TonoSelect";
 
-// Lo que el formulario manda: el nombre y, solo en Áreas, el tipo (SPEC 08).
-type FormValues = CatalogItemInput & Partial<Pick<AreaInput, "tipoId">>;
+// Lo que el formulario manda: el nombre, el tipo en Áreas (SPEC 08) y el color en Estados y
+// Prioridades (SPEC 10).
+type FormValues = CatalogItemInput &
+  Partial<Pick<AreaInput, "tipoId">> &
+  Partial<Pick<CatalogItemConColorInput, "color">>;
 
 interface CatalogItemFormDialogProps {
   // Con `areas` el formulario pide además el tipo, que es obligatorio.
@@ -41,6 +49,7 @@ interface CatalogItemFormDialogProps {
   submitLabel: string;
   initialName?: string;
   initialTipoId?: string;
+  initialColor?: Tono;
   onSubmit: (values: FormValues) => Promise<unknown>;
 }
 
@@ -79,21 +88,32 @@ function CatalogItemForm({
   submitLabel,
   initialName,
   initialTipoId,
+  initialColor,
   onSubmit,
   onDone,
 }: Omit<CatalogItemFormDialogProps, "open" | "onOpenChange" | "title"> & { onDone: () => void }) {
   const [serverError, setServerError] = useState<string>();
   const conTipo = ruta === "areas";
+  const conColor = catalogHasColor(ruta);
   const {
     register,
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    resolver: zodResolver(conTipo ? areaInputSchema : catalogItemInputSchema),
+    resolver: zodResolver(
+      conTipo
+        ? areaInputSchema
+        : conColor
+          ? catalogItemConColorInputSchema
+          : catalogItemInputSchema,
+    ),
+    // El alta de un estado o prioridad viene en gris; la edición, con el color actual.
     defaultValues: conTipo
       ? { nombre: initialName ?? "", tipoId: initialTipoId ?? "" }
-      : { nombre: initialName ?? "" },
+      : conColor
+        ? { nombre: initialName ?? "", color: initialColor ?? "gris" }
+        : { nombre: initialName ?? "" },
   });
 
   const submit = handleSubmit(async (values) => {
@@ -137,6 +157,24 @@ function CatalogItemForm({
             )}
           />
           {errors.tipoId && <p className="text-sm text-destructive">Elegí un tipo.</p>}
+        </div>
+      )}
+      {conColor && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="color">Color</Label>
+          <Controller
+            control={control}
+            name="color"
+            render={({ field }) => (
+              <TonoSelect
+                id="color"
+                value={field.value ?? "gris"}
+                onChange={field.onChange}
+                invalid={Boolean(errors.color)}
+              />
+            )}
+          />
+          {errors.color && <p className="text-sm text-destructive">Elegí un color.</p>}
         </div>
       )}
       {serverError && (

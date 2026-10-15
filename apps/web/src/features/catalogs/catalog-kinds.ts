@@ -10,6 +10,10 @@ export interface CatalogKind {
   loadErrorLabel: string;
 }
 
+// Solo Estados y Prioridades tienen color (SPEC 10): el campo del formulario y la columna de la tabla.
+export const catalogHasColor = (ruta?: CatalogRuta): boolean =>
+  ruta === "prioridades" || ruta === "estados";
+
 export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
   areas: {
     tab: "Áreas",

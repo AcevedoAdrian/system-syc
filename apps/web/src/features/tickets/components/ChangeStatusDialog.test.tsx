@@ -255,7 +255,7 @@ describe("ChangeStatusDialog", () => {
 
     it("de un cierre a otro propone la fecha de cierre actual y precarga la solución", async () => {
       renderDialog({
-        estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO" },
+        estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO", color: "verde" },
         fechaCierre: "2026-10-03",
         solucionDescripcion: "Se cambió el toner",
       });
@@ -306,7 +306,7 @@ describe("ChangeStatusDialog", () => {
 
     it("manda solo la fecha de reapertura: no toca la fecha de cierre ni la solución", async () => {
       const ticket = renderDialog({
-        estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO" },
+        estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO", color: "verde" },
         fechaCierre: "2026-10-03",
         solucionDescripcion: "Se cambió el toner",
       });

@@ -69,8 +69,8 @@ const ticket = (numero: number, extra: Partial<TicketSummary> = {}): TicketSumma
   numero,
   titulo: `Ticket ${numero}`,
   departamento: { id: "tec", nombre: "Técnico" },
-  estado: { id: "pend", nombre: "Pendiente", clave: null },
-  prioridad: { id: "alta", nombre: "Alta" },
+  estado: { id: "pend", nombre: "Pendiente", clave: null, color: "azul" },
+  prioridad: { id: "alta", nombre: "Alta", color: "naranja" },
   area: null,
   fechaRecepcion: "2026-10-01",
   ...extra,
@@ -295,6 +295,26 @@ describe("TicketsList", () => {
         "Área",
         "Fecha de recepción",
       ]);
+    });
+
+    it("estado y prioridad son insignias con el color del ítem y su nombre adentro", () => {
+      ready(
+        page([
+          ticket(13),
+          ticket(14, {
+            estado: { id: "esp", nombre: "En espera", clave: null, color: "amarillo" },
+            prioridad: { id: "urg", nombre: "Urgente", color: "rojo" },
+          }),
+        ]),
+      );
+      renderList();
+
+      const primera = screen.getByTestId("ticket-row-13");
+      expect(within(primera).getByText("Pendiente")).toHaveAttribute("data-tono", "azul");
+      expect(within(primera).getByText("Alta")).toHaveAttribute("data-tono", "naranja");
+      const segunda = screen.getByTestId("ticket-row-14");
+      expect(within(segunda).getByText("En espera")).toHaveAttribute("data-tono", "amarillo");
+      expect(within(segunda).getByText("Urgente")).toHaveAttribute("data-tono", "rojo");
     });
 
     it("muestra los datos del ticket, su área y la fecha como dd/mm/aaaa", () => {

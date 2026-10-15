@@ -50,6 +50,51 @@ describe("CatalogTable: estados", () => {
   });
 });
 
+describe("CatalogTable: color (SPEC 10)", () => {
+  const conColor: CatalogEntry[] = [
+    { id: "e1", nombre: "Pendiente", orden: 1, activo: true, clave: null, color: "azul" },
+    { id: "e2", nombre: "En espera", orden: 2, activo: true, clave: null, color: "amarillo" },
+  ];
+
+  it("Estados y Prioridades suman la columna Color entre Nombre y Estado", () => {
+    for (const ruta of ["estados", "prioridades"] as const) {
+      const { unmount } = render(<CatalogTable ruta={ruta} items={conColor} {...handlers} />);
+
+      expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+        "Nombre",
+        "Color",
+        "Estado",
+        "Acciones",
+      ]);
+      unmount();
+    }
+  });
+
+  it("la insignia lleva el nombre del color, no el del ítem, y el nombre queda como texto", () => {
+    render(<CatalogTable ruta="estados" items={conColor} {...handlers} />);
+
+    const insignia = within(row("En espera")).getByText("Amarillo");
+    expect(insignia).toHaveAttribute("data-tono", "amarillo");
+    expect(within(row("En espera")).getByText("En espera")).not.toHaveAttribute("data-tono");
+  });
+
+  it("los otros 6 catálogos no tienen la columna, aunque el ítem traiga color", () => {
+    for (const ruta of [
+      "areas",
+      "tiposArea",
+      "edificios",
+      "tipos",
+      "modulos",
+      "proveedores",
+    ] as const) {
+      const { unmount } = render(<CatalogTable ruta={ruta} items={conColor} {...handlers} />);
+
+      expect(screen.queryByRole("columnheader", { name: "Color" })).toBeNull();
+      unmount();
+    }
+  });
+});
+
 describe("CatalogTable: proveedores", () => {
   const proveedores: CatalogEntry[] = [
     {

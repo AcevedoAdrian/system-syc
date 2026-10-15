@@ -8,6 +8,7 @@ type OptionItem = {
   activo: boolean;
   orden: number;
   tipo?: { id: string; nombre: string };
+  color?: "gris" | "rojo" | "naranja" | "azul";
 };
 
 const options = vi.hoisted(() => ({
@@ -184,6 +185,96 @@ describe("CatalogOptionSelect", () => {
       await userEvent.click(screen.getByRole("combobox"));
 
       expect(optionNames()).toEqual(["Sistemas", "Archivo"]);
+    });
+  });
+
+  describe("opciones con color (SPEC 10)", () => {
+    const prioridades: OptionItem[] = [
+      { id: "baja", nombre: "Baja", activo: true, orden: 1, color: "gris" },
+      { id: "alta", nombre: "Alta", activo: true, orden: 2, color: "naranja" },
+      { id: "urg", nombre: "Urgente", activo: true, orden: 3, color: "rojo" },
+    ];
+    const tonoDe = (option: HTMLElement) =>
+      option.querySelector('[data-slot="badge"]')?.getAttribute("data-tono");
+
+    it("cada opción se ve como insignia y su nombre accesible sigue siendo el del ítem", async () => {
+      options.data = prioridades;
+      render(
+        <CatalogOptionSelect
+          id="prioridad"
+          ruta="prioridades"
+          value=""
+          onChange={() => undefined}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("combobox"));
+
+      expect(optionNames()).toEqual(["Baja", "Alta", "Urgente"]);
+      const urgente = screen.getByRole("option", { name: "Urgente" });
+      expect(tonoDe(urgente)).toBe("rojo");
+      expect(tonoDe(screen.getByRole("option", { name: "Alta" }))).toBe("naranja");
+    });
+
+    it("el botón muestra el valor elegido como insignia", () => {
+      options.data = prioridades;
+      render(
+        <CatalogOptionSelect
+          id="prioridad"
+          ruta="prioridades"
+          value="urg"
+          onChange={() => undefined}
+        />,
+      );
+
+      const boton = screen.getByRole("combobox");
+      expect(boton).toHaveTextContent("Urgente");
+      expect(tonoDe(boton)).toBe("rojo");
+    });
+
+    it("elegir una opción con color devuelve su id", async () => {
+      options.data = prioridades;
+      const onChange = vi.fn();
+      render(
+        <CatalogOptionSelect id="prioridad" ruta="prioridades" value="" onChange={onChange} />,
+      );
+
+      await userEvent.click(screen.getByRole("combobox"));
+      await userEvent.click(screen.getByRole("option", { name: "Urgente" }));
+
+      expect(onChange).toHaveBeenCalledWith("urg");
+    });
+
+    it("el valor actual desactivado conserva «(inactivo)», fuera de la insignia, y su color", async () => {
+      options.data = prioridades;
+      render(
+        <CatalogOptionSelect
+          id="prioridad"
+          ruta="prioridades"
+          value="vieja"
+          onChange={() => undefined}
+          current={{ id: "vieja", nombre: "Crítica", color: "rojo" }}
+        />,
+      );
+
+      const boton = screen.getByRole("combobox");
+      expect(boton).toHaveTextContent("Crítica (inactivo)");
+      const insignia = boton.querySelector('[data-slot="badge"]');
+      expect(insignia).toHaveAttribute("data-tono", "rojo");
+      expect(insignia).toHaveTextContent(/^Crítica$/);
+      await userEvent.click(boton);
+      expect(optionNames()).toEqual(["Baja", "Alta", "Urgente", "Crítica (inactivo)"]);
+      expect(screen.getByRole("option", { name: "Crítica (inactivo)" })).toBeInTheDocument();
+    });
+
+    it("un catálogo sin color sigue mostrando texto, sin insignia", async () => {
+      render(
+        <CatalogOptionSelect id="edificio" ruta="edificios" value="" onChange={() => undefined} />,
+      );
+
+      await userEvent.click(screen.getByRole("combobox"));
+
+      for (const option of screen.getAllByRole("option")) expect(tonoDe(option)).toBeUndefined();
     });
   });
 

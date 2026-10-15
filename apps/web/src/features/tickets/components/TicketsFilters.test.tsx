@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { TicketsSearch } from "../tickets-search";
 
 const data = vi.hoisted(() => ({
-  catalogs: {} as Record<string, { id: string; nombre: string; activo: boolean }[]>,
+  catalogs: {} as Record<string, { id: string; nombre: string; activo: boolean; color?: string }[]>,
   organizations: [] as { id: string; nombre: string; activo: boolean }[],
 }));
 vi.mock("@/features/catalogs/hooks/useCatalog", () => ({
@@ -29,8 +29,9 @@ beforeAll(() => {
 beforeEach(() => {
   data.catalogs = {
     estados: [
-      { id: "pend", nombre: "Pendiente", activo: true },
-      { id: "prog", nombre: "En progreso", activo: true },
+      { id: "pend", nombre: "Pendiente", activo: true, color: "azul" },
+      { id: "prog", nombre: "En progreso", activo: true, color: "violeta" },
+      { id: "arch", nombre: "Archivado", activo: false, color: "gris" },
     ],
     // El inactivo está primero en el orden de la administración: la bandeja lo manda al final.
     areas: [
@@ -109,6 +110,53 @@ describe("TicketsFilters", () => {
 
       expect(screen.getByRole("combobox", { name: "Estado" })).toHaveTextContent("En progreso");
       expect(screen.getByRole("combobox", { name: "Área" })).toHaveTextContent("Todos");
+    });
+
+    describe("estados y prioridades con color (SPEC 10)", () => {
+      const tonoDe = (element: HTMLElement) =>
+        element.querySelector('[data-slot="badge"]')?.getAttribute("data-tono");
+
+      it("cada opción se ve como insignia, «Todos» sigue como texto y el nombre accesible no cambia", async () => {
+        renderFilters();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Estado" }));
+
+        expect(optionNames()).toEqual([
+          "Todos",
+          "Pendiente",
+          "En progreso",
+          "Archivado (inactivo)",
+        ]);
+        expect(tonoDe(screen.getByRole("option", { name: "Todos" }))).toBeUndefined();
+        expect(tonoDe(screen.getByRole("option", { name: "En progreso" }))).toBe("violeta");
+        expect(tonoDe(screen.getByRole("option", { name: "Pendiente" }))).toBe("azul");
+      });
+
+      it("el valor elegido se ve como insignia en el botón", () => {
+        renderFilters({ estadoId: "prog" });
+
+        const boton = screen.getByRole("combobox", { name: "Estado" });
+        expect(boton).toHaveTextContent("En progreso");
+        expect(tonoDe(boton)).toBe("violeta");
+      });
+
+      it("un estado inactivo conserva «(inactivo)», fuera de la insignia y con su color", async () => {
+        renderFilters({ estadoId: "arch" });
+
+        const boton = screen.getByRole("combobox", { name: "Estado" });
+        expect(boton).toHaveTextContent("Archivado (inactivo)");
+        const insignia = boton.querySelector('[data-slot="badge"]');
+        expect(insignia).toHaveAttribute("data-tono", "gris");
+        expect(insignia).toHaveTextContent(/^Archivado$/);
+      });
+
+      it("un catálogo sin color (Áreas) sigue siendo texto", async () => {
+        renderFilters();
+
+        await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
+
+        for (const option of screen.getAllByRole("option")) expect(tonoDe(option)).toBeUndefined();
+      });
     });
 
     it("ofrece los ítems inactivos al final, marcados «(inactivo)»", async () => {

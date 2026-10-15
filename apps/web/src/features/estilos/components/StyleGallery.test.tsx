@@ -36,6 +36,18 @@ describe("StyleGallery", () => {
     expect(within(section).getAllByRole("listitem")).toHaveLength(8);
   });
 
+  it("los tonos se muestran con su nombre (tonoLabels) y suman el TonoSelect", () => {
+    render(<StyleGallery />);
+
+    const section = screen.getByRole("region", { name: "Tonos de insignia" });
+    expect(
+      within(section)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Gris", "Rojo", "Naranja", "Amarillo", "Verde", "Azul", "Violeta", "Rosa"]);
+    expect(within(section).getByRole("combobox", { name: "Color" })).toHaveTextContent("Gris");
+  });
+
   it("muestra los tres estados con sus roles", () => {
     render(<StyleGallery />);
 

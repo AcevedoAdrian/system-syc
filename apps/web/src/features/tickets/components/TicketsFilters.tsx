@@ -1,4 +1,4 @@
-import type { CatalogRuta } from "@syc/contracts";
+import type { CatalogRuta, Tono } from "@syc/contracts";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
   type TicketsSearch,
   withFilter,
 } from "../tickets-search";
+import { OptionLabel } from "./OptionLabel";
 
 // Pausa antes de buscar al escribir (SPEC 06): una consulta por pausa, no una por tecla.
 export const SEARCH_DELAY_MS = 300;
@@ -28,6 +29,8 @@ interface FilterOption {
   id: string;
   nombre: string;
   activo: boolean;
+  // Estados y prioridades (SPEC 10): con color, la opción se ve como insignia.
+  color?: Tono | undefined;
 }
 
 // Radix no admite un ítem con valor "": "Todos" viaja con este centinela y se traduce a sin filtro.
@@ -66,7 +69,7 @@ function FilterSelect({
           <SelectItem value={ALL}>Todos</SelectItem>
           {activeFirst(options).map((option) => (
             <SelectItem key={option.id} value={option.id}>
-              {option.activo ? option.nombre : `${option.nombre} (inactivo)`}
+              <OptionLabel nombre={option.nombre} color={option.color} inactive={!option.activo} />
             </SelectItem>
           ))}
         </SelectContent>

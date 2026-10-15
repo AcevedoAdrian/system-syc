@@ -1,11 +1,12 @@
+import type { Tono } from "@syc/contracts";
 import type { ReactNode } from "react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { LoadingState } from "@/components/common/LoadingState";
 import { Page } from "@/components/common/Page";
 import { PageHeader } from "@/components/common/PageHeader";
-import { Badge, badgeTonos } from "@/components/ui/badge";
+import { Badge, badgeTonos, tonoLabels } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { TonoSelect } from "@/features/catalogs/components/TonoSelect";
 
 // Clases escritas completas: Tailwind solo genera las que ve en el código.
 const SWATCHES = [
@@ -82,6 +84,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 // Referencia para quien programa un módulo nuevo (SPEC 09): todo lo que hay que reutilizar, en un
 // solo lugar. Solo existe en desarrollo; la ruta responde «no encontrado» en producción.
 export function StyleGallery() {
+  const [tono, setTono] = useState<Tono>("gris");
   return (
     <Page>
       <PageHeader
@@ -164,10 +167,14 @@ export function StyleGallery() {
         <ul className="flex flex-wrap gap-2">
           {badgeTonos.map((tono) => (
             <li key={tono}>
-              <Badge tono={tono}>{tono}</Badge>
+              <Badge tono={tono}>{tonoLabels[tono]}</Badge>
             </li>
           ))}
         </ul>
+        <div className="flex max-w-xs flex-col gap-2">
+          <Label htmlFor="galeria-tono">Color</Label>
+          <TonoSelect id="galeria-tono" value={tono} onChange={setTono} />
+        </div>
       </Section>
 
       <Section title="Tabla">

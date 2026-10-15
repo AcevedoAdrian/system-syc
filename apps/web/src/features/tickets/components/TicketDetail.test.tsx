@@ -188,6 +188,19 @@ describe("TicketDetail", () => {
       expect(screen.getByText("Técnico")).toBeInTheDocument();
     });
 
+    it("muestra el estado y la prioridad como insignias del color de cada ítem", () => {
+      show(
+        makeTicket({
+          estado: { id: "esp", nombre: "En espera", clave: null, color: "amarillo" },
+          prioridad: { id: "urg", nombre: "Urgente", color: "rojo" },
+        }),
+      );
+
+      expect(screen.getByText("En espera")).toHaveAttribute("data-tono", "amarillo");
+      expect(screen.getByText("Urgente")).toHaveAttribute("data-tono", "rojo");
+      expect(screen.getByText("Técnico")).not.toHaveAttribute("data-tono");
+    });
+
     it("un título larguísimo se parte en líneas en vez de desbordar la pantalla", () => {
       show(makeTicket({ titulo: "y".repeat(400) }));
 

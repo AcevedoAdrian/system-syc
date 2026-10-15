@@ -43,14 +43,29 @@ const fake = vi.hoisted(() => {
         queryFn: async () => structuredClone(sorted(ruta)),
       }),
     },
-    create: procedure(({ nombre, tipoId }: { nombre: string; tipoId?: string }) => {
-      if (state.createError) throw state.createError;
-      state.creates.push({ nombre, ...(tipoId === undefined ? {} : { tipoId }) });
-      const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
-      const item = withTipo({ id: `i${state.nextId++}`, nombre, orden, activo: true }, tipoId);
-      table(ruta).push(item);
-      return item;
-    }),
+    create: procedure(
+      ({ nombre, tipoId, color }: { nombre: string; tipoId?: string; color?: string }) => {
+        if (state.createError) throw state.createError;
+        state.creates.push({
+          nombre,
+          ...(tipoId === undefined ? {} : { tipoId }),
+          ...(color === undefined ? {} : { color }),
+        });
+        const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
+        const item = withTipo(
+          {
+            id: `i${state.nextId++}`,
+            nombre,
+            orden,
+            activo: true,
+            ...(color === undefined ? {} : { color }),
+          },
+          tipoId,
+        );
+        table(ruta).push(item);
+        return item;
+      },
+    ),
     update: procedure(
       ({ itemId, ...fields }: { itemId: string; nombre: string; tipoId?: string }) => {
         state.updates.push({ itemId, ...fields });
@@ -343,6 +358,139 @@ describe("CatalogsAdmin", () => {
       sitioWeb: null,
     });
     expect(await within(row("Acme")).findByText("soporte@acme.com")).toBeInTheDocument();
+  });
+
+  describe("color de estados y prioridades (SPEC 10)", () => {
+    beforeEach(() => {
+      fake.table("estados").push(
+        { id: "e1", nombre: "Pendiente", orden: 1, activo: true, clave: null, color: "azul" },
+        {
+          id: "e4",
+          nombre: "Finalizado",
+          orden: 2,
+          activo: true,
+          clave: "FINALIZADO",
+          color: "verde",
+        },
+      );
+      fake
+        .table("prioridades")
+        .push({ id: "p1", nombre: "Urgente", orden: 1, activo: true, color: "rojo" });
+    });
+
+    it("la tabla de Estados y la de Prioridades muestran la columna Color con el nombre del color", async () => {
+      renderAdmin("estados");
+      await screen.findByText("Pendiente");
+
+      expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+        "Nombre",
+        "Color",
+        "Estado",
+        "Acciones",
+      ]);
+      const azul = within(row("Pendiente")).getByText("Azul");
+      expect(azul).toHaveAttribute("data-tono", "azul");
+      expect(within(row("Finalizado")).getByText("Verde")).toHaveAttribute("data-tono", "verde");
+    });
+
+    it("la tabla de Prioridades también tiene la columna Color", async () => {
+      renderAdmin("prioridades");
+      await screen.findByText("Urgente");
+
+      expect(within(row("Urgente")).getByText("Rojo")).toHaveAttribute("data-tono", "rojo");
+    });
+
+    it("la tabla de Edificios no tiene la columna Color ni el campo en el formulario", async () => {
+      renderAdmin("edificios");
+      await screen.findByText("Sistemas");
+
+      expect(screen.queryByRole("columnheader", { name: "Color" })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo edificio" }));
+      expect(screen.queryByRole("combobox", { name: "Color" })).toBeNull();
+    });
+
+    it("el alta de un estado sin tocar el color manda gris", async () => {
+      renderAdmin("estados");
+      await screen.findByText("Pendiente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo estado" }));
+      expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent("Gris");
+      await userEvent.type(screen.getByLabelText("Nombre"), "En espera");
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      await waitFor(() => expect(fake.state.creates).toHaveLength(1));
+      expect(fake.state.creates[0]).toEqual({ nombre: "En espera", color: "gris" });
+      expect(await within(row("En espera")).findByText("Gris")).toHaveAttribute(
+        "data-tono",
+        "gris",
+      );
+    });
+
+    it("elegir Rojo en el desplegable lo manda y la tabla lo refleja", async () => {
+      renderAdmin("estados");
+      await screen.findByText("Pendiente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo estado" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Bloqueado");
+      await userEvent.click(screen.getByRole("combobox", { name: "Color" }));
+      expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Gris",
+        "Rojo",
+        "Naranja",
+        "Amarillo",
+        "Verde",
+        "Azul",
+        "Violeta",
+        "Rosa",
+      ]);
+      await userEvent.click(screen.getByRole("option", { name: "Rojo" }));
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      await waitFor(() => expect(fake.state.creates).toHaveLength(1));
+      expect(fake.state.creates[0]).toEqual({ nombre: "Bloqueado", color: "rojo" });
+      expect(await within(row("Bloqueado")).findByText("Rojo")).toHaveAttribute(
+        "data-tono",
+        "rojo",
+      );
+    });
+
+    it("editar un estado manda su color actual, y se puede cambiar", async () => {
+      renderAdmin("estados");
+      await screen.findByText("Pendiente");
+
+      await userEvent.click(within(row("Pendiente")).getByRole("button", { name: "Editar" }));
+      expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent("Azul");
+      await userEvent.clear(screen.getByLabelText("Nombre"));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Por hacer");
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      await waitFor(() => expect(fake.state.updates).toHaveLength(1));
+      expect(fake.state.updates[0]).toEqual({ itemId: "e1", nombre: "Por hacer", color: "azul" });
+
+      await userEvent.click(within(row("Por hacer")).getByRole("button", { name: "Editar" }));
+      await userEvent.click(screen.getByRole("combobox", { name: "Color" }));
+      await userEvent.click(screen.getByRole("option", { name: "Violeta" }));
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      await waitFor(() => expect(fake.state.updates).toHaveLength(2));
+      expect(fake.state.updates[1]).toEqual({
+        itemId: "e1",
+        nombre: "Por hacer",
+        color: "violeta",
+      });
+    });
+
+    it("una prioridad se edita con su color actual", async () => {
+      renderAdmin("prioridades");
+      await screen.findByText("Urgente");
+
+      await userEvent.click(within(row("Urgente")).getByRole("button", { name: "Editar" }));
+      expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent("Rojo");
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      await waitFor(() => expect(fake.state.updates).toHaveLength(1));
+      expect(fake.state.updates[0]).toEqual({ itemId: "p1", nombre: "Urgente", color: "rojo" });
+    });
   });
 
   it("en Estados las filas de sistema no tienen Eliminar", async () => {

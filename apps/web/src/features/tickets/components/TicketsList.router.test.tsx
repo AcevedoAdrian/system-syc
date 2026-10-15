@@ -40,8 +40,8 @@ const ticket = (numero: number): TicketSummary => ({
   numero,
   titulo: `Ticket ${numero}`,
   departamento: { id: "tec", nombre: "Técnico" },
-  estado: { id: "pend", nombre: "Pendiente", clave: null },
-  prioridad: { id: "alta", nombre: "Alta" },
+  estado: { id: "pend", nombre: "Pendiente", clave: null, color: "azul" },
+  prioridad: { id: "alta", nombre: "Alta", color: "naranja" },
   area: null,
   fechaRecepcion: "2026-10-01",
 });

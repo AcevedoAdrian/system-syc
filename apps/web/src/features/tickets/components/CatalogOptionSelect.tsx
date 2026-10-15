@@ -1,4 +1,4 @@
-import { areaLabel, type CatalogRuta } from "@syc/contracts";
+import { areaLabel, type CatalogRuta, type Tono } from "@syc/contracts";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,7 @@ import {
 import { useCatalog } from "@/features/catalogs/hooks/useCatalog";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
 import type { FieldControlProps } from "./Field";
+import { OptionLabel } from "./OptionLabel";
 
 // Radix no admite un ítem con valor "": el "sin valor" viaja con este centinela y se traduce a "".
 const NONE = "__none__";
@@ -27,8 +28,13 @@ interface CatalogOptionSelectProps extends FieldControlProps {
   emptyLabel?: string;
   // El valor que el ticket ya tiene. Si hoy está desactivado o eliminado no está en las opciones, pero
   // se sigue mostrando (marcado) para que guardar sin tocarlo no lo borre (SPEC 05, "referencia válida").
-  // Un área trae además su tipo, para mostrarse como «Tipo · Nombre».
-  current?: { id: string; nombre: string; tipo?: { id: string; nombre: string } } | null;
+  // Un área trae además su tipo, para mostrarse como «Tipo · Nombre»; una prioridad, su color (SPEC 10).
+  current?: {
+    id: string;
+    nombre: string;
+    tipo?: { id: string; nombre: string };
+    color?: Tono;
+  } | null;
   // Un ítem que no se ofrece (el estado actual al cambiar de estado).
   excludeId?: string;
   disabled?: boolean;
@@ -72,12 +78,18 @@ function FlatOptionSelect({
         {emptyLabel && <SelectItem value={NONE}>{emptyLabel}</SelectItem>}
         {options.map((option) => (
           <SelectItem key={option.id} value={option.id}>
-            {option.nombre}
+            <OptionLabel nombre={option.nombre} color={option.color} />
           </SelectItem>
         ))}
-        {isPending && current && <SelectItem value={current.id}>{current.nombre}</SelectItem>}
+        {isPending && current && (
+          <SelectItem value={current.id}>
+            <OptionLabel nombre={current.nombre} color={current.color} />
+          </SelectItem>
+        )}
         {currentIsOutOfOptions && (
-          <SelectItem value={current.id}>{current.nombre} (inactivo)</SelectItem>
+          <SelectItem value={current.id}>
+            <OptionLabel nombre={current.nombre} color={current.color} inactive />
+          </SelectItem>
         )}
       </SelectContent>
     </Select>

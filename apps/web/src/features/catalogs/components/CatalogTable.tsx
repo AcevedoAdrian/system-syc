@@ -2,7 +2,7 @@ import type { CatalogRuta } from "@syc/contracts";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, tonoLabels } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { catalogHasColor } from "../catalog-kinds";
 import type { CatalogEntry } from "../hooks/catalog-api";
 
 const features = tableFeatures({});
@@ -60,6 +61,19 @@ export function CatalogTable({
             </span>
           ),
         }),
+        // Estados y Prioridades (SPEC 10): la insignia lleva el nombre del color, no el del ítem.
+        ...(catalogHasColor(ruta)
+          ? [
+              column.accessor((item) => item.color ?? "gris", {
+                id: "color",
+                header: "Color",
+                cell: ({ row }) => {
+                  const tono = row.original.color ?? "gris";
+                  return <Badge tono={tono}>{tonoLabels[tono]}</Badge>;
+                },
+              }),
+            ]
+          : []),
         ...(ruta === "proveedores"
           ? CONTACT_COLUMNS.map(({ key, header }) =>
               column.accessor(key, { header, cell: ({ row }) => row.original[key] || "—" }),

@@ -46,12 +46,20 @@ const columns = column.columns([
     id: "departamento",
     header: "Departamento",
   }),
+  // Estado y prioridad son insignias del color que el admin eligió para el ítem (SPEC 10); el nombre
+  // va siempre dentro: el color nunca va solo.
   column.accessor((ticket) => ticket.estado.nombre, {
     id: "estado",
     header: "Estado",
-    cell: ({ row }) => <Badge variant="secondary">{row.original.estado.nombre}</Badge>,
+    cell: ({ row }) => <Badge tono={row.original.estado.color}>{row.original.estado.nombre}</Badge>,
   }),
-  column.accessor((ticket) => ticket.prioridad.nombre, { id: "prioridad", header: "Prioridad" }),
+  column.accessor((ticket) => ticket.prioridad.nombre, {
+    id: "prioridad",
+    header: "Prioridad",
+    cell: ({ row }) => (
+      <Badge tono={row.original.prioridad.color}>{row.original.prioridad.nombre}</Badge>
+    ),
+  }),
   column.accessor((ticket) => (ticket.area ? areaLabel(ticket.area) : "—"), {
     id: "area",
     header: "Área",
