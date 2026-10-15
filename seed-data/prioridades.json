@@ -1,1 +1,18 @@
-["Baja", "Media", "Alta", "Urgente"]
+[
+  {
+    "nombre": "Baja",
+    "color": "gris"
+  },
+  {
+    "nombre": "Media",
+    "color": "azul"
+  },
+  {
+    "nombre": "Alta",
+    "color": "naranja"
+  },
+  {
+    "nombre": "Urgente",
+    "color": "rojo"
+  }
+]

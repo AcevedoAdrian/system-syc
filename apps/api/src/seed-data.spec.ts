@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   areasSchema,
+  estadosSchema,
   findSeedDataDir,
+  prioridadesSchema,
   readSeedFile,
   requireSeedFile,
   resolveSeedAreas,
@@ -64,6 +66,105 @@ describe("readSeedFile", () => {
 
   it("requireSeedFile falla si falta", () => {
     expect(() => requireSeedFile(tmp(), "estados.json", areasSchema)).toThrow(/Falta seed-data/);
+  });
+});
+
+describe("estados.json y prioridades.json con color (SPEC 10)", () => {
+  function conArchivo(file: string, contenido: unknown) {
+    const dir = tmp();
+    writeFileSync(path.join(dir, file), JSON.stringify(contenido));
+    return dir;
+  }
+
+  it("lee el color de cada estado y conserva la clave", () => {
+    const dir = conArchivo("estados.json", [
+      { nombre: "Pendiente", color: "azul" },
+      { nombre: "Finalizado", clave: "FINALIZADO", color: "verde" },
+    ]);
+
+    expect(readSeedFile(dir, "estados.json", estadosSchema)).toEqual([
+      { nombre: "Pendiente", color: "azul" },
+      { nombre: "Finalizado", clave: "FINALIZADO", color: "verde" },
+    ]);
+  });
+
+  it("un estado sin color se carga en gris", () => {
+    const dir = conArchivo("estados.json", [{ nombre: "Pendiente" }]);
+
+    expect(readSeedFile(dir, "estados.json", estadosSchema)).toEqual([
+      { nombre: "Pendiente", color: "gris" },
+    ]);
+  });
+
+  it("un color inválido aborta nombrando el archivo, el valor y el ítem", () => {
+    const dir = conArchivo("estados.json", [
+      { nombre: "Pendiente", color: "azul" },
+      { nombre: "En espera", color: "fucsia" },
+    ]);
+
+    const leer = () => readSeedFile(dir, "estados.json", estadosSchema);
+    expect(leer).toThrow(/seed-data\/estados\.json/);
+    expect(leer).toThrow(/«fucsia»/);
+    expect(leer).toThrow(/«En espera»/);
+  });
+
+  it("las prioridades aceptan el objeto con color", () => {
+    const dir = conArchivo("prioridades.json", [
+      { nombre: "Baja", color: "gris" },
+      { nombre: "Urgente", color: "rojo" },
+    ]);
+
+    expect(readSeedFile(dir, "prioridades.json", prioridadesSchema)).toEqual([
+      { nombre: "Baja", color: "gris" },
+      { nombre: "Urgente", color: "rojo" },
+    ]);
+  });
+
+  it("las prioridades aceptan un texto suelto (el formato anterior) y lo cargan en gris", () => {
+    const dir = conArchivo("prioridades.json", ["Baja", { nombre: "Alta", color: "naranja" }]);
+
+    expect(readSeedFile(dir, "prioridades.json", prioridadesSchema)).toEqual([
+      { nombre: "Baja", color: "gris" },
+      { nombre: "Alta", color: "naranja" },
+    ]);
+  });
+
+  it("una prioridad con un color inválido aborta nombrando el archivo y el ítem", () => {
+    const dir = conArchivo("prioridades.json", [{ nombre: "Urgente", color: "Rojo" }]);
+
+    const leer = () => readSeedFile(dir, "prioridades.json", prioridadesSchema);
+    expect(leer).toThrow(/seed-data\/prioridades\.json/);
+    expect(leer).toThrow(/«Rojo»/);
+    expect(leer).toThrow(/«Urgente»/);
+  });
+
+  it("rechaza una prioridad sin nombre", () => {
+    const dir = conArchivo("prioridades.json", [{ color: "rojo" }]);
+
+    expect(() => readSeedFile(dir, "prioridades.json", prioridadesSchema)).toThrow(/nombre/);
+  });
+
+  it("los archivos del repositorio son válidos y traen la propuesta del SPEC 10", () => {
+    const dir = findSeedDataDir(process.cwd(), undefined);
+
+    const estados = readSeedFile(dir, "estados.json", estadosSchema) ?? [];
+    const prioridades = readSeedFile(dir, "prioridades.json", prioridadesSchema) ?? [];
+
+    expect(estados.map((e) => [e.nombre, e.color])).toEqual([
+      ["Pendiente", "azul"],
+      ["En progreso", "violeta"],
+      ["En espera", "amarillo"],
+      ["Finalizado", "verde"],
+      ["Cerrado", "gris"],
+      ["Cancelado", "rojo"],
+      ["Reabierto", "naranja"],
+    ]);
+    expect(prioridades.map((p) => [p.nombre, p.color])).toEqual([
+      ["Baja", "gris"],
+      ["Media", "azul"],
+      ["Alta", "naranja"],
+      ["Urgente", "rojo"],
+    ]);
   });
 });
 

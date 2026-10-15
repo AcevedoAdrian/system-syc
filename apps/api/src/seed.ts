@@ -1,3 +1,4 @@
+import type { Tono } from "@syc/contracts";
 import { z } from "zod";
 import { normalizeName, uniqueSlug } from "./common/text";
 import { loadEnv } from "./config/env.schema";
@@ -34,8 +35,8 @@ import {
 // de `seed-data/`, no constantes: ver `seed-data/README.md`.
 interface SeedData {
   departamentos: string[];
-  estados: { nombre: string; clave?: string | undefined }[];
-  prioridades: { nombre: string }[];
+  estados: { nombre: string; clave?: string | undefined; color: Tono }[];
+  prioridades: { nombre: string; color: Tono }[];
   edificios: { nombre: string }[] | null;
   tiposArea: { nombre: string }[] | null;
   areas: SeedArea[] | null;
@@ -50,7 +51,7 @@ function loadSeedData(dir: string): SeedData {
   return {
     departamentos: requireSeedFile(dir, "departamentos.json", departamentosSchema),
     estados: requireSeedFile(dir, "estados.json", estadosSchema),
-    prioridades: toItems(requireSeedFile(dir, "prioridades.json", prioridadesSchema)) ?? [],
+    prioridades: requireSeedFile(dir, "prioridades.json", prioridadesSchema),
     edificios: toItems(readSeedFile(dir, "edificios.json", edificiosSchema)),
     tiposArea: toItems(readSeedFile(dir, "tipos-area.json", tiposAreaSchema)),
     areas: readSeedFile(dir, "areas.json", areasSchema),

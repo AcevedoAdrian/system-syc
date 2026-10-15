@@ -1,27 +1,34 @@
 [
   {
-    "nombre": "Pendiente"
+    "nombre": "Pendiente",
+    "color": "azul"
   },
   {
-    "nombre": "En progreso"
+    "nombre": "En progreso",
+    "color": "violeta"
   },
   {
-    "nombre": "En espera"
+    "nombre": "En espera",
+    "color": "amarillo"
   },
   {
     "nombre": "Finalizado",
-    "clave": "FINALIZADO"
+    "clave": "FINALIZADO",
+    "color": "verde"
   },
   {
     "nombre": "Cerrado",
-    "clave": "CERRADO"
+    "clave": "CERRADO",
+    "color": "gris"
   },
   {
     "nombre": "Cancelado",
-    "clave": "CANCELADO"
+    "clave": "CANCELADO",
+    "color": "rojo"
   },
   {
     "nombre": "Reabierto",
-    "clave": "REABIERTO"
+    "clave": "REABIERTO",
+    "color": "naranja"
   }
 ]

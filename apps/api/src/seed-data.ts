@@ -1,15 +1,39 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { type Tono, tonoSchema, tonos } from "@syc/contracts";
 import { z } from "zod";
 import { normalizeName } from "./common/text";
 
 // Lectura de los archivos de `seed-data/` (en la raíz del repo). Son datos, no código: el bundle del
 // seed no los incluye, así que algunos (áreas y agentes) pueden no estar en git y copiarse aparte.
 
-const nombres = z.array(z.string().trim().min(1).max(120)).min(1);
+const nombre = z.string().trim().min(1).max(120);
+const nombres = z.array(nombre).min(1);
+
+// Estados y prioridades (SPEC 10): `color` es uno de los 8 tonos y, si falta, el ítem se carga en
+// gris (el mismo valor por defecto de la base). Un color que no es un tono aborta nombrando el
+// archivo y el ítem. Se valida como texto y se estrecha después, para poder nombrar el ítem.
+const colorEnItem = z.string().default("gris");
+const colorValido = (item: { color: string }) => tonoSchema.safeParse(item.color).success;
+const colorInvalido = {
+  path: ["color"],
+  error: (issue: { input?: unknown }) => {
+    const item = issue.input as { nombre?: unknown; color?: unknown };
+    return `«${String(item.color)}» no es un tono válido (${tonos.join(", ")}) en el ítem «${String(item.nombre)}»`;
+  },
+};
+const aTono = <T extends { color: string }>(item: T) => ({ ...item, color: item.color as Tono });
 
 export const departamentosSchema = nombres;
-export const prioridadesSchema = nombres;
+// Un texto suelto es el formato anterior (`["Baja", …]`): se carga en gris.
+export const prioridadesSchema = z
+  .array(
+    z.preprocess(
+      (item) => (typeof item === "string" ? { nombre: item } : item),
+      z.object({ nombre, color: colorEnItem }).refine(colorValido, colorInvalido).transform(aTono),
+    ),
+  )
+  .min(1);
 export const edificiosSchema = nombres;
 export const tiposAreaSchema = nombres;
 // Cada área nombra su tipo (SPEC 08); el tipo tiene que existir en `tipos-area.json` o en la base.
@@ -22,7 +46,12 @@ export const areasSchema = z
   )
   .min(1);
 export const estadosSchema = z
-  .array(z.object({ nombre: z.string().trim().min(1).max(120), clave: z.string().optional() }))
+  .array(
+    z
+      .object({ nombre, color: colorEnItem, clave: z.string().optional() })
+      .refine(colorValido, colorInvalido)
+      .transform(aTono),
+  )
   .min(1);
 export const agentesSchema = z
   .array(

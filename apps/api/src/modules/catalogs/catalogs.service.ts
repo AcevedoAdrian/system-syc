@@ -1,6 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { AuditHistory, CatalogItem, EstadoTicket, Prioridad, Proveedor } from "@syc/contracts";
+import type {
+  AuditHistory,
+  CatalogItem,
+  EstadoTicket,
+  Prioridad,
+  Proveedor,
+  Tono,
+} from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName } from "../../common/text";
 import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
@@ -177,7 +184,12 @@ export class CatalogsService {
   // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.
   async seedIfEmpty(
     def: CatalogDefinition,
-    items: readonly { nombre: string; clave?: string; tipo?: { id: string; nombre: string } }[],
+    items: readonly {
+      nombre: string;
+      clave?: string;
+      color?: Tono;
+      tipo?: { id: string; nombre: string };
+    }[],
     adminId: string,
   ): Promise<number> {
     const entries: SeedEntry[] = items.map((item, index) => {
@@ -188,6 +200,9 @@ export class CatalogsService {
         activo: true,
       };
       if (item.clave) data.clave = item.clave;
+      // SPEC 10: el ítem sin color nace gris, como la columna; así el `create` auditado coincide
+      // con lo que queda en la base.
+      if (def.inputFields.includes("color")) data.color = item.color ?? "gris";
       const reference = def.reference;
       if (reference && item.tipo) data[reference.field] = item.tipo.id;
       return {

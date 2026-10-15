@@ -1061,7 +1061,10 @@ describe("CatalogsService.seedIfEmpty", () => {
 
     const created = await service.seedIfEmpty(
       estados,
-      [{ nombre: "Pendiente" }, { nombre: "Cerrado", clave: "CERRADO" }],
+      [
+        { nombre: "Pendiente", color: "azul" },
+        { nombre: "Cerrado", clave: "CERRADO", color: "gris" },
+      ],
       "admin-1",
     );
 
@@ -1070,13 +1073,19 @@ describe("CatalogsService.seedIfEmpty", () => {
       estados,
       [
         {
-          data: { nombre: "Pendiente", nombreNormalizado: "pendiente", orden: 1, activo: true },
+          data: {
+            nombre: "Pendiente",
+            nombreNormalizado: "pendiente",
+            orden: 1,
+            activo: true,
+            color: "azul",
+          },
           audit: {
             entityType: "EstadoTicket",
             action: "create",
             actorId: null,
             payload: {
-              after: { nombre: "Pendiente", orden: 1, activo: true, clave: null },
+              after: { nombre: "Pendiente", orden: 1, activo: true, clave: null, color: "azul" },
             },
           },
         },
@@ -1087,13 +1096,20 @@ describe("CatalogsService.seedIfEmpty", () => {
             orden: 2,
             activo: true,
             clave: "CERRADO",
+            color: "gris",
           },
           audit: {
             entityType: "EstadoTicket",
             action: "create",
             actorId: null,
             payload: {
-              after: { nombre: "Cerrado", orden: 2, activo: true, clave: "CERRADO" },
+              after: {
+                nombre: "Cerrado",
+                orden: 2,
+                activo: true,
+                clave: "CERRADO",
+                color: "gris",
+              },
             },
           },
         },
@@ -1105,20 +1121,45 @@ describe("CatalogsService.seedIfEmpty", () => {
   it("no manda `clave` a un catálogo que no la tiene", async () => {
     const { service, seedIfEmpty } = buildSeedService(1);
 
-    await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1");
+    await service.seedIfEmpty(prioridades, [{ nombre: "Baja", color: "gris" }], "admin-1");
 
     const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [unknown, { data: object }[]];
     expect(Object.keys(entries[0]?.data ?? {}).sort()).toEqual([
       "activo",
+      "color",
       "nombre",
       "nombreNormalizado",
       "orden",
     ]);
   });
 
+  it("un ítem sin color de Prioridades o Estados nace gris, en la fila y en la auditoría", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1");
+
+    const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [
+      unknown,
+      { data: { color?: string }; audit: { payload: { after: { color?: string } } } }[],
+    ];
+    expect(entries[0]?.data.color).toBe("gris");
+    expect(entries[0]?.audit.payload.after.color).toBe("gris");
+  });
+
+  it("no manda `color` a un catálogo que no lo tiene", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(edificios, [{ nombre: "Central" }], "admin-1");
+
+    const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [unknown, { data: object }[]];
+    expect(entries[0]?.data).not.toHaveProperty("color");
+  });
+
   it("devuelve 0 cuando el repository encuentra la tabla con datos", async () => {
     const { service } = buildSeedService(0);
 
-    expect(await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1")).toBe(0);
+    expect(
+      await service.seedIfEmpty(prioridades, [{ nombre: "Baja", color: "gris" }], "admin-1"),
+    ).toBe(0);
   });
 });
