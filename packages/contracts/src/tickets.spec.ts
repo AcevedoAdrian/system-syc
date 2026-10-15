@@ -6,6 +6,8 @@ import {
   formatTicketNumber,
   listTicketsInputSchema,
   referenciaExternaSchema,
+  ticketSchema,
+  ticketSummarySchema,
   updateTicketInputSchema,
 } from "./tickets.js";
 
@@ -265,5 +267,53 @@ describe("listTicketsInputSchema", () => {
     expect(listTicketsInputSchema.safeParse({ fechaRecepcionDesde: "01/10/2026" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("color en las referencias del ticket", () => {
+  const ref = { id: "x", nombre: "Algo" };
+  const ticket = {
+    id: "t1",
+    numero: 13,
+    departamento: ref,
+    area: null,
+    edificio: null,
+    tipo: null,
+    modulo: null,
+    prioridad: { ...ref, color: "rojo" },
+    estado: { ...ref, clave: null, color: "azul" },
+    proveedor: null,
+    titulo: "Impresora rota",
+    descripcion: null,
+    actuacionSimple: null,
+    referenciaExterna: null,
+    solucionDescripcion: null,
+    notificado: false,
+    fechaRecepcion: "2026-10-01",
+    fechaCierre: null,
+    fechaReabierto: null,
+    creador: ref,
+    editor: ref,
+    createdAt: "2026-10-01T10:00:00.000Z",
+    updatedAt: "2026-10-01T10:00:00.000Z",
+  };
+
+  it("el ticket y cada fila de la bandeja traen el color del estado y de la prioridad", () => {
+    expect(ticketSchema.parse(ticket)).toMatchObject({
+      estado: { color: "azul" },
+      prioridad: { color: "rojo" },
+    });
+    expect(ticketSummarySchema.parse(ticket)).toMatchObject({
+      estado: { color: "azul" },
+      prioridad: { color: "rojo" },
+    });
+  });
+
+  it("rechaza una referencia sin color o con un color que no es un tono", () => {
+    expect(ticketSchema.safeParse({ ...ticket, prioridad: ref }).success).toBe(false);
+    expect(
+      ticketSchema.safeParse({ ...ticket, estado: { ...ref, clave: null, color: "fucsia" } })
+        .success,
+    ).toBe(false);
   });
 });

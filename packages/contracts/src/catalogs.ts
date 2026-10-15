@@ -5,7 +5,25 @@ import { blankToNull } from "./fields.js";
 
 const nombreSchema = z.string().trim().min(1).max(120);
 
+// SPEC 10: los 8 tonos de insignia de la base visual (SPEC 09). Es la única lista: el enum `Tono` de
+// Prisma y las clases de `badge.tsx` se comparan con esta en tests. Solo presentación.
+export const tonos = [
+  "gris",
+  "rojo",
+  "naranja",
+  "amarillo",
+  "verde",
+  "azul",
+  "violeta",
+  "rosa",
+] as const;
+
+export const tonoSchema = z.enum(tonos);
+
 export const catalogItemInputSchema = z.object({ nombre: nombreSchema });
+
+// SPEC 10: Prioridades y Estados suman el color, obligatorio en el alta y en la edición.
+export const catalogItemConColorInputSchema = catalogItemInputSchema.extend({ color: tonoSchema });
 
 // SPEC 08: el tipo es obligatorio; el service valida que exista y esté activo.
 export const areaInputSchema = catalogItemInputSchema.extend({ tipoId: z.string().min(1) });
@@ -40,10 +58,15 @@ export const proveedorSchema = catalogItemSchema.extend({
   sitioWeb: z.string().nullable(),
 });
 
+export const prioridadSchema = catalogItemSchema.extend({ color: tonoSchema });
+
 export const claveEstadoSchema = z.enum(["FINALIZADO", "CERRADO", "CANCELADO", "REABIERTO"]);
 
 // `clave` es de solo lectura: ninguna entrada la acepta.
-export const estadoTicketSchema = catalogItemSchema.extend({ clave: claveEstadoSchema.nullable() });
+export const estadoTicketSchema = catalogItemSchema.extend({
+  clave: claveEstadoSchema.nullable(),
+  color: tonoSchema,
+});
 
 export const moveCatalogItemInputSchema = z.object({
   itemId: z.string(),
@@ -72,8 +95,11 @@ export const catalogRutas = [
 export const catalogRutaSchema = z.enum(catalogRutas);
 
 export type CatalogRuta = z.infer<typeof catalogRutaSchema>;
+export type Tono = z.infer<typeof tonoSchema>;
 export type CatalogItem = z.infer<typeof catalogItemSchema>;
 export type CatalogItemInput = z.infer<typeof catalogItemInputSchema>;
+export type CatalogItemConColorInput = z.infer<typeof catalogItemConColorInputSchema>;
+export type Prioridad = z.infer<typeof prioridadSchema>;
 export type Area = z.infer<typeof areaSchema>;
 export type AreaInput = z.infer<typeof areaInputSchema>;
 export type Proveedor = z.infer<typeof proveedorSchema>;
@@ -122,8 +148,8 @@ export const catalogsContract = {
   tiposArea: catalogContract("tiposArea", catalogItemInputSchema, catalogItemSchema),
   edificios: catalogContract("edificios", catalogItemInputSchema, catalogItemSchema),
   tipos: catalogContract("tipos", catalogItemInputSchema, catalogItemSchema),
-  prioridades: catalogContract("prioridades", catalogItemInputSchema, catalogItemSchema),
+  prioridades: catalogContract("prioridades", catalogItemConColorInputSchema, prioridadSchema),
   modulos: catalogContract("modulos", catalogItemInputSchema, catalogItemSchema),
   proveedores: catalogContract("proveedores", proveedorInputSchema, proveedorSchema),
-  estados: catalogContract("estados", catalogItemInputSchema, estadoTicketSchema),
+  estados: catalogContract("estados", catalogItemConColorInputSchema, estadoTicketSchema),
 };

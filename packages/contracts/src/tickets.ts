@@ -1,7 +1,7 @@
 import { oc } from "@orpc/contract";
 import { z } from "zod";
 import { auditHistorySchema } from "./audit.js";
-import { type ClaveEstado, claveEstadoSchema } from "./catalogs.js";
+import { type ClaveEstado, claveEstadoSchema, tonoSchema } from "./catalogs.js";
 import { blankToNull, blankToNullValue, fechaNoFuturaSchema } from "./fields.js";
 
 // Bloqueo optimista (Q22): la versión (`updatedAt`) que el cliente leyó ya no es la de la base. Es un 409,
@@ -165,8 +165,10 @@ export const ticketSchema = z.object({
   edificio: refSchema.nullable(),
   tipo: refSchema.nullable(),
   modulo: refSchema.nullable(),
-  prioridad: refSchema,
-  estado: refSchema.extend({ clave: claveEstadoSchema.nullable() }),
+  // SPEC 10: el color es presentación y viene del ítem del catálogo. La foto auditable del ticket
+  // sigue guardando solo `{ id, nombre }`.
+  prioridad: refSchema.extend({ color: tonoSchema }),
+  estado: refSchema.extend({ clave: claveEstadoSchema.nullable(), color: tonoSchema }),
   proveedor: refSchema.nullable(),
   titulo: z.string(),
   descripcion: z.string().nullable(),
