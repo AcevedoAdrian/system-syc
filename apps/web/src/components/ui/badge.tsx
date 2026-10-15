@@ -1,3 +1,4 @@
+import { type Tono, tonos } from "@syc/contracts";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 import { Slot } from "radix-ui";
@@ -24,21 +25,13 @@ const badgeVariants = cva(
 );
 
 // Los 8 tonos de insignia de la base visual (SPEC 09): son el vocabulario de color que el admin elige
-// por estado y prioridad (SPEC 10). Cada uno trae fondo, texto y borde en `index.css`.
-export const badgeTonos = [
-  "gris",
-  "rojo",
-  "naranja",
-  "amarillo",
-  "verde",
-  "azul",
-  "violeta",
-  "rosa",
-] as const;
-export type BadgeTono = (typeof badgeTonos)[number];
+// por estado y prioridad (SPEC 10). La lista vive en `@syc/contracts` (una sola, compartida con la
+// API y el enum de Prisma); cada tono trae fondo, texto y borde en `index.css`.
+export const badgeTonos = tonos;
+export type BadgeTono = Tono;
 
 // Clases completas, no armadas con plantilla: Tailwind solo genera las que ve escritas.
-const tonoClasses: Record<BadgeTono, string> = {
+export const tonoClasses: Record<BadgeTono, string> = {
   gris: "border-tono-gris-border bg-tono-gris text-tono-gris-foreground",
   rojo: "border-tono-rojo-border bg-tono-rojo text-tono-rojo-foreground",
   naranja: "border-tono-naranja-border bg-tono-naranja text-tono-naranja-foreground",
@@ -47,6 +40,19 @@ const tonoClasses: Record<BadgeTono, string> = {
   azul: "border-tono-azul-border bg-tono-azul text-tono-azul-foreground",
   violeta: "border-tono-violeta-border bg-tono-violeta text-tono-violeta-foreground",
   rosa: "border-tono-rosa-border bg-tono-rosa text-tono-rosa-foreground",
+};
+
+// El nombre de cada tono tal como se le muestra al usuario («Rojo»). Es el único lugar con estos
+// textos: la administración de catálogos y la galería los leen de acá.
+export const tonoLabels: Record<BadgeTono, string> = {
+  gris: "Gris",
+  rojo: "Rojo",
+  naranja: "Naranja",
+  amarillo: "Amarillo",
+  verde: "Verde",
+  azul: "Azul",
+  violeta: "Violeta",
+  rosa: "Rosa",
 };
 
 function Badge({

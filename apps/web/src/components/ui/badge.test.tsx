@@ -1,6 +1,7 @@
+import { tonos } from "@syc/contracts";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { Badge, type BadgeTono, badgeTonos } from "./badge";
+import { Badge, type BadgeTono, badgeTonos, tonoClasses, tonoLabels } from "./badge";
 
 describe("Badge", () => {
   it("sin tono usa los colores de su variante", () => {
@@ -22,6 +23,26 @@ describe("Badge", () => {
       "violeta",
       "rosa",
     ]);
+  });
+
+  it("los tonos son los del contrato, y cada uno tiene sus clases y su nombre", () => {
+    // Un tono agregado en `@syc/contracts` y no acá (o al revés) rompe el build, no el navegador.
+    expect([...badgeTonos]).toEqual([...tonos]);
+    expect(Object.keys(tonoClasses).sort()).toEqual([...tonos].sort());
+    expect(Object.keys(tonoLabels).sort()).toEqual([...tonos].sort());
+  });
+
+  it("los nombres de los tonos son textos para el usuario, con mayúscula inicial", () => {
+    expect(tonoLabels).toEqual({
+      gris: "Gris",
+      rojo: "Rojo",
+      naranja: "Naranja",
+      amarillo: "Amarillo",
+      verde: "Verde",
+      azul: "Azul",
+      violeta: "Violeta",
+      rosa: "Rosa",
+    });
   });
 
   it.each(badgeTonos as readonly BadgeTono[])(
