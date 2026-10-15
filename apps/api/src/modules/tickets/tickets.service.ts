@@ -12,6 +12,7 @@ import {
   TICKETS_PAGE_SIZE,
   type Ticket,
   type TicketsPage,
+  type Tono,
   type UpdateTicketInput,
 } from "@syc/contracts";
 import type { AuthenticatedUser, UserScope } from "../../common/authenticated-request";
@@ -39,6 +40,7 @@ function scopeOf(actor: AuthenticatedUser): UserScope {
 
 type Ref = { id: string; nombre: string };
 type AreaRef = Ref & { tipo: Ref };
+type PrioridadRef = Ref & { color: Tono };
 
 // "Referencia válida" de un valor nuevo: existe (no eliminado) y está activo.
 function assertUsable(row: ReferenceRow | null, message: string): asserts row is ReferenceRow {
@@ -98,7 +100,7 @@ export class TicketsService {
       });
     }
 
-    await this.resolveReference("prioridad", input.prioridadId, null, MESSAGES.prioridad);
+    await this.resolvePrioridad(input.prioridadId, null);
     await this.resolveOptional("proveedor", input.proveedorId, null, MESSAGES.proveedor);
     if (input.proveedorId && input.referenciaExterna) {
       const duplicate = await this.repository.findByReferencia(
@@ -150,12 +152,7 @@ export class TicketsService {
     assertDateCorrectable("La fecha de cierre", current.fechaCierre, input.fechaCierre);
     assertDateCorrectable("La fecha de reapertura", current.fechaReabierto, input.fechaReabierto);
 
-    const prioridad = await this.resolveReference(
-      "prioridad",
-      input.prioridadId,
-      current.prioridad,
-      MESSAGES.prioridad,
-    );
+    const prioridad = await this.resolvePrioridad(input.prioridadId, current.prioridad);
     const area = await this.resolveArea(input.areaId, current.area);
     const edificio = await this.resolveOptional(
       "edificio",
@@ -293,7 +290,12 @@ export class TicketsService {
 
     const next: Ticket = {
       ...current,
-      estado: { id: destino.id, nombre: destino.nombre, clave: destino.clave },
+      estado: {
+        id: destino.id,
+        nombre: destino.nombre,
+        clave: destino.clave,
+        color: destino.color,
+      },
       fechaCierre: write.fechaCierre !== undefined ? write.fechaCierre : current.fechaCierre,
       fechaReabierto:
         write.fechaReabierto !== undefined ? write.fechaReabierto : current.fechaReabierto,
@@ -381,6 +383,15 @@ export class TicketsService {
     const row = await this.repository.findCatalogItem(catalog, id);
     assertUsable(row, message);
     return { id: row.id, nombre: row.nombre };
+  }
+
+  // Igual que `resolveReference`, pero la prioridad viaja con su color (SPEC 10): el ticket que se
+  // devuelve la muestra como insignia sin otra consulta.
+  private async resolvePrioridad(id: string, current: PrioridadRef | null): Promise<PrioridadRef> {
+    if (current?.id === id) return current;
+    const row = await this.repository.findPrioridad(id);
+    assertUsable(row, MESSAGES.prioridad);
+    return { id: row.id, nombre: row.nombre, color: row.color };
   }
 
   // Igual que `resolveReference`, pero el área viaja con su tipo (el ticket la muestra como «Tipo ·

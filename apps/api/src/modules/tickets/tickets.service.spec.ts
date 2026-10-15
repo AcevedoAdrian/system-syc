@@ -5,14 +5,16 @@ import type {
   ListTicketsInput,
   UpdateTicketInput,
 } from "@syc/contracts";
-import { listTicketsInputSchema } from "@syc/contracts";
+import { listTicketsInputSchema, type Tono } from "@syc/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import type { AuditEntry } from "../audit/audit.repository";
 import type { AuditService } from "../audit/audit.service";
+import { snapshotOf } from "./ticket-audit-snapshot";
 import type {
   AreaRow,
   EstadoRow,
+  PrioridadRow,
   ReferenceMatch,
   ReferenceRow,
   TicketCatalog,
@@ -62,12 +64,19 @@ const area = (id: string, nombre: string, activo = true): AreaRow => ({
   activo,
   tipo: diputado,
 });
-const estado = (id: string, nombre: string, activo = true): EstadoRow => ({
+const estado = (id: string, nombre: string, activo = true, color: Tono = "gris"): EstadoRow => ({
   id,
   nombre,
   activo,
   clave: null,
+  color,
 });
+const prioridad = (
+  id: string,
+  nombre: string,
+  activo = true,
+  color: Tono = "gris",
+): PrioridadRow => ({ id, nombre, activo, color });
 
 // Un ticket ya guardado, en el estado "Pendiente" y sin nada asignado salvo lo obligatorio.
 const unTicket = (extra: Partial<TicketRow> = {}): TicketRow => ({
@@ -78,8 +87,8 @@ const unTicket = (extra: Partial<TicketRow> = {}): TicketRow => ({
   edificio: null,
   tipo: null,
   modulo: null,
-  prioridad: { id: "alta", nombre: "Alta" },
-  estado: { id: "pend", nombre: "Pendiente", clave: null },
+  prioridad: { id: "alta", nombre: "Alta", color: "naranja" },
+  estado: { id: "pend", nombre: "Pendiente", clave: null, color: "azul" },
   proveedor: null,
   titulo: "Impresora rota",
   descripcion: null,
@@ -123,6 +132,7 @@ interface World {
   departamentos?: ReferenceRow[];
   catalogos?: Partial<Record<TicketCatalog, ReferenceRow[]>>;
   areas?: AreaRow[];
+  prioridades?: PrioridadRow[];
   estados?: EstadoRow[];
   tickets?: TicketRow[];
   referencias?: (ReferenceMatch & { proveedorId: string; referenciaExterna: string })[];
@@ -137,12 +147,18 @@ function buildService(world: World = {}) {
   const catalogos: Record<TicketCatalog, ReferenceRow[]> = {
     edificio: [],
     tipoTicket: [],
-    prioridad: [ref("alta", "Alta"), ref("baja", "Baja", false)],
     modulo: [],
     proveedor: [ref("acme", "Acme"), ref("viejo", "Viejo", false)],
     ...world.catalogos,
   };
-  const estados = world.estados ?? [estado("pend", "Pendiente"), estado("prog", "En progreso")];
+  const prioridades = world.prioridades ?? [
+    prioridad("alta", "Alta", true, "naranja"),
+    prioridad("baja", "Baja", false, "gris"),
+  ];
+  const estados = world.estados ?? [
+    estado("pend", "Pendiente", true, "azul"),
+    estado("prog", "En progreso", true, "violeta"),
+  ];
   const tickets = world.tickets ?? [];
   const referencias = world.referencias ?? [];
   const audits: AuditEntry[] = [];
@@ -175,6 +191,7 @@ function buildService(world: World = {}) {
     findArea: async (id: string) => areas.find((a) => a.id === id) ?? null,
     findCatalogItem: async (catalog: TicketCatalog, id: string) =>
       catalogos[catalog].find((item) => item.id === id) ?? null,
+    findPrioridad: async (id: string) => prioridades.find((p) => p.id === id) ?? null,
     findEstados: async () => estados,
     findByReferencia: async (proveedorId: string, referenciaExterna: string, exceptId?: string) =>
       referencias.find(
@@ -202,6 +219,10 @@ function buildService(world: World = {}) {
         const found = id ? items.find((i) => i.id === id) : null;
         return found ? { id: found.id, nombre: found.nombre } : null;
       };
+      const prioridadDe = (id: string) => {
+        const found = prioridades.find((p) => p.id === id);
+        return found ? { id: found.id, nombre: found.nombre, color: found.color } : null;
+      };
       const estadoRow = estados.find((e) => e.id === data.estadoId) as EstadoRow;
       const row: TicketRow = {
         id: `t-${sequence}`,
@@ -214,11 +235,13 @@ function buildService(world: World = {}) {
         edificio: null,
         tipo: null,
         modulo: null,
-        prioridad: nombreDe(catalogos.prioridad, data.prioridadId) as {
-          id: string;
-          nombre: string;
+        prioridad: prioridadDe(data.prioridadId) as TicketRow["prioridad"],
+        estado: {
+          id: estadoRow.id,
+          nombre: estadoRow.nombre,
+          clave: estadoRow.clave,
+          color: estadoRow.color,
         },
-        estado: { id: estadoRow.id, nombre: estadoRow.nombre, clave: estadoRow.clave },
         proveedor: nombreDe(catalogos.proveedor, data.proveedorId),
         titulo: data.titulo,
         descripcion: data.descripcion,
@@ -253,6 +276,10 @@ function buildService(world: World = {}) {
         const found = areas.find((a) => a.id === areaId);
         return found ? { id: found.id, nombre: found.nombre, tipo: found.tipo } : null;
       };
+      const prioridadDe = (prioridadId: string) => {
+        const found = prioridades.find((p) => p.id === prioridadId);
+        return found ? { id: found.id, nombre: found.nombre, color: found.color } : null;
+      };
       const refOf = (items: ReferenceRow[], refId: string | null) => {
         const found = refId ? items.find((i) => i.id === refId) : null;
         return found ? { id: found.id, nombre: found.nombre } : null;
@@ -260,7 +287,7 @@ function buildService(world: World = {}) {
       return {
         ...current,
         ...data,
-        prioridad: refOf(catalogos.prioridad, data.prioridadId) ?? current.prioridad,
+        prioridad: prioridadDe(data.prioridadId) ?? current.prioridad,
         area: areaDe(data.areaId),
         edificio: refOf(catalogos.edificio, data.edificioId),
         tipo: refOf(catalogos.tipoTicket, data.tipoId),
@@ -285,7 +312,12 @@ function buildService(world: World = {}) {
       return {
         ...current,
         ...campos,
-        estado: { id: destino.id, nombre: destino.nombre, clave: destino.clave },
+        estado: {
+          id: destino.id,
+          nombre: destino.nombre,
+          clave: destino.clave,
+          color: destino.color,
+        },
         updatedAt: "2026-10-06T11:00:00.000Z",
       };
     },
@@ -335,8 +367,8 @@ describe("TicketsService.create", () => {
     expect(ticket).toMatchObject({
       numero: 13,
       departamento: { id: "tec", nombre: "Técnico" },
-      prioridad: { id: "alta", nombre: "Alta" },
-      estado: { id: "pend", nombre: "Pendiente" },
+      prioridad: { id: "alta", nombre: "Alta", color: "naranja" },
+      estado: { id: "pend", nombre: "Pendiente", color: "azul" },
       area: null,
       edificio: null,
       tipo: null,
@@ -395,6 +427,7 @@ describe("TicketsService.create", () => {
         area: null,
         edificio: null,
         tipo: null,
+        // La foto auditable guarda solo `{ id, nombre }`: el color es presentación (SPEC 10).
         prioridad: { id: "alta", nombre: "Alta" },
         modulo: null,
         estado: { id: "pend", nombre: "Pendiente" },
@@ -538,7 +571,12 @@ describe("TicketsService.create", () => {
 
 describe("TicketsService.update", () => {
   const ticket = unTicket();
-  const finalizado = { id: "fin", nombre: "Finalizado", clave: "FINALIZADO" as const };
+  const finalizado = {
+    id: "fin",
+    nombre: "Finalizado",
+    clave: "FINALIZADO" as const,
+    color: "verde" as const,
+  };
 
   it("sin cambios responde 200 con el ticket y no escribe ni audita", async () => {
     const { service, updates, audits } = buildService({ tickets: [ticket] });
@@ -978,14 +1016,14 @@ describe("TicketsService.update", () => {
 // Estados con `clave` como los del seed, pero con un nombre cambiado ("Resuelto") y otro sin clave
 // que se llama "Finalizado": la regla es por `clave`, nunca por nombre (D1).
 const ESTADOS: EstadoRow[] = [
-  { id: "pend", nombre: "Pendiente", activo: true, clave: null },
-  { id: "prog", nombre: "En progreso", activo: true, clave: null },
-  { id: "fin", nombre: "Resuelto", activo: true, clave: "FINALIZADO" },
-  { id: "cer", nombre: "Cerrado", activo: true, clave: "CERRADO" },
-  { id: "can", nombre: "Cancelado", activo: true, clave: "CANCELADO" },
-  { id: "rea", nombre: "Reabierto", activo: true, clave: "REABIERTO" },
-  { id: "falso", nombre: "Finalizado", activo: true, clave: null },
-  { id: "arch", nombre: "Archivado", activo: false, clave: null },
+  { id: "pend", nombre: "Pendiente", activo: true, clave: null, color: "azul" },
+  { id: "prog", nombre: "En progreso", activo: true, clave: null, color: "violeta" },
+  { id: "fin", nombre: "Resuelto", activo: true, clave: "FINALIZADO", color: "verde" },
+  { id: "cer", nombre: "Cerrado", activo: true, clave: "CERRADO", color: "gris" },
+  { id: "can", nombre: "Cancelado", activo: true, clave: "CANCELADO", color: "rojo" },
+  { id: "rea", nombre: "Reabierto", activo: true, clave: "REABIERTO", color: "naranja" },
+  { id: "falso", nombre: "Finalizado", activo: true, clave: null, color: "amarillo" },
+  { id: "arch", nombre: "Archivado", activo: false, clave: null, color: "gris" },
 ];
 
 const cambio = (
@@ -997,7 +1035,7 @@ const cambio = (
 describe("TicketsService.changeStatus", () => {
   const ticket = unTicket();
   const cerrado = unTicket({
-    estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO" },
+    estado: { id: "fin", nombre: "Resuelto", clave: "FINALIZADO", color: "verde" },
     fechaCierre: "2026-10-03",
     solucionDescripcion: "Se cambió el toner",
   });
@@ -1277,7 +1315,9 @@ describe("TicketsService.changeStatus", () => {
     });
 
     it("el estado que el ticket ya tiene se acepta aunque se haya desactivado después", async () => {
-      const enArchivado = unTicket({ estado: { id: "arch", nombre: "Archivado", clave: null } });
+      const enArchivado = unTicket({
+        estado: { id: "arch", nombre: "Archivado", clave: null, color: "gris" },
+      });
       const { service, statusChanges } = buildService({ tickets: [enArchivado], estados: ESTADOS });
 
       await service.changeStatus(cambio(enArchivado, "arch"), admin);
@@ -1512,6 +1552,102 @@ describe("TicketsService.history", () => {
     await service.history("t-eliminado");
 
     expect(history).toHaveBeenCalledWith("Ticket", "t-eliminado");
+  });
+});
+
+describe("color de estado y prioridad (SPEC 10)", () => {
+  it("get y list devuelven el color del estado y de la prioridad", async () => {
+    const { service } = buildService({ tickets: [unTicket()] });
+
+    const detalle = await service.get("t-1");
+    const pagina = await service.list(admin, listTicketsInputSchema.parse({}));
+
+    expect(detalle).toMatchObject({
+      estado: { id: "pend", color: "azul" },
+      prioridad: { id: "alta", color: "naranja" },
+    });
+    expect(pagina.items[0]).toMatchObject({
+      estado: { color: "azul" },
+      prioridad: { color: "naranja" },
+    });
+  });
+
+  it("create devuelve el color del estado inicial y de la prioridad elegida", async () => {
+    const { service } = buildService();
+
+    const ticket = await service.create(input(), agenteTecnico);
+
+    expect(ticket.estado).toMatchObject({ id: "pend", color: "azul" });
+    expect(ticket.prioridad).toMatchObject({ id: "alta", color: "naranja" });
+  });
+
+  it("changeStatus devuelve el color del estado destino", async () => {
+    const ticket = unTicket();
+    const { service } = buildService({ tickets: [ticket], estados: ESTADOS });
+
+    const result = await service.changeStatus(cambio(ticket, "prog"), agenteTecnico);
+
+    expect(result.estado).toMatchObject({ id: "prog", color: "violeta" });
+  });
+
+  it("update devuelve el color de la prioridad nueva", async () => {
+    const ticket = unTicket();
+    const { service } = buildService({
+      tickets: [ticket],
+      prioridades: [
+        prioridad("alta", "Alta", true, "naranja"),
+        prioridad("urg", "Urgente", true, "rojo"),
+      ],
+    });
+
+    const result = await service.update(edit(ticket, { prioridadId: "urg" }), agenteTecnico);
+
+    expect(result.prioridad).toEqual({ id: "urg", nombre: "Urgente", color: "rojo" });
+  });
+
+  it("un ticket cuyo estado y prioridad cambiaron de color no ensucia su historial", async () => {
+    // El estado y la prioridad del ítem se recolorearon después de guardar el ticket: la lectura
+    // actual trae otro color, pero el ticket editado sin cambios no genera diff ni entrada.
+    const ticket = unTicket({
+      estado: { id: "pend", nombre: "Pendiente", clave: null, color: "rojo" },
+      prioridad: { id: "alta", nombre: "Alta", color: "verde" },
+    });
+    const { service, audits, updates } = buildService({ tickets: [ticket] });
+
+    await expect(service.update(edit(ticket), agenteTecnico)).resolves.toEqual(ticket);
+
+    expect(audits).toEqual([]);
+    expect(updates).toEqual([]);
+  });
+
+  it("la foto auditable no incluye el color: recolorear no cambia el snapshot", () => {
+    const antes = unTicket();
+    const despues = unTicket({
+      estado: { ...antes.estado, color: "rojo" },
+      prioridad: { ...antes.prioridad, color: "verde" },
+    });
+
+    expect(snapshotOf(despues)).toEqual(snapshotOf(antes));
+    expect(snapshotOf(antes).prioridad).toEqual({ id: "alta", nombre: "Alta" });
+    expect(snapshotOf(antes).estado).toEqual({ id: "pend", nombre: "Pendiente" });
+  });
+
+  it("cambiar de prioridad deja un diff solo con { id, nombre }, sin color", async () => {
+    const ticket = unTicket();
+    const { service, audits } = buildService({
+      tickets: [ticket],
+      prioridades: [
+        prioridad("alta", "Alta", true, "naranja"),
+        prioridad("urg", "Urgente", true, "rojo"),
+      ],
+    });
+
+    await service.update(edit(ticket, { prioridadId: "urg" }), agenteTecnico);
+
+    expect(audits[0]?.payload).toEqual({
+      before: { prioridad: { id: "alta", nombre: "Alta" } },
+      after: { prioridad: { id: "urg", nombre: "Urgente" } },
+    });
   });
 });
 

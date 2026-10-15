@@ -8,6 +8,7 @@ import {
   TICKETS_PAGE_SIZE,
   type Ticket,
   type TicketSummary,
+  type Tono,
 } from "@syc/contracts";
 import { getPrismaClient, Prisma } from "@syc/db";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
@@ -35,11 +36,17 @@ export interface AreaRow extends ReferenceRow {
 
 export interface EstadoRow extends ReferenceRow {
   clave: ClaveEstado | null;
+  color: Tono;
 }
 
-// Los catálogos que un ticket puede referenciar de forma opcional u obligatoria, salvo `estado`,
-// que se lee aparte porque trae la `clave`.
-export type TicketCatalog = "edificio" | "tipoTicket" | "prioridad" | "modulo" | "proveedor";
+// La prioridad viaja con su color (SPEC 10): el ticket la devuelve para mostrarla como insignia.
+export interface PrioridadRow extends ReferenceRow {
+  color: Tono;
+}
+
+// Los catálogos que un ticket puede referenciar de forma opcional u obligatoria, salvo `estado` y
+// `prioridad`, que se leen aparte porque traen `clave` y `color`.
+export type TicketCatalog = "edificio" | "tipoTicket" | "modulo" | "proveedor";
 
 export interface ReferenceMatch {
   id: string;
@@ -94,6 +101,8 @@ type TicketWrite = Partial<TicketUpdateData> & { estadoId?: string; departamento
 
 const ref = { select: { id: true, nombre: true } } as const;
 const area = { select: { id: true, nombre: true, tipo: ref } } as const;
+const prioridadRef = { select: { id: true, nombre: true, color: true } } as const;
+const estadoRef = { select: { id: true, nombre: true, clave: true, color: true } } as const;
 const user = { select: { id: true, name: true } } as const;
 
 const detailSelect = {
@@ -104,9 +113,9 @@ const detailSelect = {
   edificio: ref,
   tipo: ref,
   modulo: ref,
-  prioridad: ref,
+  prioridad: prioridadRef,
   proveedor: ref,
-  estado: { select: { id: true, nombre: true, clave: true } },
+  estado: estadoRef,
   titulo: true,
   descripcion: true,
   actuacionSimple: true,
@@ -127,8 +136,8 @@ const summarySelect = {
   numero: true,
   titulo: true,
   departamento: { select: { id: true, name: true } },
-  estado: { select: { id: true, nombre: true, clave: true } },
-  prioridad: ref,
+  estado: estadoRef,
+  prioridad: prioridadRef,
   area,
   fechaRecepcion: true,
 } as const;
@@ -144,7 +153,10 @@ interface DbUser {
 interface DbArea extends DbRef {
   tipo: DbRef;
 }
-interface DbEstado extends DbRef {
+interface DbPrioridad extends DbRef {
+  color: Tono;
+}
+interface DbEstado extends DbPrioridad {
   clave: string | null;
 }
 
@@ -154,7 +166,7 @@ interface DbTicketSummary {
   titulo: string;
   departamento: DbUser;
   estado: DbEstado;
-  prioridad: DbRef;
+  prioridad: DbPrioridad;
   area: DbArea | null;
   fechaRecepcion: Date;
 }
@@ -381,8 +393,6 @@ export class TicketsRepository implements TicketUsageReader {
         return this.db.edificio.findFirst({ where, select });
       case "tipoTicket":
         return this.db.tipoTicket.findFirst({ where, select });
-      case "prioridad":
-        return this.db.prioridad.findFirst({ where, select });
       case "modulo":
         return this.db.modulo.findFirst({ where, select });
       case "proveedor":
@@ -390,12 +400,20 @@ export class TicketsRepository implements TicketUsageReader {
     }
   }
 
+  // Una prioridad no eliminada con su color, o `null`.
+  async findPrioridad(id: string): Promise<PrioridadRow | null> {
+    return this.db.prioridad.findFirst({
+      where: { id, ...notDeleted },
+      select: { id: true, nombre: true, activo: true, color: true },
+    });
+  }
+
   // Todos los estados no eliminados, en el orden de `catalogs.estados.list`.
   async findEstados(): Promise<EstadoRow[]> {
     const rows = await this.db.estadoTicket.findMany({
       where: notDeleted,
       orderBy: [{ orden: "asc" }, { nombre: "asc" }],
-      select: { id: true, nombre: true, activo: true, clave: true },
+      select: { id: true, nombre: true, activo: true, clave: true, color: true },
     });
     return rows.map(fromEstado);
   }
