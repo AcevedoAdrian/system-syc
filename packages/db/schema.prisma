@@ -252,11 +252,27 @@ model TipoTicket {
   @@map("tipo_ticket")
 }
 
+// Los 8 tonos de insignia de la base visual (SPEC 09). El admin elige uno por estado y prioridad (SPEC 10).
+// La lista única vive en `@syc/contracts` (`tonos`); un test la compara con este enum.
+enum Tono {
+  gris
+  rojo
+  naranja
+  amarillo
+  verde
+  azul
+  violeta
+  rosa
+}
+
 model Prioridad {
   id                String    @id @default(cuid())
   nombre            String
   nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
   orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  // Solo presentación (SPEC 10). El `@default` existe para que la migración agregue la columna sobre filas
+  // existentes: la API nunca lo usa, el contrato exige `color` en cada alta y edición.
+  color             Tono      @default(gris)
   activo            Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -315,6 +331,8 @@ model EstadoTicket {
   nombre            String
   nombreNormalizado String // normalizeName(nombre): lo calcula el service, nunca llega del cliente
   orden             Int // lo asigna el service (máximo + 1 en el alta); solo cambia con `move`
+  // Solo presentación (SPEC 10): ninguna regla mira el color. Mismo `@default` que en `Prioridad`.
+  color             Tono      @default(gris)
   activo            Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
