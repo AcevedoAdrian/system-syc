@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { AuditHistory, CatalogItem, EstadoTicket, Proveedor } from "@syc/contracts";
+import type { AuditHistory, CatalogItem, EstadoTicket, Prioridad, Proveedor } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { normalizeName } from "../../common/text";
 import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
@@ -17,7 +17,7 @@ import {
 } from "./catalogs.repository";
 
 // Lo que devuelve cualquiera de los 8 catálogos; cada controller lo ajusta a su esquema de salida.
-export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket;
+export type CatalogItemView = CatalogItem | Prioridad | Proveedor | EstadoTicket;
 
 // Entrada de alta y edición: el service solo lee los campos de `def.inputFields`, así que un campo
 // de más (por ejemplo `clave` en un alta) nunca llega a la base.

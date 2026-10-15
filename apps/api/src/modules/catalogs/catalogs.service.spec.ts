@@ -192,15 +192,31 @@ describe("CatalogsService.list", () => {
 
   it("devuelve la clave de un estado y los datos de contacto de un proveedor", async () => {
     const { service } = buildService({
-      estados: [row("e1", "Cerrado", 1, { clave: "CERRADO" })],
+      estados: [row("e1", "Cerrado", 1, { clave: "CERRADO", color: "gris" })],
       proveedores: [row("p1", "Acme", 1, { contacto: "Ana", telefono: null })],
     });
 
     expect(await service.list(estados)).toEqual([
-      { id: "e1", nombre: "Cerrado", orden: 1, activo: true, clave: "CERRADO" },
+      { id: "e1", nombre: "Cerrado", orden: 1, activo: true, clave: "CERRADO", color: "gris" },
     ]);
     expect(await service.list(proveedores)).toEqual([
       { id: "p1", nombre: "Acme", orden: 1, activo: true, contacto: "Ana", telefono: null },
+    ]);
+  });
+});
+
+describe("CatalogsService.list: color", () => {
+  it("Prioridades y Estados devuelven el color; los otros catálogos no", async () => {
+    const { service } = buildService({
+      prioridades: [row("p1", "Urgente", 1, { color: "rojo" })],
+      edificios: [row("b1", "Anexo", 1, { color: "rojo" })],
+    });
+
+    expect(await service.list(prioridades)).toEqual([
+      { id: "p1", nombre: "Urgente", orden: 1, activo: true, color: "rojo" },
+    ]);
+    expect(await service.list(edificios)).toEqual([
+      { id: "b1", nombre: "Anexo", orden: 1, activo: true },
     ]);
   });
 });
@@ -309,14 +325,38 @@ describe("CatalogsService.create", () => {
   it("ignora los campos que la definición no acepta, como la clave de un estado", async () => {
     const { service, creates } = buildService();
 
-    await service.create(estados, { nombre: "Nuevo", clave: "CERRADO" }, admin);
+    await service.create(estados, { nombre: "Nuevo", color: "azul", clave: "CERRADO" }, admin);
 
     expect(Object.keys(creates[0] ?? {}).sort()).toEqual([
       "activo",
+      "color",
       "nombre",
       "nombreNormalizado",
       "orden",
     ]);
+  });
+
+  it("en Estados y Prioridades guarda el color, lo devuelve y lo audita", async () => {
+    const { service, audits, creates } = buildService();
+
+    const estado = await service.create(estados, { nombre: "En espera", color: "amarillo" }, admin);
+    const prioridad = await service.create(prioridades, { nombre: "Alta", color: "rojo" }, admin);
+
+    expect(estado).toMatchObject({ nombre: "En espera", color: "amarillo" });
+    expect(prioridad).toMatchObject({ nombre: "Alta", color: "rojo" });
+    expect(creates.map((data) => data.color)).toEqual(["amarillo", "rojo"]);
+    expect(audits.map((a) => a.payload)).toEqual([
+      { after: { nombre: "En espera", orden: 1, activo: true, clave: null, color: "amarillo" } },
+      { after: { nombre: "Alta", orden: 1, activo: true, color: "rojo" } },
+    ]);
+  });
+
+  it("en los otros catálogos no guarda un color que llegue de afuera", async () => {
+    const { service, creates } = buildService();
+
+    await service.create(edificios, { nombre: "Anexo", color: "rojo" }, admin);
+
+    expect(creates[0]).not.toHaveProperty("color");
   });
 });
 

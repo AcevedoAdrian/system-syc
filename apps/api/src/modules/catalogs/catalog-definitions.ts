@@ -118,6 +118,9 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
       notFound: "La prioridad no existe",
       duplicate: "Ya existe una prioridad con ese nombre",
     }),
+    // SPEC 10: el color es solo presentación; ninguna regla lo mira.
+    inputFields: ["nombre", "color"],
+    snapshotFields: [...BASE_FIELDS, "color"],
     rules: {
       lastActive: {
         deactivate: "No se puede desactivar la última prioridad activa",
@@ -155,6 +158,8 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
         "Es un estado de sistema: se puede renombrar o desactivar, pero no eliminar",
     },
     // `clave` se lee y se audita, pero no está en `inputFields`: ninguna entrada la acepta.
-    snapshotFields: [...BASE_FIELDS, "clave"],
+    // `color` (SPEC 10) es lo único que el cliente escribe además del nombre.
+    inputFields: ["nombre", "color"],
+    snapshotFields: [...BASE_FIELDS, "clave", "color"],
   },
 };
