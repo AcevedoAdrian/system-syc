@@ -1,6 +1,6 @@
 # Catálogo de specs de system-syc — índice
 
-> **Status:** Resuelto — ver SPEC 02 a 07 (el SPEC 08 se escribió después, fuera de este registro de preguntas)
+> **Status:** Resuelto — ver SPEC 02 a 07 (los SPEC 08 y 09 se escribieron después, fuera de este registro de preguntas)
 > **Date:** 2026-09-25, resuelto 2026-09-29
 > **Fuentes:** `docs/prd.md` (v3), `docs/architecture.md`, `specs/01-esqueleto-monorepo.md`, `README.md`
 
@@ -18,6 +18,7 @@ Este documento fue la propuesta inicial de specs, con preguntas abiertas. Todas 
 | 06 | Comentarios, bandeja y detalle | `specs/06-comentarios-bandeja.md` | 5 |
 | 07 | Endurecimiento y despliegue | `specs/07-endurecimiento-despliegue.md` | 6 |
 | 08 | Tipos de área (agrega un catálogo; no estaba en las preguntas Q1 a Q38) | `specs/08-tipos-de-area.md` | 3 (extiende) |
+| 09 | Base visual (paleta clara y oscura, componentes compartidos, galería y chequeo de colores; tampoco estaba en las preguntas) | `specs/09-base-visual-impeccable.md` | 6 (extiende) |
 
 ## Decisiones que resolvieron conflictos entre respuestas (2026-09-29)
 

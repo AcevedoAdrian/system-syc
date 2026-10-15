@@ -32,7 +32,7 @@ Tres reglas sostienen esa decisión:
 | Frontend                              | Vite + React (SPA)                                               |
 | Routing / estado de servidor / tablas | TanStack Router + TanStack Query + TanStack Table                |
 | Formularios                           | react-hook-form + los mismos esquemas Zod de `contracts`         |
-| UI                                    | Tailwind CSS + shadcn/ui                                         |
+| UI                                    | Tailwind CSS + shadcn/ui; base visual (SPEC 09) en `docs/base-visual.md` |
 | Calidad                               | Biome (lint + formato)                                           |
 | Tests                                 | Vitest (Playwright pendiente: por ahora las pruebas de permisos se hacen a mano) |
 | Infraestructura                       | Docker Compose (postgres + api + web)                            |
