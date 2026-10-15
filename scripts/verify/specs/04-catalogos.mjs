@@ -1,6 +1,13 @@
 import { adminId, auditCount, auditRows, q, same } from "../lib/audit.mjs";
 import { ADMIN, cleanEnv } from "../lib/env.mjs";
-import { admin, loggedIn, newUser, tipoAreaId, uniq } from "../lib/fixtures.mjs";
+import {
+  admin,
+  CATALOGOS_CON_COLOR,
+  loggedIn,
+  newUser,
+  tipoAreaId,
+  uniq,
+} from "../lib/fixtures.mjs";
 import { scalar, sql } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
@@ -22,12 +29,20 @@ const SYSTEM_STATES = ["FINALIZADO", "CERRADO", "CANCELADO", "REABIERTO"];
 
 const path = (ruta, id = "", suffix = "") => `/catalogs/${ruta}${id ? `/${id}` : ""}${suffix}`;
 
-// SPEC 08: un área exige `tipoId`; los demás catálogos solo el nombre.
-const withTipo = async (ruta, body) =>
-  ruta === "areas" && body.tipoId === undefined ? { ...body, tipoId: await tipoAreaId() } : body;
+// SPEC 08: un área exige `tipoId`. SPEC 10: Estados y Prioridades exigen `color`: en el alta, gris; en
+// una edición (`itemId`), el que el ítem ya tiene, para que renombrar no cambie su color.
+const withRequired = async (ruta, body, itemId) => {
+  let out = body;
+  if (ruta === "areas" && out.tipoId === undefined) out = { ...out, tipoId: await tipoAreaId() };
+  if (CATALOGOS_CON_COLOR.includes(ruta) && out.color === undefined) {
+    const actual = itemId ? (await list(ruta)).find((i) => i.id === itemId) : null;
+    out = { ...out, color: actual?.color ?? "gris" };
+  }
+  return out;
+};
 
 async function create(ruta, nombre) {
-  const res = await (await admin()).post(path(ruta), await withTipo(ruta, { nombre }));
+  const res = await (await admin()).post(path(ruta), await withRequired(ruta, { nombre }));
   assertStatus(res, 200, `crear "${nombre}" en ${ruta}`);
   return res.body;
 }
@@ -39,7 +54,7 @@ async function list(ruta, client) {
 }
 
 async function patch(ruta, id, body) {
-  return (await admin()).patch(path(ruta, id), await withTipo(ruta, body));
+  return (await admin()).patch(path(ruta, id), await withRequired(ruta, body, id));
 }
 
 async function setActive(ruta, id, activo) {

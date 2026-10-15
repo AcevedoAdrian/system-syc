@@ -1,8 +1,8 @@
-import { copyFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { adminId, auditRows, same } from "../lib/audit.mjs";
-import { ADMIN, cleanEnv, DB_NAME, PG } from "../lib/env.mjs";
+import { ADMIN, cleanEnv, DB_NAME } from "../lib/env.mjs";
 import {
   admin,
   createItem,
@@ -15,6 +15,7 @@ import {
 import { sql } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
+import { dropDb, freshDb, MIGRATIONS, migrationDirs, psqlFile, urlOf } from "../lib/temp-db.mjs";
 import { assert, assertStatus, ROOT, run, tail, vitest } from "../lib/util.mjs";
 
 // --- Ayudas ------------------------------------------------------------------------------------
@@ -62,55 +63,6 @@ async function inbox(client, params = {}) {
   return res.body;
 }
 const idsOf = (page) => page.items.map((t) => t.id).sort();
-
-// --- Bases temporales propias (migración y seed) ------------------------------------------------
-
-const MIGRATIONS = path.join(ROOT, "packages/db/migrations");
-const migrationDirs = () =>
-  readdirSync(MIGRATIONS, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort();
-
-const psqlFile = (database, content) => {
-  const result = run(
-    "docker",
-    [
-      "compose",
-      "exec",
-      "-T",
-      "postgres",
-      "psql",
-      "-U",
-      PG.user,
-      "-d",
-      database,
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-q",
-      "-f",
-      "-",
-    ],
-    { input: content },
-  );
-  assert(result.status === 0, `psql falló en ${database}:\n${tail(result.output)}`);
-};
-
-const urlOf = (database) =>
-  `postgresql://${PG.user}:${encodeURIComponent(PG.password)}@localhost:${PG.port}/${database}`;
-
-const dropDb = (database) => sql(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`, "postgres");
-
-// Una base nueva con las migraciones anteriores a `tipos_area` (o con todas, `hasta` = null).
-function freshDb(suffix, { hasta }) {
-  const database = `${DB_NAME}_${suffix}`;
-  sql(`CREATE DATABASE "${database}"`, "postgres");
-  for (const dir of migrationDirs()) {
-    if (hasta && dir.endsWith(hasta)) break;
-    psqlFile(database, readFileSync(path.join(MIGRATIONS, dir, "migration.sql"), "utf8"));
-  }
-  return database;
-}
 
 // --- SPEC 08 ------------------------------------------------------------------------------------
 

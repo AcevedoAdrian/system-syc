@@ -446,7 +446,7 @@ export default defineSpec({
         const fin = await estadoDe("FINALIZADO");
         const nuevoNombre = `Resuelto ${uniq()}`;
         assertStatus(
-          await a.patch(`/catalogs/estados/${fin.id}`, { nombre: nuevoNombre }),
+          await a.patch(`/catalogs/estados/${fin.id}`, { nombre: nuevoNombre, color: fin.color }),
           200,
           "renombrar",
         );
@@ -469,7 +469,7 @@ export default defineSpec({
           );
         } finally {
           assertStatus(
-            await a.patch(`/catalogs/estados/${fin.id}`, { nombre: fin.nombre }),
+            await a.patch(`/catalogs/estados/${fin.id}`, { nombre: fin.nombre, color: fin.color }),
             200,
             "devolver el nombre",
           );

@@ -6,14 +6,15 @@ que el seed lee al correr; no forman parte del código.
 | Archivo | Contenido | ¿Obligatorio? | En git |
 | --- | --- | --- | --- |
 | `departamentos.json` | Nombres de los departamentos | sí | sí |
-| `estados.json` | `{ nombre, clave? }`; la `clave` es la de los 4 estados de sistema | sí | sí |
-| `prioridades.json` | Nombres | sí | sí |
+| `estados.json` | `{ nombre, clave?, color? }`; la `clave` es la de los 4 estados de sistema | sí | sí |
+| `prioridades.json` | `{ nombre, color? }` (un texto suelto también vale y carga en gris) | sí | sí |
 | `edificios.json` | Nombres | no | sí |
 | `tipos-area.json` | Nombres de los tipos de área (Diputado, Dirección…) | no | sí |
 | `areas.json` | `{ tipo, nombre }`; el `tipo` es uno de `tipos-area.json` | no | **no** (`.gitignore`) |
 | `agentes.json` | `{ nombre, apellido, departamento }` | no | **no** (`.gitignore`) |
 
 - El orden del archivo es el `orden` del catálogo. Los tipos de área se cargan antes que las áreas.
+- `color` es uno de los 8 tonos: `gris`, `rojo`, `naranja`, `amarillo`, `verde`, `azul`, `violeta`, `rosa`. Si falta, el ítem se carga en gris. Un valor que no es un tono aborta el seed nombrando el archivo, el valor y el ítem, sin crear nada.
 - Cada área nombra su `tipo`, que se busca por nombre sin mayúsculas ni acentos. Si un tipo no existe,
   o dos áreas repiten el nombre dentro de un mismo tipo, el seed aborta nombrando los valores y no crea
   áreas. Un catálogo (tipos o áreas) solo se carga si su tabla está vacía: en una base con áreas ya

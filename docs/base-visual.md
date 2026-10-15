@@ -36,7 +36,7 @@ Un color nuevo es un token nuevo, y se agrega en `apps/web/src/index.css`:
 2. Registralo en `@theme inline` (`--color-<nombre>`) para que exista la clase de Tailwind.
 3. Si es un texto o un relleno con texto, agregalo a la lista de pares de `tokens.contrast.test.ts`: tiene que dar 4,5:1 o más en los dos temas.
 
-Un tono de insignia nuevo es un vocabulario nuevo para el administrador (SPEC 10): se agrega a `badgeTonos` en `components/ui/badge.tsx` con sus tres valores (fondo, texto y borde).
+Un tono de insignia nuevo es un vocabulario nuevo para el administrador (SPEC 10, ya hecho): la lista es única y vive en `tonos` de `packages/contracts/src/catalogs.ts`. Agregar uno es, en el mismo cambio, un valor nuevo en el enum `Tono` de Prisma (migración), sus tres tokens en `index.css` (fondo, texto y borde, en los dos temas, con contraste de 4,5:1 o más), su entrada en `tonoClasses` y en `tonoLabels` de `components/ui/badge.tsx` y en `tonos`. Los tests que comparan las cuatro listas fallan si falta alguna.
 
 ## Reglas de la base
 
@@ -49,5 +49,5 @@ Un tono de insignia nuevo es un vocabulario nuevo para el administrador (SPEC 10
 ## Qué no cubre
 
 - Las pantallas de tickets y de administración conservan su estructura anterior: toman la paleta y la tipografía nuevas por usar tokens, pero su rediseño es el SPEC 11.
-- El color de cada estado y prioridad lo elige el administrador desde el SPEC 10; esta base solo define los 8 tonos entre los que elige.
+- El color de cada estado y prioridad lo elige el administrador desde `/admin/catalogos` (SPEC 10, ya hecho): esta base define los 8 tonos entre los que elige. Se muestra siempre como `<Badge tono>` con el nombre del ítem adentro, y sale del dato del ítem, nunca de su nombre.
 - Un selector manual de tema y la adaptación a celular quedan para un spec propio.

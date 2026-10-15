@@ -6,6 +6,9 @@ import { assert, assertStatus } from "./util.mjs";
 // Fixtures de datos reutilizables por cualquier SPEC: cada criterio crea los suyos con nombres únicos,
 // así los criterios no dependen del orden en que corren.
 
+// Los catálogos que llevan color (SPEC 10): el contrato lo exige en cada alta y edición.
+export const CATALOGOS_CON_COLOR = ["prioridades", "estados"];
+
 export const uniq = () => randomBytes(3).toString("hex");
 
 let adminClient = null;
@@ -86,6 +89,8 @@ export async function tipoAreaId() {
 export async function createItem(ruta, extra = {}) {
   const body = { nombre: `${ruta} ${uniq()}`, ...extra };
   if (ruta === "areas" && body.tipoId === undefined) body.tipoId = await tipoAreaId();
+  // SPEC 10: Estados y Prioridades exigen el color en el alta.
+  if (CATALOGOS_CON_COLOR.includes(ruta) && body.color === undefined) body.color = "gris";
   const res = await (await admin()).post(`/catalogs/${ruta}`, body);
   assertStatus(res, 200, `crear en ${ruta}`);
   return res.body;
