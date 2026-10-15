@@ -29,7 +29,19 @@ import { assert, assertStatus, ROOT, run, tail, vitest } from "../lib/util.mjs";
 
 // --- Ayudas ------------------------------------------------------------------------------------
 
-const TONOS = ["gris", "rojo", "naranja", "amarillo", "verde", "azul", "violeta", "rosa"];
+// Los 16 tonos, en el orden del enum de Prisma: los 8 del SPEC 09 y los 8 de la ampliación del paso 11.
+const TONOS_BASE = ["gris", "rojo", "naranja", "amarillo", "verde", "azul", "violeta", "rosa"];
+const TONOS_NUEVOS = [
+  "celeste",
+  "turquesa",
+  "lima",
+  "marron",
+  "indigo",
+  "magenta",
+  "bordo",
+  "pizarra",
+];
+const TONOS = [...TONOS_BASE, ...TONOS_NUEVOS];
 
 // La propuesta del SPEC 10, por nombre normalizado (estados sin clave y prioridades) y por clave.
 const ESTADOS = [
@@ -100,9 +112,9 @@ function baseMigrada(suffix, { renombrarFinalizado = false, extras = false } = {
   return database;
 }
 
-function aplicarMigracion(database) {
-  const dir = migrationDirs().find((d) => d.endsWith("_color_estados_prioridades"));
-  assert(dir, "no existe la migración color_estados_prioridades");
+function aplicarMigracion(database, sufijo = "_color_estados_prioridades") {
+  const dir = migrationDirs().find((d) => d.endsWith(sufijo));
+  assert(dir, `no existe la migración ${sufijo.slice(1)}`);
   psqlFile(database, migrationSql(dir));
 }
 
@@ -223,7 +235,7 @@ export default defineSpec({
 
     criterion(
       5,
-      "`catalogs.estados.create` y `catalogs.prioridades.create` sin `color`, o con un valor que no es uno de los 8 tonos, devuelven 400; `update` también",
+      "`catalogs.estados.create` y `catalogs.prioridades.create` sin `color`, o con un valor que no es uno de los 16 tonos, devuelven 400; `update` también",
       async () => {
         const a = await admin();
         for (const ruta of CATALOGOS_CON_COLOR) {
@@ -582,6 +594,93 @@ export default defineSpec({
       { infra: false },
     ),
 
-    turboCriterion(17),
+    criterion(
+      17,
+      "Después de las migraciones, el enum `Tono` de Postgres tiene los 16 valores, en el orden de `tonos`, y `tonos_ampliados` no crea ningún `AuditLog` ni cambia ninguna fila",
+      async () => {
+        const database = baseMigrada("mig_tonos", { extras: true });
+        try {
+          aplicarMigracion(database);
+          const filas = () =>
+            sql(
+              `SELECT 'e', id, color FROM estado_ticket UNION ALL SELECT 'p', id, color FROM prioridad ORDER BY 1, 2`,
+              database,
+            );
+          const auditoria = () => sql(`SELECT count(*) FROM audit_log`, database);
+          const antes = { filas: filas(), auditoria: auditoria() };
+
+          aplicarMigracion(database, "_tonos_ampliados");
+
+          same(
+            sql(
+              `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+               WHERE t.typname = 'Tono' ORDER BY e.enumsortorder`,
+              database,
+            ).map((r) => r[0]),
+            TONOS,
+            "valores del enum Tono",
+          );
+          same(filas(), antes.filas, "filas de estados y prioridades tras ampliar");
+          same(auditoria(), antes.auditoria, "AuditLog tras ampliar");
+        } finally {
+          dropDb(database);
+        }
+      },
+    ),
+
+    criterion(
+      18,
+      "`catalogs.estados.create` y `catalogs.prioridades.create` aceptan cada uno de los 8 tonos nuevos y lo devuelven en `list`; `fucsia` sigue dando 400",
+      async () => {
+        const a = await admin();
+        for (const ruta of CATALOGOS_CON_COLOR) {
+          for (const color of TONOS_NUEVOS) {
+            const item = await createItem(ruta, { color });
+            same(item.color, color, `${ruta}: color del alta (${color})`);
+            same(
+              (await catalogo(ruta)).find((i) => i.id === item.id)?.color,
+              color,
+              `${ruta}: color en list (${color})`,
+            );
+          }
+          assertStatus(
+            await a.post(`/catalogs/${ruta}`, { nombre: `Fucsia ${uniq()}`, color: "fucsia" }),
+            400,
+            `${ruta}: fucsia`,
+          );
+        }
+      },
+    ),
+
+    criterion(
+      19,
+      "En la web, el desplegable «Color» ofrece los 16 tonos, cada uno como insignia con su nombre (con acento donde corresponde), y la tabla muestra el nombre del tono elegido",
+      async () => {
+        vitest(
+          "@syc/web",
+          "el selector de tono y la administración",
+          "src/features/catalogs/components/TonoSelect.test.tsx",
+          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
+          "src/components/ui/badge.test.tsx",
+        );
+      },
+      { infra: false },
+    ),
+
+    criterion(
+      20,
+      "Cada tono nuevo define fondo, texto y borde en los dos temas, con 4,5:1 o más entre texto y fondo, y la galería `/estilos` los muestra",
+      async () => {
+        vitest(
+          "@syc/web",
+          "los tokens de color y la galería",
+          "src/tokens.contrast.test.ts",
+          "src/features/estilos/components/StyleGallery.test.tsx",
+        );
+      },
+      { infra: false },
+    ),
+
+    turboCriterion(21),
   ],
 });

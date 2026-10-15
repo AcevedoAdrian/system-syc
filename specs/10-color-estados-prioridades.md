@@ -3,7 +3,8 @@
 > **Status:** Approved
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo), SPEC 06 (comentarios y bandeja), SPEC 09 (base visual)
 > **Date:** 2026-10-15
-> **Objective:** que el administrador elija, entre los 8 tonos de la base visual, el color de cada estado y de cada prioridad, y que ese color se vea como insignia en la bandeja, el detalle del ticket, los desplegables y la administración de catálogos.
+> **Ampliado:** 2026-10-15, con los pasos 1 a 10 ya implementados con 8 tonos. La paleta pasa a 16 tonos por decisión del usuario (pidió un mínimo de 15). Ver «Ampliación de la paleta» y el paso 11.
+> **Objective:** que el administrador elija, entre los 16 tonos de la base visual (los 8 del SPEC 09 y 8 nuevos que suma este spec), el color de cada estado y de cada prioridad, y que ese color se vea como insignia en la bandeja, el detalle del ticket, los desplegables y la administración de catálogos.
 
 ## Por qué existe este spec
 
@@ -13,12 +14,13 @@ Hoy `EstadoTicket` y `Prioridad` son ítems de catálogo sin color:
 - La prioridad es texto plano en la bandeja y no aparece en el encabezado del detalle.
 - En una bandeja de 20 filas, «Urgente» y «Baja» se leen con el mismo peso visual que «Pendiente» y «Finalizado».
 
-El SPEC 09 definió los 8 tonos (`gris`, `rojo`, `naranja`, `amarillo`, `verde`, `azul`, `violeta`, `rosa`) con contraste AA en claro y oscuro, y dejó dicho que son «el vocabulario del SPEC 10»: este spec les da uso.
+El SPEC 09 definió 8 tonos (`gris`, `rojo`, `naranja`, `amarillo`, `verde`, `azul`, `violeta`, `rosa`) con contraste AA en claro y oscuro, y dejó dicho que son «el vocabulario del SPEC 10»: este spec les da uso.
 
 Decisiones del usuario del 2026-10-15:
 
 - El color se ve en administración, bandeja, detalle y en los desplegables (filtros de la bandeja, alta y edición del ticket, cambio de estado). Solo cambia la insignia: la estructura de esas pantallas es del SPEC 11.
 - El color es obligatorio, y gris por defecto.
+- La paleta se amplía de 8 a 16 tonos (pidió un mínimo de 15): se suman `celeste`, `turquesa`, `lima`, `marron`, `indigo`, `magenta`, `bordo` y `pizarra`.
 - Los estados y prioridades que ya existen arrancan con una propuesta de color, tanto en el seed como en la migración.
 - El admin elige el color en un desplegable, cuyas opciones son las insignias con el nombre del color.
 - Dos estados (o dos prioridades) pueden tener el mismo color.
@@ -31,6 +33,9 @@ Decisiones del usuario del 2026-10-15:
 
 - Un enum `Tono` en Prisma y el campo `color` en `EstadoTicket` y `Prioridad`.
 - La migración `color_estados_prioridades`, que asigna la propuesta de color a lo que ya existe.
+- **Ampliación de la paleta (16 tonos):**
+  - la migración `tonos_ampliados`, que suma 8 valores al enum `Tono`;
+  - los 8 tonos nuevos en `tonos` (`@syc/contracts`), en `tonoClasses` y `tonoLabels` (`badge.tsx`) y sus 24 tokens en `index.css`, en claro y oscuro, con contraste AA en `tokens.contrast.test.ts`.
 - Contratos en `packages/contracts`:
   - la lista única de tonos (`tonos`, `tonoSchema`);
   - `color` en el alta, la edición y la salida de `prioridades` y `estados`;
@@ -52,8 +57,8 @@ Decisiones del usuario del 2026-10-15:
 **Fuera de alcance (para specs futuros):**
 
 - Color en los otros 6 catálogos (Áreas, Tipos de área, Edificios, Tipos de ticket, Módulos, Proveedores).
-- Un color libre (selector hexadecimal o rueda de color). El vocabulario son los 8 tonos.
-- Tonos nuevos. Agregar uno es migración + `index.css` + contraste + contratos (`docs/base-visual.md`).
+- Un color libre (selector hexadecimal o rueda de color). El vocabulario son los 16 tonos.
+- Más tonos que esos 16. Agregar uno es migración + `index.css` + contraste + contratos (`docs/base-visual.md`).
 - Guardar el color en el historial del ticket.
 - Rediseñar la bandeja, el detalle o la administración (SPEC 11).
 - Ordenar o agrupar la bandeja por color.
@@ -64,7 +69,8 @@ Decisiones del usuario del 2026-10-15:
 ```prisma
 // packages/db/schema.prisma (fragmento)
 
-// Los 8 tonos de insignia de la base visual (SPEC 09). El admin elige uno por estado y prioridad.
+// Los tonos de insignia de la base visual: los 8 del SPEC 09 y los 8 que suma la ampliación de este spec.
+// El admin elige uno por estado y prioridad.
 enum Tono {
   gris
   rojo
@@ -74,6 +80,15 @@ enum Tono {
   azul
   violeta
   rosa
+  // Ampliación (migración `tonos_ampliados`)
+  celeste
+  turquesa
+  lima
+  marron
+  indigo
+  magenta
+  bordo
+  pizarra
 }
 
 model Prioridad {
@@ -91,7 +106,7 @@ model EstadoTicket {
 
 **Migración `color_estados_prioridades`.** En este orden:
 
-1. `CREATE TYPE "Tono" AS ENUM (…)` con los 8 valores.
+1. `CREATE TYPE "Tono" AS ENUM (…)` con los 8 valores del SPEC 09. Los otros 8 los suma `tonos_ampliados`.
 2. `ALTER TABLE "estado_ticket"` y `"prioridad"`: `ADD COLUMN "color" "Tono" NOT NULL DEFAULT 'gris'`.
 3. Estados de sistema, por `clave` (el nombre puede haber cambiado, D1 de SPEC 04):
 
@@ -125,6 +140,21 @@ Los `UPDATE` incluyen las filas eliminadas lógicamente: no cuesta nada y evita 
 
 La migración **no** escribe `AuditLog`: asignar el valor inicial de un campo nuevo no es una acción de un usuario. El historial de cada ítem muestra el color desde su primer cambio. Es la misma decisión que SPEC 08 tomó para el tipo «Otro» de las áreas.
 
+**Migración `tonos_ampliados`.** Una segunda migración, y no editar `color_estados_prioridades`: esa ya está aplicada en bases de desarrollo (cambiarla rompería su checksum). Solo agrega los 8 valores al enum, en este orden:
+
+```sql
+ALTER TYPE "Tono" ADD VALUE 'celeste';
+ALTER TYPE "Tono" ADD VALUE 'turquesa';
+ALTER TYPE "Tono" ADD VALUE 'lima';
+ALTER TYPE "Tono" ADD VALUE 'marron';
+ALTER TYPE "Tono" ADD VALUE 'indigo';
+ALTER TYPE "Tono" ADD VALUE 'magenta';
+ALTER TYPE "Tono" ADD VALUE 'bordo';
+ALTER TYPE "Tono" ADD VALUE 'pizarra';
+```
+
+No toca ninguna fila ni escribe `AuditLog`: nadie usa un tono nuevo hasta que el admin lo elige. El valor es ASCII sin acentos (es un identificador de Postgres, de clase de Tailwind y de token); el texto para el usuario («Marrón», «Índigo», «Bordó») sale de `tonoLabels`. Postgres no permite usar un valor agregado en la misma transacción que lo agrega: la migración no lo usa.
+
 **Seed.** `seed-data/estados.json` suma `color` en cada ítem. `seed-data/prioridades.json` pasa de una lista de textos a `[{ "nombre": "Baja", "color": "gris" }, …]`, como `estados.json`. El seed sigue cargando solo catálogos vacíos (SPEC 04).
 
 ```json
@@ -144,9 +174,9 @@ La migración **no** escribe `AuditLog`: asignar el valor inicial de un campo nu
 
 ### Feature 10.1 — Lista única de tonos
 
-- `packages/contracts/src/catalogs.ts` exporta `tonos` (la tupla de los 8 valores) y `tonoSchema = z.enum(tonos)`.
+- `packages/contracts/src/catalogs.ts` exporta `tonos` (la tupla de los 16 valores, en el orden del enum de Prisma) y `tonoSchema = z.enum(tonos)`.
 - `apps/web/src/components/ui/badge.tsx` deja de declarar su lista: `badgeTonos` y `BadgeTono` salen de `@syc/contracts`. Los tests del SPEC 09 siguen con los mismos nombres.
-- `badge.tsx` suma `tonoLabels: Record<BadgeTono, string>` («Gris», «Rojo», «Naranja», «Amarillo», «Verde», «Azul», «Violeta», «Rosa»). Es el único lugar con esos textos.
+- `badge.tsx` suma `tonoLabels: Record<BadgeTono, string>` («Gris», «Rojo», «Naranja», «Amarillo», «Verde», «Azul», «Violeta», «Rosa», «Celeste», «Turquesa», «Lima», «Marrón», «Índigo», «Magenta», «Bordó», «Pizarra»). Es el único lugar con esos textos.
 - Un test exige que `tonos` y las claves de `tonoClasses` y `tonoLabels` coincidan: un tono agregado en un lugar y no en otro rompe el build, no el navegador.
 
 ### Feature 10.2 — Catálogos Prioridades y Estados con color
@@ -160,7 +190,7 @@ La migración **no** escribe `AuditLog`: asignar el valor inicial de un campo nu
 
 Reglas:
 
-- `color` fuera de los 8 tonos → 400 (lo rechaza Zod, antes del service).
+- `color` fuera de los 16 tonos → 400 (lo rechaza Zod, antes del service).
 - `update` reemplaza todos los campos (SPEC 04): cambiar solo el nombre exige reenviar el `color` actual. La web lo hace sola, porque el formulario trae el color cargado.
 - Cambiar el color de un ítem actualiza `updatedAt` y `updatedBy`, y deja un `AuditLog` `update`. Un `update` que no cambia nada sigue sin generar entrada (SPEC 03).
 - La unicidad de nombre, `lastActive` y `keyedNotRemovable` no cambian. El color no participa de ninguna regla.
@@ -180,7 +210,7 @@ Todo con `<Badge tono={…}>`. El nombre del estado o de la prioridad va siempre
 **Administración (`/admin/catalogos`):**
 
 - El alta y la edición de un estado o prioridad suman el campo «Color», un `TonoSelect`. En el alta viene con «Gris»; en la edición, con el color actual.
-- `TonoSelect` es un desplegable de los 8 tonos: cada opción es la insignia con el nombre del color («Rojo»), y el botón muestra la elegida. Vive en `features/catalogs/components/`.
+- `TonoSelect` es un desplegable de los 16 tonos, en el orden de `tonos`: cada opción es la insignia con el nombre del color («Rojo»), y el botón muestra la elegida. Vive en `features/catalogs/components/`.
 - La tabla de Estados y de Prioridades suma la columna «Color», entre «Nombre» y «Estado»: la insignia con el nombre del color, no con el del ítem. El nombre del ítem queda como texto.
 - Los otros 6 catálogos no ven ni el campo ni la columna.
 
@@ -195,6 +225,41 @@ Todo con `<Badge tono={…}>`. El nombre del estado o de la prioridad va siempre
 - Áreas y el resto de los catálogos no cambian en los desplegables.
 
 **Galería `/estilos`:** suma `TonoSelect`, y los tonos usan `tonoLabels`.
+
+### Feature 10.5 — Ampliación de la paleta a 16 tonos
+
+Los 8 tonos del SPEC 09 no se tocan. Se suman 8, con el mismo método (tres tokens por tono, en los dos temas) y las mismas reglas de contraste.
+
+| Tono | Etiqueta | Se parece a |
+|---|---|---|
+| `celeste` | Celeste | `azul`, `turquesa` |
+| `turquesa` | Turquesa | `celeste`, `verde` |
+| `lima` | Lima | `amarillo`, `verde` |
+| `marron` | Marrón | `gris`, `naranja` |
+| `indigo` | Índigo | `azul`, `violeta` |
+| `magenta` | Magenta | `rosa`, `violeta` |
+| `bordo` | Bordó | `rojo`, `rosa` |
+| `pizarra` | Pizarra | `gris`, `azul` |
+
+**Valores propuestos** (los definitivos viven en `apps/web/src/index.css`; esta tabla es lo que se pide aprobar). Salen de la misma plantilla que los 8 existentes en OKLCH: claro con fondo L 0,94, texto L 0,40 y borde L 0,84; oscuro con fondo L 0,30, texto L 0,80 y borde L 0,42; el croma se escala en `marron`, `bordo` y `pizarra` para que no se confundan con `naranja`, `rojo` y `azul`.
+
+| Tono | Claro: fondo / texto / borde | Oscuro: fondo / texto / borde | Contraste (claro / oscuro) |
+|---|---|---|---|
+| `celeste` | `#d4f1f9` / `#00515f` / `#9ed5e3` | `#05343d` / `#69cee6` / `#0d5665` | 7,6 / 7,4 |
+| `turquesa` | `#d5f3ee` / `#00544d` / `#9ed8cf` | `#053631` / `#69d3c6` / `#0c5952` | 7,5 / 7,4 |
+| `lima` | `#e8efd7` / `#414e00` / `#c5d1a5` | `#2b3113` / `#b5c87d` / `#485324` | 7,7 / 7,4 |
+| `marron` | `#f3e9e2` / `#5a422f` / `#d8c7b9` | `#362b23` / `#d4b8a1` / `#5a493c` | 7,8 / 7,3 |
+| `indigo` | `#e6eaff` / `#3c407c` / `#c1c7f2` | `#282b47` / `#aeb8fe` / `#444973` | 7,9 / 7,3 |
+| `magenta` | `#f8e4f6` / `#653161` / `#e2bddd` | `#3c243a` / `#e3a6dd` / `#633f5f` | 8,0 / 7,2 |
+| `bordo` | `#fce5e7` / `#6c343e` / `#e8bec3` | `#3f2529` / `#eca9b2` / `#684046` | 8,0 / 7,2 |
+| `pizarra` | `#e6ecf1` / `#3a4a57` / `#c1ccd6` | `#282f35` / `#aec0d0` / `#444f58` | 7,7 / 7,3 |
+
+Reglas:
+
+- Todos los pares texto/fondo tienen 4,5:1 o más en los dos temas (el test de `tokens.contrast.test.ts` suma los 8 tonos a su lista y falla si alguno no llega).
+- Algunos pares se parecen: `marron` con `gris`, `bordo` con `rojo` y `rosa`, `celeste` con `turquesa` y `azul`. Por eso, igual que con los primeros 8, **el color nunca va solo**: el nombre del ítem va siempre dentro de la insignia y el color se lee también por su nombre en la tabla de administración.
+- Un tono ya elegido por un ítem nunca se quita de la lista: el enum solo crece.
+- La ampliación no cambia ninguna regla de estados, prioridades ni tickets: el color sigue siendo solo presentación.
 
 ### Qué ve cada rol
 
@@ -244,13 +309,21 @@ Sin cambios: cualquier usuario con sesión ve el color (viene en `catalogs.<…>
 
     Verificar: `pnpm turbo lint typecheck test build` y `pnpm verify --spec 04,05,06,08,10` terminan con código 0.
 
+11. **Ampliación de la paleta a 16 tonos** (agregado el 2026-10-15, sobre los pasos 1 a 10 ya implementados).
+    - **Migración.** `tonos_ampliados` con los 8 `ALTER TYPE "Tono" ADD VALUE` de arriba, y los 8 valores nuevos al final del enum `Tono` en `schema.prisma`. Verificar: `prisma migrate dev` aplica limpio sobre una base que ya tiene `color_estados_prioridades`, un segundo `migrate dev` no genera nada, y `prisma generate` expone los 16 valores.
+    - **Contratos y API.** `tonos` pasa a 16 (mismo orden que el enum). `catalogs.spec.ts` y `tonos.spec.ts` (API) comparan la lista con el enum de Prisma. Verificar: un alta con `celeste` o `pizarra` se acepta y `"fucsia"` sigue dando 400.
+    - **Tokens.** Los 24 tokens nuevos por tema en `index.css` (`--tono-<nombre>`, `-foreground`, `-border`), su registro en `@theme inline` y los 8 nombres en la lista `tonos` de `tokens.contrast.test.ts`. Verificar: el test de contraste y `pnpm lint` (colores solo por token) pasan.
+    - **Web.** `tonoClasses` y `tonoLabels` suman los 8 (clases escritas completas, no armadas con plantilla), y la galería `/estilos` muestra los 16. Verificar: `badge.test.tsx` (las listas coinciden con `tonos`), `TonoSelect.test.tsx` (ofrece 16 opciones) y los tests de la galería. Los tests que escriben las listas de 8 a mano se actualizan.
+    - **Verify.** Un criterio nuevo en `10-color-estados-prioridades.mjs`: el enum de una base migrada tiene los 16 valores en orden y un estado se crea, se edita y se lista con un tono nuevo. Verificar: `pnpm verify --spec 04,05,06,08,10` pasa.
+    - **Documentación.** `CLAUDE.md`, `docs/base-visual.md`, `docs/prd.md`, `apps/web/CLAUDE.md` y `seed-data/README.md` dicen 16 donde dicen 8; `docs/base-visual.md` lista los tonos nuevos.
+
 ## Criterios de aceptación
 
 - [ ] Después de `prisma migrate deploy` sobre una base con los datos del seed anterior, los 7 estados y las 4 prioridades tienen la propuesta de color y no existe ninguna fila con `color` nulo.
 - [ ] Un estado o prioridad creado a mano antes de la migración queda en `gris`.
 - [ ] Un estado de sistema cuyo nombre fue cambiado conserva el color de su `clave`.
 - [ ] La migración no crea ningún `AuditLog`.
-- [ ] `catalogs.estados.create` y `catalogs.prioridades.create` sin `color`, o con un valor que no es uno de los 8 tonos, devuelven 400.
+- [ ] `catalogs.estados.create` y `catalogs.prioridades.create` sin `color`, o con un valor que no es uno de los 16 tonos, devuelven 400.
 - [ ] Crear y editar un estado o prioridad con `color` lo devuelve en `list`, y el `history` muestra el diff `color: { antes, despues }`.
 - [ ] Un agente recibe 403 en `create` y `update` de `estados` y `prioridades`, y 200 en `list` con `color`.
 - [ ] `tickets.get`, cada fila de `tickets.list` y `tickets.changeStatus` traen `estado.color` y `prioridad.color`.
@@ -262,6 +335,10 @@ Sin cambios: cualquier usuario con sesión ve el color (viene en `catalogs.<…>
 - [ ] En la web, la bandeja y el encabezado del detalle muestran estado y prioridad con la insignia del color del ítem, y el nombre va dentro de la insignia.
 - [ ] En la web, los desplegables de estado y prioridad (filtros, alta, edición y cambio de estado) muestran las opciones con su insignia, y el valor actual desactivado conserva «(inactivo)».
 - [ ] `pnpm lint` no encuentra colores sueltos: todo sale de los tokens `tono-*`.
+- [ ] Después de las migraciones, el enum `Tono` de Postgres tiene los 16 valores, en el orden de `tonos`, y `tonos_ampliados` no crea ningún `AuditLog` ni cambia ninguna fila.
+- [ ] `catalogs.estados.create` y `catalogs.prioridades.create` aceptan cada uno de los 8 tonos nuevos y lo devuelven en `list`; `"fucsia"` sigue dando 400.
+- [ ] En la web, el desplegable «Color» ofrece los 16 tonos, cada uno como insignia con su nombre (con acento donde corresponde: «Marrón», «Índigo», «Bordó»), y la tabla de Estados y de Prioridades muestra el nombre del tono elegido.
+- [ ] Cada tono nuevo define fondo, texto y borde en los dos temas, con 4,5:1 o más entre texto y fondo, y la galería `/estilos` los muestra.
 - [ ] `pnpm verify --spec 04,05,06,08,10` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
@@ -274,18 +351,25 @@ Sin cambios: cualquier usuario con sesión ve el color (viene en `catalogs.<…>
 - **Sí:** un enum de Postgres (`Tono`) y no un texto libre. La base rechaza un valor que no existe, y agregar un tono ya es una decisión de diseño (`docs/base-visual.md`) que pide migración de todas formas.
 - **Sí:** una sola lista de tonos, en `@syc/contracts`. La API, la web y el enum de Prisma se comparan en tests: un tono nuevo en un lugar y no en otro falla en CI.
 - **Sí:** el admin elige con un desplegable de insignias (decisión del usuario, 2026-10-15). Es un campo más del formulario, como los otros.
-- **Sí:** los colores se pueden repetir dentro de un catálogo (decisión del usuario, 2026-10-15). Hay 7 estados y 8 tonos: una restricción de unicidad impediría el estado número 9. El nombre va siempre dentro de la insignia, así que dos estados del mismo color se distinguen.
+- **Sí:** los colores se pueden repetir dentro de un catálogo (decisión del usuario, 2026-10-15). Hay 7 estados y 16 tonos: una restricción de unicidad impediría el estado número 9. El nombre va siempre dentro de la insignia, así que dos estados del mismo color se distinguen.
 - **Sí:** columna «Color» aparte en la administración (decisión del usuario, 2026-10-15). El nombre queda como texto y el color se lee con su nombre, no solo por su aspecto.
 - **Sí:** estado y prioridad como insignias en el encabezado del detalle (decisión del usuario, 2026-10-15). Es el único cambio de estructura que se admite antes del SPEC 11, porque la prioridad no aparecía.
 - **No:** guardar el color en la foto auditable del ticket. El color es presentación y cambia por decisión del admin; el historial del ticket guarda lo que se sabe del ticket (`{ id, nombre }`).
 - **No:** que el color tenga significado para el sistema. Ninguna regla (estado de cierre, prioridad mínima, filtros) mira el color.
 - **Sí:** solo Estados y Prioridades. Son los únicos catálogos que un agente lee como estado de un ticket de un vistazo; el resto son datos de clasificación.
+- **Sí:** ampliar la paleta a 16 tonos dentro de este spec (decisión del usuario, 2026-10-15; pidió un mínimo de 15). Se hace en este spec y no en uno aparte porque los 8 tonos nuevos usan exactamente el cableado que ya existe (enum, contrato, `badge.tsx`, `TonoSelect`) y el vocabulario de color es lo que este spec define. Se agrega como el paso 11, sin renumerar los pasos ya implementados.
+- **Sí:** 8 tonos nuevos (`celeste`, `turquesa`, `lima`, `marron`, `indigo`, `magenta`, `bordo`, `pizarra`) con valores propuestos de la misma plantilla que los 8 existentes. Los nombres y los valores quedan a aprobación del usuario antes de implementar.
+- **Sí:** una migración nueva (`tonos_ampliados`) y no editar `color_estados_prioridades`: esa ya está aplicada en bases de desarrollo y cambiarla rompería su checksum.
+- **Sí:** valores del enum en ASCII sin acentos (`marron`, `indigo`, `bordo`); el texto con acento sale de `tonoLabels`. Un valor con acento sería un identificador de Postgres, de Tailwind y de token con caracteres que conviene evitar.
 - **No:** rediseñar pantallas. Cambia la insignia, no el diseño de la bandeja ni del detalle (SPEC 11).
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |---|---|
+| Con 16 tonos pastel, algunos pares se parecen (`marron`/`gris`, `bordo`/`rojo`/`rosa`, `celeste`/`turquesa`/`azul`) y un estado se confunde con otro por el color. | El nombre va siempre dentro de la insignia y el color nunca va solo (regla 5 de `docs/base-visual.md`). Los valores propuestos son de la misma plantilla que los 8 existentes y se pueden afinar sin migración: son solo tokens de `index.css`. |
+| `ALTER TYPE … ADD VALUE` no se puede usar en la misma transacción que lo agrega, ni se puede deshacer. | La migración solo agrega valores y no los usa. Un tono mal elegido se quita del contrato y de la paleta pero queda en el enum de Postgres: por eso los nombres se aprueban antes de implementar. |
+| Un desplegable de 16 opciones es largo. | Es una lista corta y estática en el orden de `tonos`; Radix la scrollea dentro del popover. Un selector en grilla es de un spec de diseño (SPEC 11). |
 | Un estado o prioridad que el admin renombró antes de migrar no coincide con la propuesta y queda gris. | Es un dato, no un error: el admin lo colorea desde `/admin/catalogos`. Los estados de sistema no dependen del nombre. |
 | Dos valores iguales dentro de un catálogo (porque se permite repetir) hacen que un estado se confunda con otro. | El nombre va siempre dentro de la insignia, y el color nunca va solo. |
 | El enum de Prisma, la lista del contrato y las clases de `badge.tsx` se desalinean al agregar un tono. | Los tests de la Feature 10.1 y de la tarea 2 fallan en CI. |
@@ -297,7 +381,7 @@ Sin cambios: cualquier usuario con sesión ve el color (viene en `catalogs.<…>
 ## Qué **no** está en este spec
 
 - Color en Áreas, Tipos de área, Edificios, Tipos de ticket, Módulos y Proveedores.
-- Color libre (hexadecimal) o tonos nuevos.
+- Color libre (hexadecimal) o más tonos que los 16.
 - El color en el historial del ticket.
 - Rediseñar la bandeja, el detalle o la administración (SPEC 11).
 - Ordenar o agrupar tickets por color.

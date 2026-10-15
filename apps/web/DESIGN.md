@@ -227,8 +227,8 @@ El tema oscuro sale de las superficies de la definición de origen y de valores 
 | Destructivo | #b33335 | #ff8781 |
 | Borde / campo | #e6dfd8 / #cfc7b8 | #2f2d29 / #3a3834 |
 
-### Los 8 tonos de insignia
-Cada tono tiene fondo, texto y borde, y es el vocabulario con el que un administrador elegirá el color de cada estado y prioridad. Se usan con `<Badge tono="verde">`; el texto de cada uno da 4,5:1 o más sobre su fondo, en los dos temas.
+### Los 16 tonos de insignia
+Cada tono tiene fondo, texto y borde, y es el vocabulario con el que un administrador elige el color de cada estado y prioridad. Se usan con `<Badge tono="verde">`; el texto de cada uno da 4,5:1 o más sobre su fondo, en los dos temas.
 
 | Tono | Fondo | Texto | Borde | Fondo (oscuro) | Texto (oscuro) | Borde (oscuro) |
 |---|---|---|---|---|---|---|
@@ -240,6 +240,14 @@ Cada tono tiene fondo, texto y borde, y es el vocabulario con el que un administ
 | azul | #ddefff | #124a7b | #aecef1 | #192f46 | #8cc3fc | #2e5072 |
 | violeta | #f2e8ff | #543772 | #d3c1eb | #342742 | #cdaef2 | #56436c |
 | rosa | #ffe4ee | #6f2d4a | #ecbbcc | #41232f | #f2a3c1 | #6b3c4f |
+| celeste | #d4f1f9 | #00515f | #9ed5e3 | #05343d | #69cee6 | #0d5665 |
+| turquesa | #d5f3ee | #00544d | #9ed8cf | #053631 | #69d3c6 | #0c5952 |
+| lima | #e8efd7 | #414e00 | #c5d1a5 | #2b3113 | #b5c87d | #485324 |
+| marron | #f3e9e2 | #5a422f | #d8c7b9 | #362b23 | #d4b8a1 | #5a493c |
+| indigo | #e6eaff | #3c407c | #c1c7f2 | #282b47 | #aeb8fe | #444973 |
+| magenta | #f8e4f6 | #653161 | #e2bddd | #3c243a | #e3a6dd | #633f5f |
+| bordo | #fce5e7 | #6c343e | #e8bec3 | #3f2529 | #eca9b2 | #684046 |
+| pizarra | #e6ecf1 | #3a4a57 | #c1ccd6 | #282f35 | #aec0d0 | #444f58 |
 
 ### Named Rules
 **The One Coral Rule.** El coral marca dónde se actúa (la acción principal, el enlace, el foco) y nada más. No se usa como decoración ni para decir que algo está bien o mal.
@@ -303,7 +311,7 @@ Tranquilos y firmes: el borde, el color y el foco hacen todo el trabajo.
 - **Disabled:** al 50 % de opacidad y sin eventos.
 
 ### Chips / Badges
-- **Style:** píldora de 24 px, 13 px en 500. La variante por defecto es crema de tarjeta con tinta; con `tono` toma el fondo, el texto y el borde de uno de los 8 tonos.
+- **Style:** píldora de 24 px, 13 px en 500. La variante por defecto es crema de tarjeta con tinta; con `tono` toma el fondo, el texto y el borde de uno de los 16 tonos.
 - **State:** una insignia es solo información, no un botón.
 
 ### Cards / Containers

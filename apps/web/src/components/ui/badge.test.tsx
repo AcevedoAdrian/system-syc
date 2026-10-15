@@ -12,7 +12,7 @@ describe("Badge", () => {
     expect(badge).not.toHaveAttribute("data-tono");
   });
 
-  it("ofrece los 8 tonos de la base visual", () => {
+  it("ofrece los 16 tonos de la base visual: los 8 del SPEC 09 y los 8 de la ampliación", () => {
     expect(badgeTonos).toEqual([
       "gris",
       "rojo",
@@ -22,6 +22,14 @@ describe("Badge", () => {
       "azul",
       "violeta",
       "rosa",
+      "celeste",
+      "turquesa",
+      "lima",
+      "marron",
+      "indigo",
+      "magenta",
+      "bordo",
+      "pizarra",
     ]);
   });
 
@@ -42,6 +50,14 @@ describe("Badge", () => {
       azul: "Azul",
       violeta: "Violeta",
       rosa: "Rosa",
+      celeste: "Celeste",
+      turquesa: "Turquesa",
+      lima: "Lima",
+      marron: "Marrón",
+      indigo: "Índigo",
+      magenta: "Magenta",
+      bordo: "Bordó",
+      pizarra: "Pizarra",
     });
   });
 

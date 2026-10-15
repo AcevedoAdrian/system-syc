@@ -23,7 +23,7 @@ describe("TonoSelect", () => {
     expect(boton.querySelector('[data-slot="badge"]')).toHaveAttribute("data-tono", "verde");
   });
 
-  it("ofrece los 8 tonos, cada uno como insignia con el nombre del color", async () => {
+  it("ofrece los 16 tonos, cada uno como insignia con el nombre del color", async () => {
     render(<TonoSelect value="gris" onChange={vi.fn()} />);
 
     await userEvent.click(screen.getByRole("combobox"));
@@ -34,6 +34,19 @@ describe("TonoSelect", () => {
       opciones.map((o) => o.querySelector('[data-slot="badge"]')?.getAttribute("data-tono")),
     ).toEqual([...tonos]);
     expect(screen.getByRole("option", { name: "Naranja" })).toBeInTheDocument();
+    // Los nombres con acento salen de `tonoLabels`; el valor que viaja no lo tiene.
+    expect(screen.getByRole("option", { name: "Marrón" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Bordó" })).toBeInTheDocument();
+  });
+
+  it("elegir un tono de la ampliación avisa su valor sin acento", async () => {
+    const onChange = vi.fn();
+    render(<TonoSelect value="gris" onChange={onChange} />);
+
+    await userEvent.click(screen.getByRole("combobox"));
+    await userEvent.click(screen.getByRole("option", { name: "Índigo" }));
+
+    expect(onChange).toHaveBeenCalledWith("indigo");
   });
 
   it("avisa el tono elegido", async () => {

@@ -252,7 +252,8 @@ model TipoTicket {
   @@map("tipo_ticket")
 }
 
-// Los 8 tonos de insignia de la base visual (SPEC 09). El admin elige uno por estado y prioridad (SPEC 10).
+// Los tonos de insignia de la base visual: los 8 del SPEC 09 y los 8 que suma la ampliación del SPEC 10.
+// El admin elige uno por estado y prioridad.
 // La lista única vive en `@syc/contracts` (`tonos`); un test la compara con este enum.
 enum Tono {
   gris
@@ -263,6 +264,15 @@ enum Tono {
   azul
   violeta
   rosa
+  // Ampliación de la paleta (migración `tonos_ampliados`). Al final, porque `ADD VALUE` agrega al final.
+  celeste
+  turquesa
+  lima
+  marron
+  indigo
+  magenta
+  bordo
+  pizarra
 }
 
 model Prioridad {

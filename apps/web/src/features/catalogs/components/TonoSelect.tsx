@@ -16,7 +16,7 @@ interface TonoSelectProps {
   disabled?: boolean;
 }
 
-// Desplegable de los 8 tonos (SPEC 10): cada opción es la insignia con el nombre del color («Rojo»),
+// Desplegable de los 16 tonos (SPEC 10): cada opción es la insignia con el nombre del color («Rojo»),
 // y el botón muestra la elegida con la misma insignia. El nombre va dentro de la insignia: el color
 // nunca va solo.
 export function TonoSelect({ value, onChange, id, invalid, disabled }: TonoSelectProps) {

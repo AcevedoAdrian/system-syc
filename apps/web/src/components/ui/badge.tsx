@@ -24,7 +24,7 @@ const badgeVariants = cva(
   },
 );
 
-// Los 8 tonos de insignia de la base visual (SPEC 09): son el vocabulario de color que el admin elige
+// Los 16 tonos de insignia de la base visual (8 del SPEC 09 y 8 de la ampliación del SPEC 10): son el vocabulario de color que el admin elige
 // por estado y prioridad (SPEC 10). La lista vive en `@syc/contracts` (una sola, compartida con la
 // API y el enum de Prisma); cada tono trae fondo, texto y borde en `index.css`.
 export const badgeTonos = tonos;
@@ -40,6 +40,14 @@ export const tonoClasses: Record<BadgeTono, string> = {
   azul: "border-tono-azul-border bg-tono-azul text-tono-azul-foreground",
   violeta: "border-tono-violeta-border bg-tono-violeta text-tono-violeta-foreground",
   rosa: "border-tono-rosa-border bg-tono-rosa text-tono-rosa-foreground",
+  celeste: "border-tono-celeste-border bg-tono-celeste text-tono-celeste-foreground",
+  turquesa: "border-tono-turquesa-border bg-tono-turquesa text-tono-turquesa-foreground",
+  lima: "border-tono-lima-border bg-tono-lima text-tono-lima-foreground",
+  marron: "border-tono-marron-border bg-tono-marron text-tono-marron-foreground",
+  indigo: "border-tono-indigo-border bg-tono-indigo text-tono-indigo-foreground",
+  magenta: "border-tono-magenta-border bg-tono-magenta text-tono-magenta-foreground",
+  bordo: "border-tono-bordo-border bg-tono-bordo text-tono-bordo-foreground",
+  pizarra: "border-tono-pizarra-border bg-tono-pizarra text-tono-pizarra-foreground",
 };
 
 // El nombre de cada tono tal como se le muestra al usuario («Rojo»). Es el único lugar con estos
@@ -53,6 +61,14 @@ export const tonoLabels: Record<BadgeTono, string> = {
   azul: "Azul",
   violeta: "Violeta",
   rosa: "Rosa",
+  celeste: "Celeste",
+  turquesa: "Turquesa",
+  lima: "Lima",
+  marron: "Marrón",
+  indigo: "Índigo",
+  magenta: "Magenta",
+  bordo: "Bordó",
+  pizarra: "Pizarra",
 };
 
 function Badge({

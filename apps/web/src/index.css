@@ -56,7 +56,7 @@
   --color-background: var(--background);
   --color-scrim: var(--scrim);
 
-  /* 8 tonos de insignia: fondo (`bg-tono-rojo`), texto (`text-tono-rojo-foreground`) y borde. */
+  /* 16 tonos de insignia (8 del SPEC 09 y 8 de la ampliación del SPEC 10): fondo (`bg-tono-rojo`), texto (`text-tono-rojo-foreground`) y borde. */
   --color-tono-gris: var(--tono-gris);
   --color-tono-gris-foreground: var(--tono-gris-foreground);
   --color-tono-gris-border: var(--tono-gris-border);
@@ -81,6 +81,30 @@
   --color-tono-rosa: var(--tono-rosa);
   --color-tono-rosa-foreground: var(--tono-rosa-foreground);
   --color-tono-rosa-border: var(--tono-rosa-border);
+  --color-tono-celeste: var(--tono-celeste);
+  --color-tono-celeste-foreground: var(--tono-celeste-foreground);
+  --color-tono-celeste-border: var(--tono-celeste-border);
+  --color-tono-turquesa: var(--tono-turquesa);
+  --color-tono-turquesa-foreground: var(--tono-turquesa-foreground);
+  --color-tono-turquesa-border: var(--tono-turquesa-border);
+  --color-tono-lima: var(--tono-lima);
+  --color-tono-lima-foreground: var(--tono-lima-foreground);
+  --color-tono-lima-border: var(--tono-lima-border);
+  --color-tono-marron: var(--tono-marron);
+  --color-tono-marron-foreground: var(--tono-marron-foreground);
+  --color-tono-marron-border: var(--tono-marron-border);
+  --color-tono-indigo: var(--tono-indigo);
+  --color-tono-indigo-foreground: var(--tono-indigo-foreground);
+  --color-tono-indigo-border: var(--tono-indigo-border);
+  --color-tono-magenta: var(--tono-magenta);
+  --color-tono-magenta-foreground: var(--tono-magenta-foreground);
+  --color-tono-magenta-border: var(--tono-magenta-border);
+  --color-tono-bordo: var(--tono-bordo);
+  --color-tono-bordo-foreground: var(--tono-bordo-foreground);
+  --color-tono-bordo-border: var(--tono-bordo-border);
+  --color-tono-pizarra: var(--tono-pizarra);
+  --color-tono-pizarra-foreground: var(--tono-pizarra-foreground);
+  --color-tono-pizarra-border: var(--tono-pizarra-border);
 
   /* 8 px en botones y campos, 12 px en tarjetas y diálogos (`rounded-xl`); las insignias son píldora. */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -171,6 +195,30 @@
   --tono-rosa: #ffe4ee;
   --tono-rosa-foreground: #6f2d4a;
   --tono-rosa-border: #ecbbcc;
+  --tono-celeste: #d4f1f9;
+  --tono-celeste-foreground: #00515f;
+  --tono-celeste-border: #9ed5e3;
+  --tono-turquesa: #d5f3ee;
+  --tono-turquesa-foreground: #00544d;
+  --tono-turquesa-border: #9ed8cf;
+  --tono-lima: #e8efd7;
+  --tono-lima-foreground: #414e00;
+  --tono-lima-border: #c5d1a5;
+  --tono-marron: #f3e9e2;
+  --tono-marron-foreground: #5a422f;
+  --tono-marron-border: #d8c7b9;
+  --tono-indigo: #e6eaff;
+  --tono-indigo-foreground: #3c407c;
+  --tono-indigo-border: #c1c7f2;
+  --tono-magenta: #f8e4f6;
+  --tono-magenta-foreground: #653161;
+  --tono-magenta-border: #e2bddd;
+  --tono-bordo: #fce5e7;
+  --tono-bordo-foreground: #6c343e;
+  --tono-bordo-border: #e8bec3;
+  --tono-pizarra: #e6ecf1;
+  --tono-pizarra-foreground: #3a4a57;
+  --tono-pizarra-border: #c1ccd6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -240,6 +288,30 @@
     --tono-rosa: #41232f;
     --tono-rosa-foreground: #f2a3c1;
     --tono-rosa-border: #6b3c4f;
+    --tono-celeste: #05343d;
+    --tono-celeste-foreground: #69cee6;
+    --tono-celeste-border: #0d5665;
+    --tono-turquesa: #053631;
+    --tono-turquesa-foreground: #69d3c6;
+    --tono-turquesa-border: #0c5952;
+    --tono-lima: #2b3113;
+    --tono-lima-foreground: #b5c87d;
+    --tono-lima-border: #485324;
+    --tono-marron: #362b23;
+    --tono-marron-foreground: #d4b8a1;
+    --tono-marron-border: #5a493c;
+    --tono-indigo: #282b47;
+    --tono-indigo-foreground: #aeb8fe;
+    --tono-indigo-border: #444973;
+    --tono-magenta: #3c243a;
+    --tono-magenta-foreground: #e3a6dd;
+    --tono-magenta-border: #633f5f;
+    --tono-bordo: #3f2529;
+    --tono-bordo-foreground: #eca9b2;
+    --tono-bordo-border: #684046;
+    --tono-pizarra: #282f35;
+    --tono-pizarra-foreground: #aec0d0;
+    --tono-pizarra-border: #444f58;
   }
 }
 

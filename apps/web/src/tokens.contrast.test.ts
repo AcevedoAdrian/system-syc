@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { tonos } from "@syc/contracts";
 import { parse, rgb, wcagContrast } from "culori";
 import { describe, expect, it } from "vitest";
 
@@ -73,8 +74,6 @@ function contrastOnTint(
   };
   return wcagContrast(color(theme, fg), mixed);
 }
-
-const tonos = ["gris", "rojo", "naranja", "amarillo", "verde", "azul", "violeta", "rosa"] as const;
 
 // [texto, fondo]: cada `*-foreground` sobre el fondo en el que se usa.
 const textPairs: Array<[string, string]> = [

@@ -5,7 +5,7 @@ import { blankToNull } from "./fields.js";
 
 const nombreSchema = z.string().trim().min(1).max(120);
 
-// SPEC 10: los 8 tonos de insignia de la base visual (SPEC 09). Es la única lista: el enum `Tono` de
+// SPEC 10: los 16 tonos de insignia de la base visual (los 8 del SPEC 09 y 8 de la ampliación). Es la única lista: el enum `Tono` de
 // Prisma y las clases de `badge.tsx` se comparan con esta en tests. Solo presentación.
 export const tonos = [
   "gris",
@@ -16,6 +16,15 @@ export const tonos = [
   "azul",
   "violeta",
   "rosa",
+  // Ampliación (migración `tonos_ampliados`): el orden es el del enum de Prisma.
+  "celeste",
+  "turquesa",
+  "lima",
+  "marron",
+  "indigo",
+  "magenta",
+  "bordo",
+  "pizarra",
 ] as const;
 
 export const tonoSchema = z.enum(tonos);

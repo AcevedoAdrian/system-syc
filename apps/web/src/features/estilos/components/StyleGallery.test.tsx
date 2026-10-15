@@ -29,11 +29,11 @@ describe("StyleGallery", () => {
     }
   });
 
-  it("muestra los 8 tonos de insignia", () => {
+  it("muestra los 16 tonos de insignia", () => {
     render(<StyleGallery />);
 
     const section = screen.getByRole("region", { name: "Tonos de insignia" });
-    expect(within(section).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(section).getAllByRole("listitem")).toHaveLength(16);
   });
 
   it("los tonos se muestran con su nombre (tonoLabels) y suman el TonoSelect", () => {
@@ -44,7 +44,24 @@ describe("StyleGallery", () => {
       within(section)
         .getAllByRole("listitem")
         .map((li) => li.textContent),
-    ).toEqual(["Gris", "Rojo", "Naranja", "Amarillo", "Verde", "Azul", "Violeta", "Rosa"]);
+    ).toEqual([
+      "Gris",
+      "Rojo",
+      "Naranja",
+      "Amarillo",
+      "Verde",
+      "Azul",
+      "Violeta",
+      "Rosa",
+      "Celeste",
+      "Turquesa",
+      "Lima",
+      "Marrón",
+      "Índigo",
+      "Magenta",
+      "Bordó",
+      "Pizarra",
+    ]);
     expect(within(section).getByRole("combobox", { name: "Color" })).toHaveTextContent("Gris");
   });
 

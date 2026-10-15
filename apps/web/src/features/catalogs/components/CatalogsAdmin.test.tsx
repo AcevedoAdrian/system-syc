@@ -442,6 +442,14 @@ describe("CatalogsAdmin", () => {
         "Azul",
         "Violeta",
         "Rosa",
+        "Celeste",
+        "Turquesa",
+        "Lima",
+        "Marrón",
+        "Índigo",
+        "Magenta",
+        "Bordó",
+        "Pizarra",
       ]);
       await userEvent.click(screen.getByRole("option", { name: "Rojo" }));
       await userEvent.click(screen.getByRole("button", { name: "Crear" }));
@@ -451,6 +459,24 @@ describe("CatalogsAdmin", () => {
       expect(await within(row("Bloqueado")).findByText("Rojo")).toHaveAttribute(
         "data-tono",
         "rojo",
+      );
+    });
+
+    it("un tono de la ampliación viaja sin acento y la tabla muestra su etiqueta con acento", async () => {
+      renderAdmin("prioridades");
+      await screen.findByText("Urgente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nueva prioridad" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Diferida");
+      await userEvent.click(screen.getByRole("combobox", { name: "Color" }));
+      await userEvent.click(screen.getByRole("option", { name: "Marrón" }));
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      await waitFor(() => expect(fake.state.creates).toHaveLength(1));
+      expect(fake.state.creates[0]).toEqual({ nombre: "Diferida", color: "marron" });
+      expect(await within(row("Diferida")).findByText("Marrón")).toHaveAttribute(
+        "data-tono",
+        "marron",
       );
     });
 

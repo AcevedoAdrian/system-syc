@@ -8,7 +8,7 @@ Las reglas para construir pantallas y módulos nuevos de la web con la misma bas
 |---|---|---|
 | `apps/web/src/index.css` | **Los valores**: colores, tonos, radios y fuentes, en el tema claro y en el oscuro. Es la fuente de verdad | A mano |
 | `apps/web/src/tokens.contrast.test.ts` | Exige contraste AA (4,5:1) en cada texto y cada tono, en los dos temas | A mano |
-| `apps/web/DESIGN.md` | La descripción visual del sistema: tokens, los 8 tonos y los componentes compartidos | Generado; se puede reescribir al regenerarlo |
+| `apps/web/DESIGN.md` | La descripción visual del sistema: tokens, los 16 tonos y los componentes compartidos | Generado; se puede reescribir al regenerarlo |
 | `apps/web/PRODUCT.md` | El producto visto desde el diseño. Ante una diferencia con `docs/prd.md`, manda el PRD | A mano |
 | `docs/base-visual.md` (este archivo) | **Las reglas** para módulos nuevos; tiene que sobrevivir a una regeneración de `DESIGN.md` | A mano |
 | `/estilos` | La galería viva de todo lo reutilizable. Solo existe en desarrollo y no tiene link en el menú | Código |
@@ -23,7 +23,7 @@ Una pantalla nueva respeta esto:
 2. **Cargar, vaciar y fallar tienen componente.** `LoadingState` (`role="status"`), `EmptyState` y `ErrorState` (`role="alert"`, con «Reintentar» si recibe `onRetry`). No improvises un texto plano.
 3. **Solo tokens.** Un color sale de una clase de token (`bg-primary`, `text-muted-foreground`, `bg-tono-rojo`), nunca de la paleta de Tailwind (`bg-red-600`, `bg-white`) ni de un literal (`#f00`, `rgb(…)`). `pnpm lint` rechaza los colores sueltos y nombra archivo y línea.
 4. **Mirá `/estilos` antes de crear un componente.** Si ya existe, usalo; si falta algo, se agrega a la galería junto con el componente.
-5. **El estado nunca va solo en color.** Una insignia, un punto o un tono lleva su texto al lado. Para colorear usá `<Badge tono="verde">`: son 8 tonos (`gris`, `rojo`, `naranja`, `amarillo`, `verde`, `azul`, `violeta`, `rosa`).
+5. **El estado nunca va solo en color.** Una insignia, un punto o un tono lleva su texto al lado. Para colorear usá `<Badge tono="verde">`: son 16 tonos (`gris`, `rojo`, `naranja`, `amarillo`, `verde`, `azul`, `violeta`, `rosa`, `celeste`, `turquesa`, `lima`, `marron`, `indigo`, `magenta`, `bordo`, `pizarra`). Los 8 primeros son del SPEC 09; los otros 8, de la ampliación del SPEC 10.
 6. **El coral marca dónde se actúa.** La acción principal, el enlace y el foco; no sirve de decoración ni para decir «bien» o «mal».
 7. **La serif es solo para el título de pantalla.** Lo demás va en Inter, y los números de ticket y códigos en JetBrains Mono (`font-mono`).
 8. **Sumá tu módulo al menú y a las migas.** Una sección nueva en `MENU` de `components/layout/Sidebar.tsx` y su prefijo en `components/layout/breadcrumbs.ts`. El resto del menú no se rediseña.
@@ -49,5 +49,5 @@ Un tono de insignia nuevo es un vocabulario nuevo para el administrador (SPEC 10
 ## Qué no cubre
 
 - Las pantallas de tickets y de administración conservan su estructura anterior: toman la paleta y la tipografía nuevas por usar tokens, pero su rediseño es el SPEC 11.
-- El color de cada estado y prioridad lo elige el administrador desde `/admin/catalogos` (SPEC 10, ya hecho): esta base define los 8 tonos entre los que elige. Se muestra siempre como `<Badge tono>` con el nombre del ítem adentro, y sale del dato del ítem, nunca de su nombre.
+- El color de cada estado y prioridad lo elige el administrador desde `/admin/catalogos` (SPEC 10, ya hecho): esta base define los 16 tonos entre los que elige. Se muestra siempre como `<Badge tono>` con el nombre del ítem adentro, y sale del dato del ítem, nunca de su nombre.
 - Un selector manual de tema y la adaptación a celular quedan para un spec propio.

@@ -110,7 +110,7 @@ describe("areaInputSchema", () => {
 });
 
 describe("tonos", () => {
-  it("son los 8 de la base visual, en el orden del SPEC 09", () => {
+  it("son los 16 de la base visual: los 8 del SPEC 09 y los 8 de la ampliación, en ese orden", () => {
     expect([...tonos]).toEqual([
       "gris",
       "rojo",
@@ -120,12 +120,26 @@ describe("tonos", () => {
       "azul",
       "violeta",
       "rosa",
+      "celeste",
+      "turquesa",
+      "lima",
+      "marron",
+      "indigo",
+      "magenta",
+      "bordo",
+      "pizarra",
     ]);
+    expect(new Set(tonos).size).toBe(16);
+  });
+
+  it("los valores son identificadores simples: minúsculas ASCII, sin acentos", () => {
+    for (const tono of tonos) expect(tono).toMatch(/^[a-z]+$/);
   });
 
   it("tonoSchema acepta cada tono y rechaza cualquier otro valor", () => {
     for (const tono of tonos) expect(tonoSchema.safeParse(tono).success).toBe(true);
     expect(tonoSchema.safeParse("fucsia").success).toBe(false);
+    expect(tonoSchema.safeParse("Marrón").success).toBe(false); // el valor es `marron`; el acento es solo de la etiqueta
     expect(tonoSchema.safeParse("Rojo").success).toBe(false);
     expect(tonoSchema.safeParse("").success).toBe(false);
     expect(tonoSchema.safeParse(null).success).toBe(false);
@@ -137,7 +151,7 @@ describe("catalogItemConColorInputSchema", () => {
     expect(catalogItemConColorInputSchema.safeParse({ nombre: "Alta" }).success).toBe(false);
   });
 
-  it("rechaza un color que no es uno de los 8 tonos", () => {
+  it("rechaza un color que no es uno de los 16 tonos", () => {
     expect(
       catalogItemConColorInputSchema.safeParse({ nombre: "Alta", color: "fucsia" }).success,
     ).toBe(false);
