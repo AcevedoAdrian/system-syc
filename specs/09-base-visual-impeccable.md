@@ -1,6 +1,6 @@
 # SPEC 09 — Base visual con impeccable
 
-> **Status:** Approved
+> **Status:** Completed
 > **Depends on:** SPEC 01 (esqueleto del monorepo), SPEC 02 (autenticación y acceso), SPEC 06 (comentarios y bandeja)
 > **Date:** 2026-10-13
 > **Objective:** usar el skill impeccable, instalado solo en local y sin hooks ni telemetría, para elegir sobre la bandeja y dejar una base visual (paleta clara y oscura, tipografía, componentes compartidos, galería y reglas chequeadas en `pnpm lint`) aplicada al login y al marco, para que las pantallas y los módulos nuevos la reutilicen.
@@ -52,7 +52,7 @@ Cambios del usuario del 2026-10-14, que reemplazan lo que el 2026-10-13 se habí
   - `.claude/skills/impeccable/` (SKILL.md, `reference/`, `scripts/`);
   - `.claude/agents/impeccable-*.md` (4 subagentes);
   - sin hooks: si el instalador escribe hooks en `.claude/settings.json`, se quitan después;
-  - telemetría apagada con `npx impeccable telemetry off`;
+  - telemetría apagada con la variable de entorno `DO_NOT_TRACK=1`, en `.claude/settings.local.json` (ignorado por git) y en la shell (el CLI no tiene un comando `telemetry`);
   - todo queda ignorado por `.git/info/exclude` de la máquina, no por `.gitignore`;
   - `biome.json`, `.dockerignore` y `.gitignore` no cambian.
 - `apps/web/PRODUCT.md`, escrito por `/impeccable init` (la versión anterior se borró y se genera de nuevo).
@@ -157,7 +157,7 @@ Convenciones:
   - Biome respeta `.git/info/exclude` porque `biome.json` ya tiene `vcs.useIgnoreFile` (comprobado el 2026-10-14: un `.json` mal formateado en `.impeccable/` no se marca, y uno fuera del exclude sí).
   - Los Dockerfiles de la API y la web copian solo `apps/` y `packages/`, nunca la raíz: `.claude/` y `.impeccable/` no entran a ninguna imagen.
 - No hay hooks de impeccable: ni en `.claude/settings.json` ni en `.claude/settings.local.json`. El detector se corre a mano (`.claude/skills/impeccable/scripts/impeccable detect <ruta>`).
-- La telemetría está apagada.
+- La telemetría está apagada con `DO_NOT_TRACK=1`, fijada en `.claude/settings.local.json` y en la shell. El CLI no ofrece un comando que lo confirme.
 - Se actualiza con `npx impeccable update`, y los archivos de `.claude/skills/impeccable/` y `.claude/agents/impeccable-*.md` no se editan a mano.
 
 ### Feature 9.2 — Dirección visual
@@ -240,7 +240,7 @@ Convenciones:
 1. **Instalar impeccable en local.**
    - Correr `npx impeccable install --providers=claude --scope=project`.
    - Si escribió hooks, quitarlos de `.claude/settings.json` (o correr `/impeccable hooks off`); si el archivo queda sin otra cosa, borrarlo.
-   - Apagar la telemetría con `npx impeccable telemetry off`.
+   - Apagar la telemetría con `DO_NOT_TRACK=1` en `.claude/settings.local.json` y en la shell (el CLI instalado no tiene un comando `telemetry`).
    - Confirmar que `.git/info/exclude` tiene las 4 líneas de la Feature 9.1 y que ya no lista `/apps/web/PRODUCT.md` ni `/apps/web/DESIGN.md`, porque esos dos archivos se versionan.
    - No tocar `biome.json`, `.dockerignore` ni `.gitignore`.
 
@@ -383,29 +383,29 @@ El usuario pidió sumar los estilos de su maqueta a esta dirección. Decisiones 
 
 ## Criterios de aceptación
 
-- [ ] `.claude/skills/impeccable/SKILL.md` y los 4 `.claude/agents/impeccable-*.md` existen en la máquina de desarrollo, `/impeccable` está disponible en Claude Code, y `git ls-files` no lista ninguno de esos archivos ni nada de `.impeccable/`.
-- [ ] `.gitignore` no cambió. Después de instalar y de correr `/impeccable audit`, `git status` no muestra archivos de impeccable.
-- [ ] No hay hooks de impeccable: `.claude/settings.json` no existe o no menciona impeccable, y `.claude/settings.local.json` tampoco.
-- [ ] La telemetría de impeccable está apagada, y el CLI lo confirma.
-- [ ] Las imágenes de producción de la web y de la API no contienen `.claude/` ni `.impeccable/`.
-- [ ] `apps/web/PRODUCT.md` y `apps/web/DESIGN.md` están en git. `DESIGN.md` documenta los tokens, los 8 tonos y los componentes compartidos.
-- [ ] `docs/base-visual.md` existe y tiene la sección "Módulos nuevos".
-- [ ] `biome.json`, `.dockerignore` y `.gitignore` no cambiaron respecto de `main`, y `pnpm lint` pasa con los archivos de impeccable presentes en la máquina.
-- [ ] Ni `package.json`, `turbo.json`, `.github/`, `scripts/`, `apps/web/src` ni la configuración compartida nombran a impeccable.
-- [ ] La sección "Dirección elegida" de este spec describe la propuesta que eligió el usuario.
-- [ ] `index.css` no tiene bloque `.dark`. Con el sistema operativo en oscuro, la app se ve en oscuro sin recargar.
-- [ ] `tokens.contrast.test.ts` pasa: cada texto y cada tono tienen contraste de 4,5:1 o más sobre su fondo, en claro y en oscuro.
-- [ ] La fuente se sirve desde el build: cargar la app no hace pedidos a otros orígenes.
-- [ ] `Page`, `PageHeader`, `LoadingState`, `EmptyState`, `ErrorState` y `Badge` con `tono` existen y tienen tests. `LoadingState` expone `role="status"`, y `ErrorState` expone `role="alert"` y llama a `onRetry`.
-- [ ] `/estilos` muestra la galería en desarrollo y responde "no encontrado" en el build de producción.
-- [ ] `HealthIndicator` usa `success`, `warning` y `destructive`, con texto además del color.
-- [ ] En la máquina donde impeccable está instalado, el detector sobre el marco, el login, `components/common` y la galería termina con código 0.
-- [ ] A 1024 px de ancho, ni el marco ni el login tienen scroll horizontal.
-- [ ] Ningún archivo de `apps/web/src` salvo `index.css` tiene clases de la paleta de Tailwind ni colores literales.
-- [ ] `pnpm lint` falla nombrando archivo y línea si un componente usa `bg-red-600` o `"#ff0000"`, y no falla por un comentario con `#123`.
-- [ ] Las pantallas de tickets y administración se comportan igual: todos sus tests pasan sin cambios.
-- [ ] `apps/web/CLAUDE.md` tiene la sección "Base visual", con el enlace a `docs/base-visual.md`.
-- [ ] `pnpm verify --spec 09` y `pnpm turbo lint typecheck test build` terminan con código 0, sin que impeccable esté instalado.
+- [x] `.claude/skills/impeccable/SKILL.md` y los 4 `.claude/agents/impeccable-*.md` existen en la máquina de desarrollo, `/impeccable` está disponible en Claude Code, y `git ls-files` no lista ninguno de esos archivos ni nada de `.impeccable/`.
+- [x] `.gitignore` no cambió. Después de instalar y de correr `/impeccable audit`, `git status` no muestra archivos de impeccable.
+- [x] No hay hooks de impeccable: `.claude/settings.json` no existe o no menciona impeccable, y `.claude/settings.local.json` tampoco.
+- [x] La telemetría de impeccable está apagada: `DO_NOT_TRACK=1` está fijada en `.claude/settings.local.json` y en la shell (el CLI no ofrece un comando que lo confirme).
+- [x] Las imágenes de producción de la web y de la API no contienen `.claude/` ni `.impeccable/`: sus Dockerfiles copian solo `apps/` y `packages/` desde la raíz.
+- [x] `apps/web/PRODUCT.md` y `apps/web/DESIGN.md` están en git. `DESIGN.md` documenta los tokens, los 8 tonos y los componentes compartidos.
+- [x] `docs/base-visual.md` existe y tiene la sección "Módulos nuevos".
+- [x] `biome.json`, `.dockerignore` y `.gitignore` no cambiaron respecto de `main`, y `pnpm lint` pasa con los archivos de impeccable presentes en la máquina.
+- [x] Ni `package.json`, `turbo.json`, `.github/`, `scripts/`, `apps/web/src` ni la configuración compartida nombran a impeccable.
+- [x] La sección "Dirección elegida" de este spec describe la propuesta que eligió el usuario.
+- [x] `index.css` no tiene bloque `.dark`. Con el sistema operativo en oscuro, la app se ve en oscuro sin recargar.
+- [x] `tokens.contrast.test.ts` pasa: cada texto y cada tono tienen contraste de 4,5:1 o más sobre su fondo, en claro y en oscuro.
+- [x] La fuente se sirve desde el build: cargar la app no hace pedidos a otros orígenes.
+- [x] `Page`, `PageHeader`, `LoadingState`, `EmptyState`, `ErrorState` y `Badge` con `tono` existen y tienen tests. `LoadingState` expone `role="status"`, y `ErrorState` expone `role="alert"` y llama a `onRetry`.
+- [x] `/estilos` muestra la galería en desarrollo y responde "no encontrado" en el build de producción.
+- [x] `HealthIndicator` usa `success`, `warning` y `destructive`, con texto además del color.
+- [x] En la máquina donde impeccable está instalado, el detector sobre el marco, el login, `components/common` y la galería termina con código 0.
+- [x] A 1024 px de ancho, ni el marco ni el login tienen scroll horizontal.
+- [x] Ningún archivo de `apps/web/src` salvo `index.css` tiene clases de la paleta de Tailwind ni colores literales.
+- [x] `pnpm lint` falla nombrando archivo y línea si un componente usa `bg-red-600` o `"#ff0000"`, y no falla por un comentario con `#123`.
+- [x] Las pantallas de tickets y administración se comportan igual: todos sus tests pasan sin cambios.
+- [x] `apps/web/CLAUDE.md` tiene la sección "Base visual", con el enlace a `docs/base-visual.md`.
+- [x] `pnpm verify --spec 09` y `pnpm turbo lint typecheck test build` terminan con código 0, sin que impeccable esté instalado.
 
 ## Decisiones
 
