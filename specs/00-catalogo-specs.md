@@ -18,6 +18,7 @@ Este documento fue la propuesta inicial de specs, con preguntas abiertas. Todas 
 | 06 | Comentarios, bandeja y detalle | `specs/06-comentarios-bandeja.md` | 5 |
 | 07 | Endurecimiento y despliegue | `specs/07-endurecimiento-despliegue.md` | 6 |
 | 08 | Tipos de área (agrega un catálogo; no estaba en las preguntas Q1 a Q38) | `specs/08-tipos-de-area.md` | 3 (extiende) |
+| 09 | Sistema visual (maqueta de Claude Design, por etapas; tampoco estaba en las preguntas) | `specs/09-sistema-visual.md` | — |
 
 ## Decisiones que resolvieron conflictos entre respuestas (2026-09-29)
 

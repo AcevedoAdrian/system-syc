@@ -9,6 +9,17 @@ Organización por *feature*, no por tipo de archivo: todo lo relacionado a un mi
 - `components/ui` no conoce el dominio (primitivos de shadcn); `features/*/components` sí.
 - Los formularios usan react-hook-form con los esquemas Zod de `packages/contracts`.
 
+## Sistema visual
+
+La referencia es la maqueta `docs/Maqueta-Dashboard/Main.dc.html` (SPEC 09, `specs/09-sistema-visual.md`, que dice qué etapa está hecha). Se replica en los componentes propios; no se copia su HTML.
+
+- Los colores salen **solo** de los tokens de `src/index.css` (`bg-background`, `text-body`, `bg-primary`, `text-link`, `bg-feature`…). Prohibido hex, `rgb()`, `oklch()` y colores de la paleta de Tailwind (`bg-blue-500`, `text-red-600`) en los componentes.
+- Si falta un color, se agrega un token nuevo en `index.css`: en `:root`, en `.dark` y en `@theme inline`. Nunca en el componente.
+- `--primary` (`#a9583e`) es el botón principal y cumple AA con texto blanco. `--brand` (`#cc785c`) es el acento de marca (logo, foco, campo obligatorio): no lleva texto blanco encima.
+- `--success` es el texto de confirmación (AA); `--teal` es decorativo (secciones, interruptor).
+- Tipografías: `font-sans` (Inter), `font-heading` (Cormorant Garamond, títulos), `font-mono` (JetBrains Mono, número de ticket) y `font-brand` (Bricolage Grotesque, logo). Alojadas con `@fontsource`; no se usa Google Fonts.
+- Se reutiliza `components/ui` antes de crear estilos propios.
+
 ## Particularidades
 
 - **El cliente oRPC usa `OpenAPILink`**: la API expone el contrato como OpenAPI/REST, no como RPC.
