@@ -1,6 +1,9 @@
 import type { Organization } from "@syc/contracts";
+import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { listCardClass } from "@/components/common/data-table";
+import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/errors";
 import {
@@ -46,27 +49,43 @@ export function OrganizationsAdmin() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Departamentos</h1>
-        <Button onClick={() => setCreating(true)}>Nuevo departamento</Button>
-      </div>
+    <section className="mx-auto flex w-full max-w-300 flex-col gap-8">
+      <PageHeader
+        title="Departamentos"
+        description="Equipos que atienden los tickets. Solo administradores."
+        action={
+          <Button className="h-10 px-5" onClick={() => setCreating(true)}>
+            <Plus aria-hidden="true" />
+            Nuevo departamento
+          </Button>
+        }
+      />
 
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
           {actionError}
         </p>
       )}
-      {isPending && <p>Cargando departamentos…</p>}
-      {isError && <p role="alert">No se pudieron cargar los departamentos.</p>}
-      {organizations && (
-        <OrganizationsTable
-          organizations={organizations}
-          onRename={setRenaming}
-          onToggleActive={toggleActive}
-          onRemove={setRemoving}
-        />
-      )}
+
+      <section aria-label="Listado de departamentos" className={listCardClass}>
+        {isPending && <p className="px-5 py-8 text-muted-foreground">Cargando departamentos…</p>}
+        {isError && (
+          <p role="alert" className="px-5 py-8 text-destructive">
+            No se pudieron cargar los departamentos.
+          </p>
+        )}
+        {organizations && organizations.length === 0 && (
+          <p className="px-5 py-8 text-muted-foreground">Todavía no hay departamentos.</p>
+        )}
+        {organizations && organizations.length > 0 && (
+          <OrganizationsTable
+            organizations={organizations}
+            onRename={setRenaming}
+            onToggleActive={toggleActive}
+            onRemove={setRemoving}
+          />
+        )}
+      </section>
 
       <OrganizationFormDialog
         open={creating}
@@ -91,8 +110,9 @@ export function OrganizationsAdmin() {
         title="Eliminar departamento"
         description={`Se eliminará "${removing?.nombre}" de forma definitiva. Solo se puede si no tiene agentes asignados.`}
         confirmLabel="Eliminar"
+        destructive
         onConfirm={confirmRemove}
       />
-    </div>
+    </section>
   );
 }

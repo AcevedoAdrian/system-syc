@@ -23,11 +23,11 @@ function validateSearch(): ValidateSearch {
 }
 
 describe("ruta /admin/catalogos", () => {
-  it.each(catalogRutas)("conserva la pestaña ?catalogo=%s", (ruta) => {
+  it.each(catalogRutas)("conserva el catálogo ?catalogo=%s", (ruta) => {
     expect(validateSearch()({ catalogo: ruta })).toEqual({ catalogo: ruta });
   });
 
-  it("sin parámetro o con uno desconocido no define pestaña (la pantalla abre en Áreas)", () => {
+  it("sin parámetro o con uno desconocido no define catálogo (la pantalla abre en Áreas)", () => {
     expect(validateSearch()({}).catalogo).toBeUndefined();
     expect(validateSearch()({ catalogo: "otra-cosa" }).catalogo).toBeUndefined();
   });

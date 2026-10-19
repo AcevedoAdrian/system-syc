@@ -2,17 +2,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type ResetPasswordInput, resetPasswordInputSchema, type User } from "@syc/contracts";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { controlClass, Field } from "@/components/common/Field";
+import { DrawerForm, FormDrawer } from "@/components/common/FormDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/errors";
 
 const passwordSchema = resetPasswordInputSchema.pick({ password: true });
@@ -50,50 +42,51 @@ function ResetPasswordForm({
   });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="new-password">Nueva contraseña</Label>
-        <Input
-          id="new-password"
-          type="password"
-          autoComplete="new-password"
-          autoFocus
-          aria-invalid={errors.password ? true : undefined}
-          {...register("password")}
-        />
-        {errors.password && (
-          <p className="text-sm text-destructive">Debe tener entre 8 y 128 caracteres.</p>
+    <DrawerForm
+      onSubmit={submit}
+      submitLabel="Resetear contraseña"
+      submitting={isSubmitting}
+      error={serverError}
+    >
+      <p className="text-body">
+        Vas a definir una contraseña nueva para <span className="font-medium">{user.name}</span>. Se
+        cerrarán sus sesiones activas y no hace falta conocer la anterior.
+      </p>
+      <Field
+        id="new-password"
+        label="Nueva contraseña"
+        required
+        error={errors.password && "Debe tener entre 8 y 128 caracteres."}
+      >
+        {(aria) => (
+          <Input
+            id="new-password"
+            type="password"
+            autoComplete="new-password"
+            autoFocus
+            maxLength={128}
+            className={controlClass}
+            {...aria}
+            {...register("password")}
+          />
         )}
-      </div>
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">
-          {serverError}
-        </p>
-      )}
-      <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
-          Resetear contraseña
-        </Button>
-      </DialogFooter>
-    </form>
+      </Field>
+    </DrawerForm>
   );
 }
 
+// Un panel lateral (SPEC 09, 9.6) para resetear la contraseña de un usuario.
 export function ResetPasswordDialog({ user, onOpenChange, onSubmit }: ResetPasswordDialogProps) {
   return (
-    <Dialog open={user !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Resetear contraseña</DialogTitle>
-          <DialogDescription>
-            {user && `Vas a definir una contraseña nueva para ${user.name}. `}
-            Se cerrarán sus sesiones activas y no hace falta conocer la anterior.
-          </DialogDescription>
-        </DialogHeader>
-        {user && (
-          <ResetPasswordForm user={user} onSubmit={onSubmit} onDone={() => onOpenChange(false)} />
-        )}
-      </DialogContent>
-    </Dialog>
+    <FormDrawer
+      open={user !== null}
+      onOpenChange={onOpenChange}
+      title="Resetear contraseña"
+      description="Define una contraseña nueva para la cuenta."
+    >
+      {user && (
+        <ResetPasswordForm user={user} onSubmit={onSubmit} onDone={() => onOpenChange(false)} />
+      )}
+    </FormDrawer>
   );
 }

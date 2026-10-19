@@ -21,6 +21,7 @@ const REQUIRED_TOKENS = [
   "muted-foreground",
   "accent",
   "destructive",
+  "destructive-foreground",
   "success",
   "warning",
   "border",
@@ -447,6 +448,94 @@ export default defineSpec({
           "src/features/tickets/components/TicketBadges.test.tsx",
           "src/features/tickets/components/CatalogOptionSelect.test.tsx",
           "src/features/tickets/ticket-colors.test.ts",
+        );
+      },
+    ),
+
+    // Etapa 9.6 — administración. Se verifica con los tests de los componentes (jsdom).
+    criterion(
+      30,
+      "Los diálogos (Dialog y AlertDialog) tienen el diseño de la maqueta, sin «×» por defecto, y se cierran con «Cancelar» y con Escape",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los diálogos",
+          "src/components/ui/dialog.test.tsx",
+          "src/components/common/ConfirmDialog.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      31,
+      "El panel lateral muestra título, cuerpo y acciones, se cierra con «×», «Cancelar» y Escape, y atrapa el foco",
+      async () => {
+        vitest("@syc/web", "El panel lateral", "src/components/common/FormDrawer.test.tsx");
+      },
+    ),
+
+    criterion(32, "El interruptor es un role=switch con etiqueta, estado y teclado", async () => {
+      vitest("@syc/web", "El interruptor", "src/components/ui/switch.test.tsx");
+    }),
+
+    criterion(
+      33,
+      "Departamentos: lista con interruptor, renombrar y eliminar; el panel valida y muestra los errores del servidor",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los departamentos",
+          "src/features/organizations/components/OrganizationsAdmin.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      34,
+      "Usuarios: lista con sus columnas, interruptor (sin desactivarse a uno mismo), edición y reseteo de contraseña en el panel",
+      async () => {
+        vitest("@syc/web", "Los usuarios", "src/features/users/components/UsersAdmin.test.tsx");
+      },
+    ),
+
+    criterion(
+      35,
+      "Catálogos: encabezado, búsqueda, filtros con cantidades, tabla, orden, edición, activación, eliminación y paginación de 10 en 10, sin pestañas",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los catálogos",
+          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
+          "src/features/catalogs/components/CatalogTable.test.tsx",
+          "src/features/catalogs/catalog-view.test.ts",
+          "src/routes/_authenticated/admin/catalogos.test.ts",
+        );
+      },
+    ),
+
+    criterion(
+      36,
+      "Los formularios de catálogo (nombre, tipo de área y proveedor) se abren en el panel y validan",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los formularios de catálogo",
+          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
+          "src/features/catalogs/components/ProveedorFormDialog.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      37,
+      "«Cambiar mi contraseña» y los diálogos de confirmación usan el diseño nuevo y conservan su validación",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Cambiar mi contraseña y las confirmaciones",
+          "src/features/auth/components/ChangePasswordDialog.test.tsx",
+          "src/components/common/ConfirmDialog.test.tsx",
+          "src/components/common/lists.test.tsx",
         );
       },
     ),

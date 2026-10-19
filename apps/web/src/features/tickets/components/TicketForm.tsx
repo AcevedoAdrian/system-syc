@@ -28,6 +28,7 @@ import {
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
+import { controlClass, Field, TodayButton, textareaClass } from "@/components/common/Field";
 import { FormActionBar } from "@/components/common/FormActionBar";
 import { FormSection } from "@/components/common/FormSection";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useUpdateTicket } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
-import { controlClass, Field, TodayButton, textareaClass } from "./Field";
 import { EstadoDot, PrioridadDot } from "./TicketBadges";
 
 // El formulario trabaja con texto (un campo en blanco es ""); el esquema lo convierte en `null`.

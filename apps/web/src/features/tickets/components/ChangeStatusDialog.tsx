@@ -6,6 +6,7 @@ import {
 } from "@syc/contracts";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { Field } from "@/components/common/Field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +23,6 @@ import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useReloadTicket } from "../hooks/useReloadTicket";
 import { useChangeTicketStatus } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
-import { Field } from "./Field";
 
 interface StatusFormValues {
   estadoId: string;

@@ -30,6 +30,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
@@ -98,6 +99,7 @@
   --accent: #f5f0e8;
   --accent-foreground: #141413;
   --destructive: #b73a3a;
+  --destructive-foreground: #ffffff;
   /* Texto de confirmación: 4,9:1 sobre el fondo claro (AA). El teal de la maqueta (--teal) da 3,7:1 y queda para uso decorativo. */
   --success: #287a69;
   --warning: #d4a017;
@@ -154,6 +156,7 @@
   --accent: #1f1e1b;
   --accent-foreground: #faf9f5;
   --destructive: #ef8a85;
+  --destructive-foreground: #181715;
   --success: #5db8a6;
   --warning: #d4a017;
   --border: #34322d;

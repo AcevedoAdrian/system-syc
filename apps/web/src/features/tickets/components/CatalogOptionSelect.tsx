@@ -1,6 +1,7 @@
 import { areaLabel, type CatalogRuta } from "@syc/contracts";
 import { cn } from "cn";
 import type { ReactNode } from "react";
+import { type FieldControlProps, selectClass } from "@/components/common/Field";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { useCatalog } from "@/features/catalogs/hooks/useCatalog";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
-import { type FieldControlProps, selectClass } from "./Field";
 
 // Con un punto delante, el valor queda pegado a él y la flecha se va a la derecha (sin esto, `justify-between`
 // reparte los tres y centra el valor).

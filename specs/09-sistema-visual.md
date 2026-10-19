@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada; 9.6 pendiente
+> **Status:** Completed (con tarjetas de resumen de la bandeja pendientes, ver 9.4) — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada, 9.6 (administración) implementada
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -26,7 +26,7 @@ Decisiones del usuario del 2026-10-16:
 | 9.3 | Layout autenticado: sidebar y topbar | Hecha |
 | 9.4 | Bandeja de tickets; color de estados y prioridades (las tarjetas de resumen quedan para una etapa aparte) | Hecha |
 | 9.5 | Formulario y detalle de ticket (secciones de color, pestañas, comentarios e historial) | Hecha |
-| 9.6 | Administración: departamentos, usuarios y catálogos | Pendiente |
+| 9.6 | Administración: departamentos, usuarios, catálogos y diálogos | Hecha |
 
 Las etapas 9.2 a 9.6 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
 
@@ -282,6 +282,53 @@ Referencia: `TICKETS: ALTA / EDICIÓN` de `docs/Maqueta-Dashboard/Main.dc.html`.
 - [x] **09.29** La prioridad muestra su punto de color dentro del selector, con la misma regla que la bandeja.
 
 A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas de la pantalla de alta, el detalle y las tres pestañas en claro y oscuro, y del alta a 430px de ancho): falta recorrerlo con un agente y probar guardar con cambios, el conflicto 409 y un comentario real. Los tests cubren esos casos.
+
+## Etapa 9.6 — Administración
+
+Referencia: `ADMINISTRACIÓN: DEPARTAMENTOS`, `ADMINISTRACIÓN: USUARIOS`, `CATÁLOGOS: LISTADO`, el panel lateral de administración (`DRAWER`), `CAMBIAR MI CONTRASEÑA` y `CONFIRMAR ELIMINACIÓN` de `docs/Maqueta-Dashboard/Main.dc.html`. Rediseña `/admin/departamentos`, `/admin/usuarios` y `/admin/catalogos`, y los diálogos de toda la aplicación. La API, los contratos, las reglas (último admin, departamento con historia, catálogo en uso, estados de sistema) y los mensajes de error no cambian.
+
+### Alcance
+
+**Dentro:**
+
+- **Diálogos** (`Dialog` y `AlertDialog`, que usan «Cambiar mi contraseña», «Cambiar estado», «Cambiar departamento», los de confirmación y los de aviso): tarjeta de 420px con borde y radio de 12px, relleno de 32px, el título en `font-heading` de 28px, la descripción de 16px en `--muted-foreground`, los botones a la derecha sin franja gris, el fondo detrás en `--scrim` y la sombra `--shadow-dialog`. Sin botón «×» por defecto: se cierran con «Cancelar» o con Escape.
+- **Panel lateral** (`FormDrawer`): un panel de 440px que entra por la derecha, con el título arriba y un botón «×» redondo, el cuerpo con scroll y las acciones fijas al pie. Lo usan los formularios de departamentos, usuarios (alta, edición y reseteo de contraseña) y catálogos (incluido el de proveedores). Es un diálogo modal: atrapa el foco y se cierra con Escape.
+- **Interruptor** (`Switch`): el «Activo» de departamentos y usuarios. Es un `role="switch"` de 44×26px, verde azulado cuando está activo, con el estado escrito al lado («Activo»/«Desactivado»).
+- **Encabezado de página** (`PageHeader`): título en `font-heading` de 36px, bajada y, a la derecha, la acción principal con su «+».
+- **Departamentos:** la lista en una tarjeta con las columnas Nombre, Agentes asignados, Activo y Acciones. Acciones con ícono de 40px: «Renombrar» y «Eliminar» (si el departamento nunca tuvo tickets ni agentes, como hoy).
+- **Usuarios:** la lista en una tarjeta con Usuario (monoespaciado), Nombre, Rol, Departamento, Email, Activo y Acciones («Editar» y «Resetear contraseña»). Nadie puede desactivarse a sí mismo; el email generado (`<usuario>@syc.local`) se muestra atenuado.
+- **Catálogos:** sin pestañas (el menú lateral abre cada catálogo, 9.3). El encabezado trae el nombre del catálogo, su descripción y «Nuevo …». Dentro de la tarjeta: búsqueda por nombre, los filtros «Todos», «Activos» y «Desactivados» con su cantidad, la tabla (Orden con las flechas, Nombre, las columnas propias de Áreas y de Proveedores, Estado como píldora con punto y las acciones «Editar», «Desactivar»/«Reactivar» y «Eliminar») y el pie «Mostrando a–b de N · Página p de n» con «Anterior» y «Siguiente» (10 por página). Las flechas de orden se deshabilitan mientras haya una búsqueda o un filtro, porque mover una fila dentro de una lista parcial no tiene sentido.
+- **Cambiar mi contraseña:** el diálogo con el diseño nuevo, con la misma validación.
+
+**Fuera:**
+
+- La vista general de catálogos con tarjetas de la maqueta: el menú lateral ya abre cada catálogo (9.3).
+- Los avisos flotantes de la maqueta («Departamento creado»): el sistema no tiene un sistema de avisos; el resultado se ve en la lista y los errores siguen saliendo en el formulario o sobre la lista.
+- Cambios en la API, los contratos o la base.
+
+### Decisiones
+
+- **Formularios en un panel lateral, no en un diálogo centrado**, como la maqueta: el panel deja ver la lista mientras se edita y aguanta formularios largos (usuario, proveedor).
+- **Interruptor en vez de botón «Desactivar/Reactivar»** en departamentos y usuarios, como la maqueta. En catálogos se queda un botón con ícono de encendido («Desactivar «X»»/«Reactivar «X»»), también como la maqueta.
+- **Cada botón de ícono lleva el nombre del registro** en su etiqueta («Editar «Redes»», «Eliminar «Redes»»), para que un lector de pantalla distinga las filas.
+- **Búsqueda, filtro y paginación de catálogos en el navegador**, sobre la lista completa que ya trae `catalogs.<catálogo>.list`; son datos chicos (el más largo, Áreas, tiene unas 120 filas).
+- **El interruptor apagado usa `--neutral-dot`**, no el gris claro de la maqueta: sobre el fondo crema ese gris da 1,2:1 y un control necesita 3:1. El estado, además, está escrito al lado.
+- **Las descripciones de los paneles son distintas de las ayudas de los campos**, para que un lector de pantalla no repita el mismo texto al abrir el panel y al entrar al campo.
+- **Sin pestañas de catálogos:** el menú lateral las reemplaza.
+- **«Eliminar» se conserva en departamentos**, aunque la maqueta no lo tiene: el sistema lo permite cuando el departamento nunca tuvo tickets ni agentes (SPEC 02, D2). Los usuarios no se eliminan, solo se desactivan, como hoy.
+
+### Criterios de aceptación (9.6)
+
+- [x] **09.30** Los diálogos (`Dialog` y `AlertDialog`) tienen el diseño de la maqueta, sin «×» por defecto, y siguen cerrándose con «Cancelar» y con Escape.
+- [x] **09.31** El panel lateral muestra título, cuerpo y acciones, se cierra con su botón «×», con «Cancelar» y con Escape, y atrapa el foco.
+- [x] **09.32** El interruptor es un `role="switch"` con su etiqueta, su estado y teclado (espacio).
+- [x] **09.33** Departamentos: la lista con interruptor, renombrar y eliminar; el panel de alta y de renombrado valida y muestra los errores del servidor.
+- [x] **09.34** Usuarios: la lista con sus columnas, el interruptor (sin poder desactivarse a uno mismo), editar y resetear contraseña en el panel.
+- [x] **09.35** Catálogos: encabezado, búsqueda, filtros con cantidades, tabla, orden, edición, activación, eliminación y paginación de 10 en 10; sin pestañas.
+- [x] **09.36** Los formularios de catálogo (nombre, tipo de área y proveedor) se abren en el panel y validan como antes.
+- [x] **09.37** «Cambiar mi contraseña» y los diálogos de confirmación usan el diseño nuevo y conservan su validación.
+
+A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas de los tres listados en claro y oscuro, los paneles de departamento, usuario y proveedor, el diálogo de contraseña y los catálogos a 430px): falta recorrerlo con un agente (no entra a estas pantallas) y probar guardar de verdad en cada panel; los tests cubren esos casos.
 
 ## Decisiones
 

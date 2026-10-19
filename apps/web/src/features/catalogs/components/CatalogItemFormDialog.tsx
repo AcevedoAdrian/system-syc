@@ -8,17 +8,9 @@ import {
 } from "@syc/contracts";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { controlClass, Field, selectClass } from "@/components/common/Field";
+import { DrawerForm, FormDrawer } from "@/components/common/FormDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -50,17 +42,25 @@ function TipoSelect({
   value,
   onChange,
   invalid,
+  describedBy,
 }: {
   value: string;
   onChange: (value: string) => void;
   invalid: boolean;
+  describedBy?: string;
 }) {
   const { data: tipos = [] } = useCatalog("tiposArea");
   const options = tipos.filter((tipo) => tipo.activo || tipo.id === value);
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger id="tipoId" className="w-full" aria-invalid={invalid ? true : undefined}>
+      <SelectTrigger
+        id="tipoId"
+        className={selectClass}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
+        aria-required
+      >
         <SelectValue placeholder="Elegí un tipo" />
       </SelectTrigger>
       <SelectContent>
@@ -107,72 +107,72 @@ function CatalogItemForm({
   });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="nombre">Nombre</Label>
-        <Input
-          id="nombre"
-          autoFocus
-          aria-invalid={errors.nombre ? true : undefined}
-          {...register("nombre")}
-        />
-        {errors.nombre && (
-          <p className="text-sm text-destructive">
-            El nombre es obligatorio (hasta 120 caracteres).
-          </p>
-        )}
-      </div>
-      {conTipo && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="tipoId">Tipo</Label>
-          <Controller
-            control={control}
-            name="tipoId"
-            render={({ field }) => (
-              <TipoSelect
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                invalid={Boolean(errors.tipoId)}
-              />
-            )}
+    <DrawerForm
+      onSubmit={submit}
+      submitLabel={submitLabel}
+      submitting={isSubmitting}
+      error={serverError}
+    >
+      <Field
+        id="nombre"
+        label="Nombre"
+        required
+        hint={
+          conTipo
+            ? "El nombre no puede repetirse dentro del mismo tipo."
+            : "El nombre no puede repetirse dentro del catálogo."
+        }
+        error={errors.nombre && "El nombre es obligatorio (hasta 120 caracteres)."}
+      >
+        {(aria) => (
+          <Input
+            id="nombre"
+            autoFocus
+            maxLength={120}
+            placeholder="Nombre del registro"
+            className={controlClass}
+            {...aria}
+            {...register("nombre")}
           />
-          {errors.tipoId && <p className="text-sm text-destructive">Elegí un tipo.</p>}
-        </div>
+        )}
+      </Field>
+      {conTipo && (
+        <Field id="tipoId" label="Tipo de área" required error={errors.tipoId && "Elegí un tipo."}>
+          {(aria) => (
+            <Controller
+              control={control}
+              name="tipoId"
+              render={({ field }) => (
+                <TipoSelect
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  invalid={Boolean(errors.tipoId)}
+                  describedBy={aria["aria-describedby"]}
+                />
+              )}
+            />
+          )}
+        </Field>
       )}
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">
-          {serverError}
-        </p>
-      )}
-      <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </form>
+    </DrawerForm>
   );
 }
 
+// Un panel lateral (SPEC 09, 9.6) para dar de alta o editar un ítem de catálogo.
 export function CatalogItemFormDialog({
   open,
   onOpenChange,
   title,
   ...formProps
 }: CatalogItemFormDialogProps) {
-  const conTipo = formProps.ruta === "areas";
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {conTipo
-              ? "El nombre no puede repetirse dentro del mismo tipo."
-              : "El nombre no puede repetirse dentro del catálogo."}
-          </DialogDescription>
-        </DialogHeader>
-        <CatalogItemForm {...formProps} onDone={() => onOpenChange(false)} />
-      </DialogContent>
-    </Dialog>
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description="Alta o edición de un registro del catálogo."
+    >
+      <CatalogItemForm {...formProps} onDone={() => onOpenChange(false)} />
+    </FormDrawer>
   );
 }

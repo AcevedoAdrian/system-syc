@@ -17,6 +17,9 @@ const buttonVariants = cva(
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
+        // Acción destructiva con relleno (confirmar una eliminación). `--destructive-foreground` es
+        // blanco en claro y casi negro en oscuro, donde el rojo es claro.
+        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         // `--link`, no `--primary`: el primario no llega a 4,5:1 como texto sobre el fondo oscuro.
         link: "text-link underline-offset-4 hover:underline",
       },

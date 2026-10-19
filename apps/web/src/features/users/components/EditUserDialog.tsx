@@ -7,17 +7,9 @@ import {
 } from "@syc/contracts";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { controlClass, Field, selectClass } from "@/components/common/Field";
+import { DrawerForm, FormDrawer } from "@/components/common/FormDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/errors";
 import { DepartmentSelect } from "./DepartmentSelect";
 import { RoleSelect } from "./RoleSelect";
@@ -84,105 +76,125 @@ function EditUserForm({
   });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="username">Usuario</Label>
-        <Input
-          id="username"
-          autoComplete="off"
-          aria-invalid={errors.username ? true : undefined}
-          {...register("username")}
-        />
-        <p className="text-xs text-muted-foreground">
-          Cambiarlo modifica el nombre con el que la persona inicia sesión.
-        </p>
-        {errors.username && <p className="text-sm text-destructive">El usuario no es válido.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="name">Nombre</Label>
-        <Input id="name" aria-invalid={errors.name ? true : undefined} {...register("name")} />
-        {errors.name && <p className="text-sm text-destructive">El nombre es obligatorio.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">Email (opcional)</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="off"
-          aria-invalid={errors.email ? true : undefined}
-          {...register("email", { setValueAs: emptyToNull })}
-        />
-        {errors.email && <p className="text-sm text-destructive">El email no es válido.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="role">Rol</Label>
-        <Controller
-          control={control}
-          name="role"
-          render={({ field }) => (
-            <RoleSelect
-              id="role"
-              value={field.value ?? user.role}
-              onChange={(next) => {
-                field.onChange(next);
-                if (next === "admin") setValue("organizationId", undefined);
-              }}
-            />
-          )}
-        />
-      </div>
-      {role === "agente" && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="organizationId">Departamento</Label>
+    <DrawerForm
+      onSubmit={submit}
+      submitLabel="Guardar"
+      submitting={isSubmitting}
+      error={serverError}
+    >
+      <Field
+        id="username"
+        label="Usuario"
+        required
+        hint="Cambiarlo modifica el nombre con el que la persona inicia sesión."
+        error={errors.username && "El usuario no es válido."}
+      >
+        {(aria) => (
+          <Input
+            id="username"
+            autoComplete="off"
+            autoFocus
+            maxLength={30}
+            className={`${controlClass} font-mono text-[15px] md:text-[15px]`}
+            {...aria}
+            {...register("username")}
+          />
+        )}
+      </Field>
+      <Field id="name" label="Nombre" required error={errors.name && "El nombre es obligatorio."}>
+        {(aria) => (
+          <Input
+            id="name"
+            maxLength={120}
+            className={controlClass}
+            {...aria}
+            {...register("name")}
+          />
+        )}
+      </Field>
+      <Field id="email" label="Email (opcional)" error={errors.email && "El email no es válido."}>
+        {(aria) => (
+          <Input
+            id="email"
+            type="email"
+            autoComplete="off"
+            maxLength={254}
+            className={controlClass}
+            {...aria}
+            {...register("email", { setValueAs: emptyToNull })}
+          />
+        )}
+      </Field>
+      <Field
+        id="role"
+        label="Rol"
+        required
+        hint="Un agente tiene exactamente un departamento; un administrador, ninguno."
+      >
+        {(aria) => (
           <Controller
             control={control}
-            name="organizationId"
+            name="role"
             render={({ field }) => (
-              <DepartmentSelect
-                id="organizationId"
-                value={field.value}
-                onChange={field.onChange}
-                departments={departments}
-                placeholder={
-                  user.department
-                    ? `${user.department.nombre} (desactivado)`
-                    : "Elegí un departamento"
-                }
-                invalid={Boolean(errors.organizationId)}
+              <RoleSelect
+                id="role"
+                {...aria}
+                value={field.value ?? user.role}
+                onChange={(next) => {
+                  field.onChange(next);
+                  if (next === "admin") setValue("organizationId", undefined);
+                }}
               />
             )}
           />
-          {errors.organizationId && (
-            <p className="text-sm text-destructive">Elegí un departamento para el agente.</p>
+        )}
+      </Field>
+      {role === "agente" && (
+        <Field
+          id="organizationId"
+          label="Departamento"
+          required
+          error={errors.organizationId && "Elegí un departamento para el agente."}
+        >
+          {(aria) => (
+            <Controller
+              control={control}
+              name="organizationId"
+              render={({ field }) => (
+                <DepartmentSelect
+                  id="organizationId"
+                  value={field.value}
+                  onChange={field.onChange}
+                  departments={departments}
+                  placeholder={
+                    user.department
+                      ? `${user.department.nombre} (desactivado)`
+                      : "Elegí un departamento"
+                  }
+                  invalid={Boolean(errors.organizationId)}
+                  aria-describedby={aria["aria-describedby"]}
+                  aria-required={aria["aria-required"]}
+                  className={selectClass}
+                />
+              )}
+            />
           )}
-        </div>
+        </Field>
       )}
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">
-          {serverError}
-        </p>
-      )}
-      <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
-          Guardar
-        </Button>
-      </DialogFooter>
-    </form>
+    </DrawerForm>
   );
 }
 
+// Un panel lateral (SPEC 09, 9.6) para editar un usuario.
 export function EditUserDialog({ user, onOpenChange, ...formProps }: EditUserDialogProps) {
   return (
-    <Dialog open={user !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Editar usuario</DialogTitle>
-          <DialogDescription>
-            Un agente tiene exactamente un departamento; un administrador, ninguno.
-          </DialogDescription>
-        </DialogHeader>
-        {user && <EditUserForm {...formProps} user={user} onDone={() => onOpenChange(false)} />}
-      </DialogContent>
-    </Dialog>
+    <FormDrawer
+      open={user !== null}
+      onOpenChange={onOpenChange}
+      title="Editar usuario"
+      description="Datos de la cuenta de acceso al sistema."
+    >
+      {user && <EditUserForm {...formProps} user={user} onDone={() => onOpenChange(false)} />}
+    </FormDrawer>
   );
 }

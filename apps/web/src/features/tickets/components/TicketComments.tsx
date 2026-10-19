@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { Field, textareaClass } from "@/components/common/Field";
 import { FormSection } from "@/components/common/FormSection";
 import { initialsOf } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import { getErrorMessage } from "@/lib/errors";
 import { useCreateComment, useRemoveComment } from "../hooks/useCommentMutations";
 import { useTicketComments } from "../hooks/useTicketComments";
 import { formatTimestamp } from "../ticket-fields";
-import { Field, textareaClass } from "./Field";
 
 const commentFormSchema = z.object({ texto: comentarioTextoSchema });
 type CommentForm = z.infer<typeof commentFormSchema>;
@@ -162,6 +162,7 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
           title="Eliminar comentario"
           description="El comentario deja de verse en el ticket y no se puede recuperar desde la aplicación. En el historial queda anotado que se eliminó, sin su texto."
           confirmLabel="Eliminar"
+          destructive
           onConfirm={confirmRemove}
         />
       )}

@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { CatalogEntry } from "../hooks/catalog-api";
 import { CatalogTable } from "./CatalogTable";
@@ -26,12 +27,12 @@ describe("CatalogTable: estados", () => {
 
     for (const nombre of ["Finalizado", "Cerrado", "Cancelado", "Reabierto"]) {
       expect(within(row(nombre)).getByText("De sistema")).toBeInTheDocument();
-      expect(within(row(nombre)).queryByRole("button", { name: "Eliminar" })).toBeNull();
+      expect(within(row(nombre)).queryByRole("button", { name: /^Eliminar/ })).toBeNull();
       // Pero sí se pueden editar, mover y desactivar.
-      expect(within(row(nombre)).getByRole("button", { name: "Editar" })).toBeInTheDocument();
+      expect(within(row(nombre)).getByRole("button", { name: /^Editar/ })).toBeInTheDocument();
     }
     expect(within(row("Pendiente")).queryByText("De sistema")).toBeNull();
-    expect(within(row("Pendiente")).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+    expect(within(row("Pendiente")).getByRole("button", { name: /^Eliminar/ })).toBeInTheDocument();
   });
 
   it("no muestra la clave como texto", () => {
@@ -46,7 +47,7 @@ describe("CatalogTable: estados", () => {
     render(<CatalogTable ruta="estados" items={estados} {...handlers} />);
 
     expect(within(row("Cerrado")).getByText("Desactivado")).toBeInTheDocument();
-    expect(within(row("Cerrado")).getByRole("button", { name: "Reactivar" })).toBeInTheDocument();
+    expect(within(row("Cerrado")).getByRole("button", { name: /^Reactivar/ })).toBeInTheDocument();
   });
 });
 
@@ -79,6 +80,7 @@ describe("CatalogTable: proveedores", () => {
 
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual([
+      "Orden",
       "Nombre",
       "Contacto",
       "Teléfono",
@@ -92,10 +94,11 @@ describe("CatalogTable: proveedores", () => {
     expect(within(row("Solo nombre")).getAllByText("—")).toHaveLength(4);
   });
 
-  it("los catálogos simples solo tienen Nombre y Estado", () => {
+  it("los catálogos simples solo tienen Orden, Nombre y Estado", () => {
     render(<CatalogTable ruta="edificios" items={estados} {...handlers} />);
 
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Orden",
       "Nombre",
       "Estado",
       "Acciones",
@@ -109,10 +112,11 @@ describe("CatalogTable: áreas", () => {
     { id: "a2", nombre: "Sin tipo", orden: 2, activo: true },
   ];
 
-  it("suma la columna Tipo antes del nombre y muestra — si falta", () => {
+  it("suma la columna Tipo antes del nombre (y después del orden) y muestra — si falta", () => {
     render(<CatalogTable ruta="areas" items={areas} {...handlers} />);
 
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Orden",
       "Tipo",
       "Nombre",
       "Estado",
@@ -120,5 +124,96 @@ describe("CatalogTable: áreas", () => {
     ]);
     expect(within(row("Acosta")).getByText("Diputado")).toBeInTheDocument();
     expect(within(row("Sin tipo")).getByText("—")).toBeInTheDocument();
+  });
+});
+
+describe("CatalogTable: acciones", () => {
+  const edificios: CatalogEntry[] = [
+    { id: "e1", nombre: "Anexo", orden: 1, activo: true },
+    { id: "e2", nombre: "Central", orden: 2, activo: true },
+    { id: "e3", nombre: "Depósito", orden: 3, activo: false },
+  ];
+
+  it("cada botón de ícono lleva el nombre del registro en su etiqueta y en su tooltip", () => {
+    render(<CatalogTable ruta="edificios" items={edificios} {...handlers} />);
+
+    const fila = within(row("Central"));
+    for (const name of [
+      "Subir «Central»",
+      "Bajar «Central»",
+      "Editar «Central»",
+      "Desactivar «Central»",
+      "Eliminar «Central»",
+    ]) {
+      expect(fila.getByRole("button", { name })).toHaveAttribute("title", name);
+    }
+    expect(
+      within(row("Depósito")).getByRole("button", { name: "Reactivar «Depósito»" }),
+    ).toBeInTheDocument();
+  });
+
+  it("cada acción avisa con su registro", async () => {
+    const user = userEvent.setup();
+    for (const fn of Object.values(handlers)) fn.mockReset();
+    render(<CatalogTable ruta="edificios" items={edificios} {...handlers} />);
+    const fila = within(row("Central"));
+
+    await user.click(fila.getByRole("button", { name: "Subir «Central»" }));
+    await user.click(fila.getByRole("button", { name: "Bajar «Central»" }));
+    await user.click(fila.getByRole("button", { name: "Editar «Central»" }));
+    await user.click(fila.getByRole("button", { name: "Desactivar «Central»" }));
+    await user.click(fila.getByRole("button", { name: "Eliminar «Central»" }));
+
+    expect(handlers.onMove).toHaveBeenNthCalledWith(1, edificios[1], "subir");
+    expect(handlers.onMove).toHaveBeenNthCalledWith(2, edificios[1], "bajar");
+    expect(handlers.onEdit).toHaveBeenCalledWith(edificios[1]);
+    expect(handlers.onToggleActive).toHaveBeenCalledWith(edificios[1]);
+    expect(handlers.onRemove).toHaveBeenCalledWith(edificios[1]);
+  });
+
+  it("la primera fila no puede subir y la última no puede bajar", () => {
+    render(<CatalogTable ruta="edificios" items={edificios} {...handlers} />);
+
+    expect(within(row("Anexo")).getByRole("button", { name: "Subir «Anexo»" })).toBeDisabled();
+    expect(within(row("Anexo")).getByRole("button", { name: "Bajar «Anexo»" })).toBeEnabled();
+    expect(
+      within(row("Depósito")).getByRole("button", { name: "Bajar «Depósito»" }),
+    ).toBeDisabled();
+  });
+
+  it("con `orderIds`, el primero y el último son los de la lista completa, no los de la página", () => {
+    render(
+      <CatalogTable
+        ruta="edificios"
+        items={[edificios[1] as CatalogEntry]}
+        orderIds={["e1", "e2", "e3"]}
+        {...handlers}
+      />,
+    );
+
+    // «Central» está en el medio de la lista completa: puede subir y bajar aunque sea la única fila.
+    expect(within(row("Central")).getByRole("button", { name: "Subir «Central»" })).toBeEnabled();
+    expect(within(row("Central")).getByRole("button", { name: "Bajar «Central»" })).toBeEnabled();
+  });
+
+  it("con `canReorder` en falso, las flechas quedan deshabilitadas en todas las filas", () => {
+    render(<CatalogTable ruta="edificios" items={edificios} canReorder={false} {...handlers} />);
+
+    for (const nombre of ["Anexo", "Central", "Depósito"]) {
+      expect(within(row(nombre)).getByRole("button", { name: `Subir «${nombre}»` })).toBeDisabled();
+      expect(within(row(nombre)).getByRole("button", { name: `Bajar «${nombre}»` })).toBeDisabled();
+    }
+  });
+
+  it("el estado es una píldora con su punto, que no se lee en voz alta", () => {
+    render(<CatalogTable ruta="edificios" items={edificios} {...handlers} />);
+
+    const activo = within(row("Anexo")).getByText("Activo");
+    expect(activo).toHaveClass("rounded-full");
+    expect(activo.firstElementChild).toHaveClass("bg-teal");
+    expect(activo.firstElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(within(row("Depósito")).getByText("Desactivado").firstElementChild).toHaveClass(
+      "border-neutral-dot",
+    );
   });
 });

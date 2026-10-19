@@ -16,6 +16,14 @@ import {
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
+import {
+  controlClass,
+  Field,
+  type FieldControlProps,
+  selectClass,
+  TodayButton,
+  textareaClass,
+} from "@/components/common/Field";
 import { FormActionBar } from "@/components/common/FormActionBar";
 import { FormSection } from "@/components/common/FormSection";
 import { Button } from "@/components/ui/button";
@@ -27,14 +35,6 @@ import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage } from "@/lib/errors";
 import { useCreateTicket } from "../hooks/useTicketMutations";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
-import {
-  controlClass,
-  Field,
-  type FieldControlProps,
-  selectClass,
-  TodayButton,
-  textareaClass,
-} from "./Field";
 import { PrioridadDot } from "./TicketBadges";
 
 // El esquema del contrato acepta "" en los ids (`z.string()`); el formulario exige elegir.

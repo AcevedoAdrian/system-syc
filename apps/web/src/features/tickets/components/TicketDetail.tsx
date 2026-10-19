@@ -201,6 +201,7 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
             title="Eliminar ticket"
             description={`Se eliminará el ticket ${formatTicketNumber(ticket.numero)}. Su número no se reutiliza y su historial se conserva, pero deja de aparecer en la lista.`}
             confirmLabel="Eliminar"
+            destructive
             onConfirm={confirmRemove}
           />
         </>

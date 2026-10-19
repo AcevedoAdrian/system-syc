@@ -1,5 +1,6 @@
 import type { Ticket } from "@syc/contracts";
 import { useState } from "react";
+import { Field } from "@/components/common/Field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +15,6 @@ import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useReloadTicket } from "../hooks/useReloadTicket";
 import { useChangeTicketDepartment } from "../hooks/useTicketMutations";
-import { Field } from "./Field";
 
 interface ChangeDepartmentDialogProps {
   ticket: Ticket;
