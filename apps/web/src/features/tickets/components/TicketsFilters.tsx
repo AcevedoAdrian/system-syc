@@ -1,4 +1,6 @@
 import type { CatalogRuta } from "@syc/contracts";
+import { cn } from "cn";
+import { ListFilter, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,33 +35,59 @@ interface FilterOption {
 // Radix no admite un ítem con valor "": "Todos" viaja con este centinela y se traduce a sin filtro.
 const ALL = "__all__";
 
+// Los filtros que viven bajo «Más filtros». Si la URL trae alguno, el panel arranca abierto.
+const MORE_FILTER_KEYS = [
+  "areaId",
+  "tipoAreaId",
+  "edificioId",
+  "tipoId",
+  "proveedorId",
+  "moduloId",
+  "fechaRecepcionDesde",
+  "fechaRecepcionHasta",
+] as const satisfies readonly TicketsFilterKey[];
+
+const MORE_PANEL_ID = "filtros-adicionales";
+
 // Los ítems activos primero y, al final, los inactivos marcados: un ticket histórico de un área
 // desactivada se tiene que poder seguir encontrando. Cada grupo conserva su orden.
 function activeFirst(options: FilterOption[]): FilterOption[] {
   return [...options.filter((o) => o.activo), ...options.filter((o) => !o.activo)];
 }
 
+// `inline`: la etiqueta va a la izquierda del selector (fila principal). Sin `inline`, arriba (panel de
+// «Más filtros»).
 function FilterSelect({
   id,
   label,
   options,
   value,
   onChange,
+  inline,
 }: {
   id: string;
   label: string;
   options: FilterOption[];
   value: string | undefined;
   onChange: (value: string | undefined) => void;
+  inline?: boolean;
 }) {
   return (
-    <div className="flex min-w-40 flex-col gap-1">
-      <Label htmlFor={id}>{label}</Label>
+    <div className={cn("flex min-w-0 gap-2", inline ? "items-center" : "flex-col gap-1.5")}>
+      <Label
+        htmlFor={id}
+        className={inline ? "text-sm font-normal text-muted-foreground" : "text-[13px]"}
+      >
+        {label}
+      </Label>
       <Select
         value={value ?? ALL}
         onValueChange={(next) => onChange(next === ALL ? undefined : next)}
       >
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger
+          id={id}
+          className={cn("data-[size=default]:h-10", inline ? "min-w-36" : "w-full")}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -82,12 +110,14 @@ function CatalogFilter({
   label,
   filters,
   onChange,
+  inline,
 }: {
   ruta: CatalogRuta;
   filterKey: TicketsFilterKey;
   label: string;
   filters: TicketsSearch;
   onChange: FiltersChange;
+  inline?: boolean;
 }) {
   const { data: items = [] } = useCatalog(ruta);
   return (
@@ -97,6 +127,7 @@ function CatalogFilter({
       options={items}
       value={filters[filterKey] as string | undefined}
       onChange={(value) => onChange(withFilter(filters, filterKey, value))}
+      inline={inline}
     />
   );
 }
@@ -118,6 +149,7 @@ function DepartmentFilter({
       options={departments}
       value={filters.departamentoId}
       onChange={(value) => onChange(withFilter(filters, "departamentoId", value))}
+      inline
     />
   );
 }
@@ -151,8 +183,14 @@ function SearchField({ filters, onChange }: { filters: TicketsSearch; onChange: 
   }, [text]);
 
   return (
-    <div className="flex min-w-60 flex-1 flex-col gap-1">
-      <Label htmlFor="filtro-q">Buscar</Label>
+    <div className="relative max-w-75 min-w-60 flex-[1_1_240px]">
+      <Label htmlFor="filtro-q" className="sr-only">
+        Buscar
+      </Label>
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-3.5 size-4.5 -translate-y-1/2 text-muted-foreground"
+      />
       <Input
         id="filtro-q"
         type="search"
@@ -160,7 +198,8 @@ function SearchField({ filters, onChange }: { filters: TicketsSearch; onChange: 
         name="q"
         autoComplete="off"
         maxLength={200}
-        placeholder="Título, descripción, solución o comentarios…"
+        placeholder="Título, texto o comentarios…"
+        className="h-10 rounded-lg pr-3.5 pl-10 text-sm md:text-sm"
         onChange={(event) => setText(event.target.value)}
       />
     </div>
@@ -185,11 +224,14 @@ function DateFilter({
   max?: string;
 }) {
   return (
-    <div className="flex min-w-40 flex-col gap-1">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={id} className="text-[13px]">
+        {label}
+      </Label>
       <Input
         id={id}
         type="date"
+        className="h-10 rounded-lg"
         value={filters[filterKey] ?? ""}
         min={min}
         max={max}
@@ -200,7 +242,7 @@ function DateFilter({
 }
 
 // Búsqueda y filtros de la bandeja. No guarda los filtros: los recibe de la URL y avisa cada cambio, que
-// siempre vuelve a la página 1.
+// siempre vuelve a la página 1. Lo único que guarda es si «Más filtros» está abierto.
 export function TicketsFilters({
   filters,
   onChange,
@@ -210,48 +252,87 @@ export function TicketsFilters({
   onChange: FiltersChange;
   isAdmin: boolean;
 }) {
-  const catalog = (ruta: CatalogRuta, filterKey: TicketsFilterKey, label: string) => (
+  const moreActive = MORE_FILTER_KEYS.filter((key) => filters[key] !== undefined).length;
+  // Abierto desde el principio si la URL trae un filtro de los de adentro; y se abre solo si después
+  // llega uno (por ejemplo, desde un enlace): un filtro activo no puede quedar escondido.
+  const [moreOpen, setMoreOpen] = useState(moreActive > 0);
+  useEffect(() => {
+    if (moreActive > 0) setMoreOpen(true);
+  }, [moreActive]);
+
+  const catalog = (
+    ruta: CatalogRuta,
+    filterKey: TicketsFilterKey,
+    label: string,
+    inline?: boolean,
+  ) => (
     <CatalogFilter
       ruta={ruta}
       filterKey={filterKey}
       label={label}
       filters={filters}
       onChange={onChange}
+      inline={inline}
     />
   );
 
   return (
-    <search aria-label="Búsqueda y filtros" className="flex flex-wrap items-end gap-3">
-      <SearchField filters={filters} onChange={onChange} />
-      {catalog("estados", "estadoId", "Estado")}
-      {catalog("tiposArea", "tipoAreaId", "Tipo de área")}
-      {catalog("areas", "areaId", "Área")}
-      {catalog("edificios", "edificioId", "Edificio")}
-      {catalog("tipos", "tipoId", "Tipo")}
-      {catalog("prioridades", "prioridadId", "Prioridad")}
-      {catalog("proveedores", "proveedorId", "Proveedor")}
-      {catalog("modulos", "moduloId", "Módulo")}
-      {isAdmin && <DepartmentFilter filters={filters} onChange={onChange} />}
-      <DateFilter
-        id="filtro-fechaRecepcionDesde"
-        label="Recepción desde"
-        filterKey="fechaRecepcionDesde"
-        filters={filters}
-        onChange={onChange}
-        max={filters.fechaRecepcionHasta}
-      />
-      <DateFilter
-        id="filtro-fechaRecepcionHasta"
-        label="Recepción hasta"
-        filterKey="fechaRecepcionHasta"
-        filters={filters}
-        onChange={onChange}
-        min={filters.fechaRecepcionDesde}
-      />
-      {hasActiveFilters(filters) && (
-        <Button type="button" variant="outline" onClick={() => onChange({})}>
-          Limpiar filtros
+    <search aria-label="Búsqueda y filtros">
+      <div className="flex flex-wrap items-center gap-3 px-5 py-4">
+        <SearchField filters={filters} onChange={onChange} />
+        {catalog("estados", "estadoId", "Estado", true)}
+        {catalog("prioridades", "prioridadId", "Prioridad", true)}
+        {isAdmin && <DepartmentFilter filters={filters} onChange={onChange} />}
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 gap-2 px-3.5"
+          aria-expanded={moreOpen}
+          aria-controls={MORE_PANEL_ID}
+          onClick={() => setMoreOpen((open) => !open)}
+        >
+          <ListFilter aria-hidden="true" />
+          Más filtros{moreActive > 0 && ` (${moreActive})`}
         </Button>
+        {hasActiveFilters(filters) && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 px-1 text-foreground underline hover:bg-transparent"
+            onClick={() => onChange({})}
+          >
+            Limpiar filtros
+          </Button>
+        )}
+      </div>
+      {moreOpen && (
+        <div
+          id={MORE_PANEL_ID}
+          className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 px-5 pt-1 pb-5"
+        >
+          {catalog("areas", "areaId", "Área")}
+          {catalog("tiposArea", "tipoAreaId", "Tipo de área")}
+          {catalog("edificios", "edificioId", "Edificio")}
+          {catalog("tipos", "tipoId", "Tipo de ticket")}
+          {catalog("proveedores", "proveedorId", "Proveedor")}
+          {catalog("modulos", "moduloId", "Módulo")}
+          <DateFilter
+            id="filtro-fechaRecepcionDesde"
+            label="Recepción desde"
+            filterKey="fechaRecepcionDesde"
+            filters={filters}
+            onChange={onChange}
+            max={filters.fechaRecepcionHasta}
+          />
+          <DateFilter
+            id="filtro-fechaRecepcionHasta"
+            label="Recepción hasta"
+            filterKey="fechaRecepcionHasta"
+            filters={filters}
+            onChange={onChange}
+            min={filters.fechaRecepcionDesde}
+          />
+        </div>
       )}
     </search>
   );

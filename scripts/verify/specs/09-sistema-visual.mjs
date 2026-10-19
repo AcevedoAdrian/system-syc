@@ -269,5 +269,186 @@ export default defineSpec({
         }
       },
     ),
+
+    // Etapa 9.4 — bandeja de tickets. Se verifica con los tests de los componentes (jsdom).
+    criterion(
+      16,
+      "El color de cada estado y prioridad sale de las reglas del SPEC (clave, posición, desde la última)",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El color de estados y prioridades",
+          "src/features/tickets/ticket-colors.test.ts",
+        );
+      },
+    ),
+
+    criterion(
+      17,
+      "La fila muestra el número como único enlace, el estado en una píldora con su punto y la prioridad con su punto y su nombre",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La tabla de la bandeja",
+          "src/features/tickets/components/TicketsList.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      18,
+      "La barra de filtros tiene la fila principal y «Más filtros» (con la cuenta y abierto si la URL trae uno)",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los filtros de la bandeja",
+          "src/features/tickets/components/TicketsFilters.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      19,
+      "Los filtros, la búsqueda con pausa y «Limpiar filtros» siguen contra la URL",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La bandeja con los filtros en la URL",
+          "src/features/tickets/components/TicketsFilters.test.tsx",
+          "src/features/tickets/components/TicketsList.router.test.tsx",
+          "src/features/tickets/tickets-search.test.ts",
+          "src/routes/_authenticated/tickets/index.test.ts",
+        );
+      },
+    ),
+
+    criterion(
+      20,
+      "El pie muestra «Mostrando a–b de N · Página p de n» y los enlaces Anterior/Siguiente que conservan los filtros",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La paginación de la bandeja",
+          "src/features/tickets/components/TicketsList.test.tsx",
+          "src/features/tickets/components/TicketsList.router.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      21,
+      "El encabezado ofrece «Nuevo ticket» y la bandeja conserva sus estados",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los estados de la bandeja",
+          "src/features/tickets/components/TicketsList.test.tsx",
+        );
+      },
+    ),
+
+    // Etapa 9.5 — formulario y detalle de ticket. Se verifica con los tests de los componentes (jsdom).
+    criterion(
+      22,
+      "El alta muestra sus dos secciones con contadores y «Usar hoy»; admin y agente ven su departamento como corresponde; valida y envía",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El formulario de alta",
+          "src/features/tickets/components/CreateTicketForm.test.tsx",
+          "src/features/tickets/components/Field.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      23,
+      "La edición muestra las cuatro secciones, las fechas de cierre y reapertura solo si existen, y guarda, descarta y avisa del conflicto",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El formulario de edición",
+          "src/features/tickets/components/TicketForm.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      24,
+      "Las pestañas Datos, Comentarios e Historial cambian de panel con el mouse y las flechas, sin desmontar lo escrito",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Las pestañas del ticket",
+          "src/features/tickets/components/TicketTabs.test.tsx",
+          "src/features/tickets/components/TicketDetail.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      25,
+      "La barra fija tiene las acciones de cada formulario y muestra el aviso de guardado y los errores del servidor",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La barra de acciones",
+          "src/components/common/FormSection.test.tsx",
+          "src/features/tickets/components/CreateTicketForm.test.tsx",
+          "src/features/tickets/components/TicketForm.test.tsx",
+          "src/features/tickets/components/TicketDetail.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      26,
+      "El encabezado muestra número, título, estado y departamento, y sus acciones según el rol y los cambios sin guardar",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El encabezado del ticket",
+          "src/features/tickets/components/TicketDetail.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      27,
+      "Los comentarios se ven como conversación; comentar valida, envía y limpia; solo el admin elimina",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los comentarios",
+          "src/features/tickets/components/TicketComments.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      28,
+      "El historial muestra cada movimiento con su fecha, su autor y sus cambios",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El historial",
+          "src/features/tickets/components/TicketHistory.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      29,
+      "La prioridad muestra su punto de color dentro del selector, con la misma regla que la bandeja",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El punto de la prioridad",
+          "src/features/tickets/components/TicketBadges.test.tsx",
+          "src/features/tickets/components/CatalogOptionSelect.test.tsx",
+          "src/features/tickets/ticket-colors.test.ts",
+        );
+      },
+    ),
   ],
 });

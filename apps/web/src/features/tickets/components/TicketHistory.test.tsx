@@ -26,6 +26,26 @@ const show = (data: AuditHistory) => {
 };
 
 describe("TicketHistory", () => {
+  it("es una región ámbar «Historial» con su descripción", () => {
+    show([]);
+
+    const region = screen.getByRole("region", { name: "Historial" });
+    expect(region).toHaveClass("form-section", "tone-amber");
+    expect(region).toHaveTextContent("del más reciente al más antiguo");
+  });
+
+  it("cada movimiento lleva una raya del color de la sección a la izquierda", () => {
+    show([entry("1", "create", {})]);
+
+    expect(screen.getByRole("listitem")).toHaveClass("border-l-[3px]", "border-(--sc)");
+  });
+
+  it("sin movimientos, un recuadro punteado", () => {
+    show([]);
+
+    expect(screen.getByText("Todavía no hay movimientos.")).toHaveClass("border-dashed");
+  });
+
   it("mientras carga, y si falla, lo avisa", () => {
     hook.state = { data: undefined, isPending: true, isError: false };
     const { unmount } = render(<TicketHistory ticketId="t-13" />);

@@ -60,6 +60,50 @@ afterEach(() => {
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
 
 describe("CatalogOptionSelect", () => {
+  it("muestra lo que se le pasa en `leading` dentro del botón, antes del valor", () => {
+    render(
+      <CatalogOptionSelect
+        id="area"
+        ruta="edificios"
+        value="a1"
+        onChange={() => undefined}
+        leading={<span data-testid="punto" />}
+      />,
+    );
+
+    const boton = screen.getByRole("combobox");
+    expect(boton).toContainElement(screen.getByTestId("punto"));
+    expect(boton.firstElementChild).toBe(screen.getByTestId("punto"));
+  });
+
+  it("con `leading`, el valor queda junto al punto y la flecha a la derecha", () => {
+    render(
+      <CatalogOptionSelect
+        id="area"
+        ruta="edificios"
+        value="a1"
+        onChange={() => undefined}
+        leading={<span data-testid="punto" />}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveClass("justify-start", "[&>svg:last-child]:ml-auto");
+  });
+
+  it("sin `leading`, el botón reparte el valor y la flecha como siempre", () => {
+    render(
+      <CatalogOptionSelect id="area" ruta="edificios" value="a1" onChange={() => undefined} />,
+    );
+
+    expect(screen.getByRole("combobox")).not.toHaveClass("justify-start");
+  });
+
+  it("el botón mide 40px y usa texto de 16px", () => {
+    render(<CatalogOptionSelect id="area" ruta="edificios" value="" onChange={() => undefined} />);
+
+    expect(screen.getByRole("combobox")).toHaveClass("data-[size=default]:h-10", "text-base");
+  });
+
   it("ofrece los ítems activos que le da useCatalogOptions, en su orden", async () => {
     render(<CatalogOptionSelect id="area" ruta="edificios" value="" onChange={() => undefined} />);
 

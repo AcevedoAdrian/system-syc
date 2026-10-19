@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/client";
 import { hoyArgentina, type User } from "@syc/contracts";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   } as Record<string, { id: string; nombre: string }[]>,
 }));
 
+// Los puntos de color salen de los catálogos; su lógica tiene sus propios tests.
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
 vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({ data: mocks.user }),
 }));
@@ -30,7 +32,12 @@ vi.mock("@/features/organizations/hooks/useOrganizations", () => ({
 vi.mock("../hooks/useTicketMutations", () => ({
   useCreateTicket: () => ({ mutateAsync: mocks.create }),
 }));
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => mocks.navigate }));
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => mocks.navigate,
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}));
 
 // Los selectores de Radix se prueban aparte: acá son `<select>` nativos para ejercitar el formulario.
 vi.mock("@/features/users/components/DepartmentSelect", () => ({
@@ -129,11 +136,11 @@ describe("CreateTicketForm", () => {
       "Fecha de recepción",
       "Descripción",
       "Actuación simple",
-      "Proveedor",
       "Referencia externa",
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+    expect(screen.getByRole("combobox", { name: "Proveedor" })).toBeInTheDocument();
   });
 
   it("propone hoy como fecha de recepción, sin poder elegir una futura", () => {
@@ -142,6 +149,122 @@ describe("CreateTicketForm", () => {
     const fecha = screen.getByLabelText("Fecha de recepción");
     expect(fecha).toHaveValue(hoyArgentina());
     expect(fecha).toHaveAttribute("max", hoyArgentina());
+  });
+
+  describe("diseño (SPEC 09, etapa 9.5)", () => {
+    it("tiene dos secciones, «Datos del ticket» y «Proveedor», y no ofrece clasificación", () => {
+      render(<CreateTicketForm />);
+
+      expect(screen.getByRole("region", { name: "Datos del ticket" })).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Proveedor" })).toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Clasificación" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("region", { name: "Solución y seguimiento" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("cada campo está dentro de su sección", () => {
+      render(<CreateTicketForm />);
+
+      const datos = within(screen.getByRole("region", { name: "Datos del ticket" }));
+      for (const label of [
+        "Título",
+        "Prioridad",
+        "Fecha de recepción",
+        "Descripción",
+        "Actuación simple",
+      ]) {
+        expect(datos.getByLabelText(label)).toBeInTheDocument();
+      }
+      const proveedor = within(screen.getByRole("region", { name: "Proveedor" }));
+      expect(proveedor.getByLabelText("Referencia externa")).toBeInTheDocument();
+      expect(proveedor.getByRole("combobox", { name: "Proveedor" })).toBeInTheDocument();
+    });
+
+    it("el título y la descripción cuentan sus caracteres", async () => {
+      render(<CreateTicketForm />);
+      expect(screen.getByText("0/200")).toBeInTheDocument();
+      expect(screen.getByText("0/5000")).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText("Título"), "Hola");
+      await userEvent.type(screen.getByLabelText("Descripción"), "Detalle");
+
+      expect(screen.getByText("4/200")).toBeInTheDocument();
+      expect(screen.getByText("7/5000")).toBeInTheDocument();
+    });
+
+    it("el título no admite más de 200 caracteres", () => {
+      render(<CreateTicketForm />);
+
+      expect(screen.getByLabelText("Título")).toHaveAttribute("maxlength", "200");
+    });
+
+    it("«Usar hoy» vuelve a poner la fecha de hoy", async () => {
+      render(<CreateTicketForm />);
+      const fecha = screen.getByLabelText("Fecha de recepción");
+      fireEvent.change(fecha, { target: { value: "2020-01-01" } });
+      expect(fecha).toHaveValue("2020-01-01");
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar hoy" }));
+
+      expect(fecha).toHaveValue(hoyArgentina());
+    });
+
+    it("«Cancelar» es un enlace a la bandeja y no envía nada", async () => {
+      render(<CreateTicketForm />);
+
+      const cancelar = screen.getByRole("link", { name: "Cancelar" });
+      expect(cancelar).toHaveAttribute("href", "/tickets");
+      await userEvent.click(cancelar);
+
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it("las acciones van en una barra fija al pie, con «Crear ticket» al final", () => {
+      render(<CreateTicketForm />);
+
+      const crear = screen.getByRole("button", { name: "Crear ticket" });
+      const barra = crear.parentElement as HTMLElement;
+      expect(barra).toHaveClass("sticky", "bottom-0");
+      expect(barra).toContainElement(screen.getByRole("link", { name: "Cancelar" }));
+      expect(barra.lastElementChild).toBe(crear);
+    });
+
+    it("el error del servidor sale en la barra de acciones", async () => {
+      mocks.create.mockRejectedValue(new Error("Falló"));
+      render(<CreateTicketForm />);
+      await userEvent.type(screen.getByLabelText("Título"), "Impresora");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      const alerta = await screen.findByRole("alert");
+      expect(alerta.closest(".sticky")).not.toBeNull();
+    });
+
+    it("la actuación simple es corta y va en tipografía monoespaciada", () => {
+      render(<CreateTicketForm />);
+
+      const actuacion = screen.getByLabelText("Actuación simple");
+      expect(actuacion).toHaveAttribute("placeholder", "Ej.: 1023/2026");
+      expect(actuacion).toHaveClass("font-mono");
+      expect(actuacion).toHaveAccessibleDescription("Suele ser corta.");
+    });
+
+    it("el agente ve por qué no puede cambiar el departamento", () => {
+      render(<CreateTicketForm />);
+
+      expect(screen.getByLabelText("Departamento")).toHaveAccessibleDescription(
+        "Es el departamento de tu cuenta. No se puede cambiar.",
+      );
+    });
+
+    it("el admin no ve esa explicación", () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+
+      expect(screen.getByLabelText(/^Departamento/)).not.toHaveAccessibleDescription();
+    });
   });
 
   describe("agente", () => {
@@ -253,7 +376,7 @@ describe("CreateTicketForm", () => {
         "Elegí un proveedor para cargar la referencia.",
       );
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
       expect(referencia).toBeEnabled();
       expect(referencia).not.toHaveAccessibleDescription();
     });
@@ -348,7 +471,7 @@ describe("CreateTicketForm", () => {
       render(<CreateTicketForm />);
       expect(screen.getByLabelText("Referencia externa")).toBeDisabled();
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
 
       expect(screen.getByLabelText("Referencia externa")).toBeEnabled();
     });
@@ -358,7 +481,7 @@ describe("CreateTicketForm", () => {
 
       await userEvent.type(screen.getByLabelText("Título"), "Falla del proveedor");
       await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
       await userEvent.type(screen.getByLabelText("Referencia externa"), "019092/2026");
       await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
 
@@ -371,10 +494,10 @@ describe("CreateTicketForm", () => {
 
     it("quitar el proveedor vacía y deshabilita la referencia", async () => {
       render(<CreateTicketForm />);
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
       await userEvent.type(screen.getByLabelText("Referencia externa"), "5/2026");
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "");
 
       expect(screen.getByLabelText("Referencia externa")).toBeDisabled();
       expect(screen.getByLabelText("Referencia externa")).toHaveValue("");
@@ -384,7 +507,7 @@ describe("CreateTicketForm", () => {
       render(<CreateTicketForm />);
       await userEvent.type(screen.getByLabelText("Título"), "Falla");
       await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "acme");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
       await userEvent.type(screen.getByLabelText("Referencia externa"), value);
 
       await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));

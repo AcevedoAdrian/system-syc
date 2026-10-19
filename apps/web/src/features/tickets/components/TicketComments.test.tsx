@@ -54,6 +54,57 @@ describe("TicketComments", () => {
     mocks.remove.mockResolvedValue(undefined);
   });
 
+  describe("diseño (SPEC 09, etapa 9.5)", () => {
+    it("es una región azul «Comentarios» con su descripción", () => {
+      show([]);
+
+      const region = screen.getByRole("region", { name: "Comentarios" });
+      expect(region).toHaveClass("form-section", "tone-blue");
+      expect(region).toHaveTextContent("No se pueden editar.");
+    });
+
+    it("cada comentario lleva un avatar con las iniciales del autor, que no se lee en voz alta", () => {
+      show([comment("c1", "Hola", { autor: { id: "u2", nombre: "Ana Pérez" } })]);
+
+      const avatar = screen.getByText("AP");
+      expect(avatar).toHaveAttribute("aria-hidden", "true");
+      expect(avatar).toHaveClass("rounded-full");
+    });
+
+    it("el comentario va en un globo con el autor en negrita y el texto respetando los saltos de línea", () => {
+      show([comment("c1", "Línea 1\nLínea 2")]);
+
+      const texto = screen.getByText(/Línea 1/);
+      expect(texto).toHaveClass("whitespace-pre-wrap", "wrap-break-word");
+      expect(screen.getByText("Ana")).toHaveClass("font-medium");
+      expect(texto.parentElement).toHaveClass("rounded-lg", "border");
+    });
+
+    it("la etiqueta del campo se ve y el contador cuenta lo escrito", async () => {
+      show([]);
+      expect(screen.getByText("Nuevo comentario")).not.toHaveClass("sr-only");
+      expect(screen.getByText("0/2000")).toBeInTheDocument();
+
+      await userEvent.type(screen.getByRole("textbox", { name: "Nuevo comentario" }), "Hola");
+
+      expect(screen.getByText("4/2000")).toBeInTheDocument();
+    });
+
+    it("sin comentarios muestra un recuadro punteado", () => {
+      show([]);
+
+      expect(screen.getByText("Todavía no hay comentarios.")).toHaveClass("border-dashed");
+    });
+
+    it("el botón «Comentar» va a la derecha", () => {
+      show([]);
+
+      expect(screen.getByRole("button", { name: "Comentar" }).parentElement).toHaveClass(
+        "justify-end",
+      );
+    });
+  });
+
   describe("la lista", () => {
     it("mientras carga, y si falla, lo avisa", () => {
       render(<TicketComments ticketId="t-13" />);

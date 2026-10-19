@@ -1,4 +1,5 @@
 import type { Organization } from "@syc/contracts";
+import { cn } from "cn";
 import {
   Select,
   SelectContent,
@@ -17,6 +18,7 @@ interface DepartmentSelectProps {
   // Los que entrega el `Field` de los formularios de ticket: error, ayuda y campo obligatorio.
   "aria-describedby"?: string;
   "aria-required"?: boolean;
+  className?: string;
 }
 
 // Ofrece solo los departamentos activos: a uno desactivado no se le pueden asignar agentes nuevos.
@@ -29,12 +31,13 @@ export function DepartmentSelect({
   invalid,
   "aria-describedby": describedBy,
   "aria-required": required,
+  className,
 }: DepartmentSelectProps) {
   return (
     <Select value={value ?? ""} onValueChange={onChange}>
       <SelectTrigger
         id={id}
-        className="w-full"
+        className={cn("w-full", className)}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
         aria-required={required}

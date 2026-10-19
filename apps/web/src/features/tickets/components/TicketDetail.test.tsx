@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/client";
 import type { Ticket, User } from "@syc/contracts";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTicket } from "../ticket-fixtures";
@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   blocker: { status: "idle" } as { status: "idle" | "blocked"; proceed?: unknown; reset?: unknown },
 }));
 
+// Los puntos de color salen de los catálogos; su lógica tiene sus propios tests.
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
 vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({ data: mocks.user }),
 }));
@@ -66,12 +68,14 @@ vi.mock("./TicketForm", async () => {
       onSaved: () => void;
       onReload: () => Promise<unknown>;
       onDirtyChange: (dirty: boolean) => void;
+      notice?: string;
     }) => {
       useEffect(() => {
         mocks.formMounts += 1;
       }, []);
       return (
         <div data-testid="formulario" data-version={props.ticket.updatedAt}>
+          <p data-testid="aviso-visible">{props.notice}</p>
           <button type="button" onClick={() => props.onDirtyChange(true)}>
             ensuciar
           </button>
@@ -147,6 +151,76 @@ describe("TicketDetail", () => {
     mocks.navigate.mockReset();
     mocks.blockerOpts = undefined;
     mocks.blocker = { status: "idle" };
+  });
+
+  describe("diseño (SPEC 09, etapa 9.5)", () => {
+    it("el título lleva el número y el título del ticket, y la bajada explica los campos obligatorios", () => {
+      show(makeTicket({ numero: 13, titulo: "Impresora rota" }));
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "TE-000013 · Impresora rota" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Actualizá los datos del ticket. Los campos con * son obligatorios."),
+      ).toBeInTheDocument();
+    });
+
+    it("bajo el título muestra el estado, como píldora, y el departamento", () => {
+      show(makeTicket());
+
+      const encabezado = screen.getByRole("banner");
+      expect(within(encabezado).getByText("Pendiente")).toHaveClass("rounded-full");
+      expect(within(encabezado).getByText("Técnico")).toBeInTheDocument();
+    });
+
+    it("tiene las pestañas Datos, Comentarios e Historial, con Datos activa", () => {
+      show(makeTicket());
+
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+        "Datos",
+        "Comentarios",
+        "Historial",
+      ]);
+      expect(screen.getByRole("tab", { name: "Datos" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("el formulario está en «Datos», los comentarios en «Comentarios» y el historial en «Historial»", async () => {
+      show(makeTicket());
+      const panelDe = (nombre: string) =>
+        document.getElementById(
+          screen.getByRole("tab", { name: nombre }).getAttribute("aria-controls") as string,
+        ) as HTMLElement;
+
+      expect(panelDe("Datos")).toContainElement(screen.getByTestId("formulario"));
+      expect(panelDe("Comentarios")).toContainElement(screen.getByTestId("comentarios"));
+      expect(panelDe("Historial")).toContainElement(screen.getByTestId("historial"));
+      expect(panelDe("Comentarios")).toHaveAttribute("hidden");
+
+      await userEvent.click(screen.getByRole("tab", { name: "Comentarios" }));
+
+      expect(panelDe("Comentarios")).not.toHaveAttribute("hidden");
+      expect(panelDe("Datos")).toHaveAttribute("hidden");
+    });
+
+    it("cambiar de pestaña no vuelve a montar el formulario", async () => {
+      show(makeTicket());
+      expect(mocks.formMounts).toBe(1);
+
+      await userEvent.click(screen.getByRole("tab", { name: "Historial" }));
+      await userEvent.click(screen.getByRole("tab", { name: "Datos" }));
+
+      expect(mocks.formMounts).toBe(1);
+    });
+
+    it("con cambios sin guardar, cambiar de pestaña no los descarta ni pide confirmar", async () => {
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      await userEvent.click(screen.getByRole("tab", { name: "Comentarios" }));
+
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeDisabled();
+      expect(screen.queryByText("Descartar cambios")).not.toBeInTheDocument();
+    });
   });
 
   describe("estados de la carga", () => {
@@ -420,11 +494,11 @@ describe("TicketDetail", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "guardado" }));
       expect(screen.getByRole("status")).toHaveTextContent("Cambios guardados.");
-      // Usa el color del tema (con contraste AA en claro y oscuro), no un verde fijo.
-      expect(screen.getByRole("status")).toHaveClass("text-success");
+      expect(screen.getByTestId("aviso-visible")).toHaveTextContent("Cambios guardados.");
 
       await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
       expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(screen.getByTestId("aviso-visible")).toBeEmptyDOMElement();
     });
 
     it("sin aviso la región queda vacía, pero montada: el lector solo anuncia lo que cambia en una ya existente", () => {
@@ -433,14 +507,19 @@ describe("TicketDetail", () => {
       expect(screen.getByRole("status")).toBeEmptyDOMElement();
     });
 
-    it("el aviso va pegado al formulario (donde está «Guardar cambios»), no en el encabezado", async () => {
+    it("el aviso visible va en el formulario (en su barra de acciones) y la región que lo anuncia, fuera de él", async () => {
       show(makeTicket());
 
       await userEvent.click(screen.getByRole("button", { name: "guardado" }));
 
-      const aviso = screen.getByRole("status");
-      expect(screen.getByTestId("formulario").parentElement).toContainElement(aviso);
-      expect(screen.getByRole("banner")).not.toContainElement(aviso);
+      const region = screen.getByRole("status");
+      // La región es solo para lectores de pantalla: el aviso que se ve lo dibuja el formulario.
+      expect(region).toHaveClass("sr-only");
+      expect(screen.getByTestId("formulario")).toContainElement(
+        screen.getByTestId("aviso-visible"),
+      );
+      expect(screen.getByTestId("formulario")).not.toContainElement(region);
+      expect(screen.getByRole("banner")).not.toContainElement(region);
     });
 
     it("es el mismo elemento antes y después de guardar, aunque el formulario se vuelva a montar", async () => {

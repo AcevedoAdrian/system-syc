@@ -1,20 +1,25 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type Comment, comentarioTextoSchema } from "@syc/contracts";
+import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { FormSection } from "@/components/common/FormSection";
+import { initialsOf } from "@/components/layout/navigation";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { getErrorMessage } from "@/lib/errors";
 import { useCreateComment, useRemoveComment } from "../hooks/useCommentMutations";
 import { useTicketComments } from "../hooks/useTicketComments";
 import { formatTimestamp } from "../ticket-fields";
+import { Field, textareaClass } from "./Field";
 
 const commentFormSchema = z.object({ texto: comentarioTextoSchema });
 type CommentForm = z.infer<typeof commentFormSchema>;
+
+const emptyClass = "rounded-lg border border-dashed px-6 py-6 text-center text-muted-foreground";
 
 // Comentarios del ticket (SPEC 06, Feature 6.4): se leen como una conversación, del más antiguo al más
 // reciente, con el formulario al final. Son inmutables: no hay editar, y solo el admin elimina (la API
@@ -32,6 +37,7 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CommentForm>({
     resolver: zodResolver(commentFormSchema),
@@ -62,74 +68,86 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
   const isAdmin = user?.role === "admin";
 
   return (
-    <section aria-labelledby="comentarios-titulo" className="flex max-w-2xl flex-col gap-3">
-      <h2 id="comentarios-titulo" className="text-lg font-semibold">
-        Comentarios
-      </h2>
-
-      {isPending && <p className="text-sm text-muted-foreground">Cargando comentarios…</p>}
+    <FormSection
+      id="comentarios-titulo"
+      tone="blue"
+      icon={MessageSquare}
+      title="Comentarios"
+      description="Notas sobre el ticket, de la más antigua a la más reciente. No se pueden editar."
+    >
+      {isPending && <p className="text-muted-foreground">Cargando comentarios…</p>}
       {isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive">
           No se pudieron cargar los comentarios.
         </p>
       )}
       {comments && comments.length === 0 && (
-        <p className="text-sm text-muted-foreground">Todavía no hay comentarios.</p>
+        <p className={emptyClass}>Todavía no hay comentarios.</p>
       )}
       {comments && comments.length > 0 && (
-        <ol className="flex flex-col gap-3">
+        <ol className="flex flex-col gap-5">
           {comments.map((comment) => (
-            <li key={comment.id} className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-muted-foreground">
-                  {comment.autor.nombre} ·{" "}
-                  <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
-                </p>
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label={`Eliminar comentario de ${comment.autor.nombre}`}
-                    onClick={() => setRemoving(comment)}
-                  >
-                    Eliminar
-                  </Button>
-                )}
+            <li key={comment.id} className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className="form-section-icon rounded-full text-[13px] font-medium"
+              >
+                {initialsOf(comment.autor.nombre)}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-lg border bg-background px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[13px] text-muted-foreground">
+                    <span className="font-medium text-foreground">{comment.autor.nombre}</span> ·{" "}
+                    <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
+                  </p>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Eliminar comentario de ${comment.autor.nombre}`}
+                      onClick={() => setRemoving(comment)}
+                    >
+                      Eliminar
+                    </Button>
+                  )}
+                </div>
+                <p className="wrap-break-word whitespace-pre-wrap text-body">{comment.texto}</p>
               </div>
-              <p className="whitespace-pre-wrap wrap-break-word">{comment.texto}</p>
             </li>
           ))}
         </ol>
       )}
       {removeError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive">
           {removeError}
         </p>
       )}
 
-      <form onSubmit={submit} noValidate className="flex flex-col gap-2">
-        <Label htmlFor="comentario-texto" className="sr-only">
-          Nuevo comentario
-        </Label>
-        <Textarea
+      <form onSubmit={submit} noValidate className="flex flex-col gap-3 border-t pt-6">
+        <Field
           id="comentario-texto"
-          placeholder="Escribí un comentario…"
-          aria-invalid={errors.texto ? true : undefined}
-          aria-describedby={errors.texto ? "comentario-texto-error" : undefined}
-          {...register("texto")}
-        />
-        {errors.texto && (
-          <p id="comentario-texto-error" className="text-sm text-destructive">
-            El comentario es obligatorio (hasta 2000 caracteres).
-          </p>
-        )}
+          label="Nuevo comentario"
+          icon={MessageSquare}
+          counter={{ value: (watch("texto") ?? "").length, max: 2000 }}
+          error={errors.texto && "El comentario es obligatorio (hasta 2000 caracteres)."}
+        >
+          {(aria) => (
+            <Textarea
+              id="comentario-texto"
+              placeholder="Escribí un comentario…"
+              className={`${textareaClass} min-h-22`}
+              {...aria}
+              {...register("texto")}
+            />
+          )}
+        </Field>
         {serverError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-destructive">
             {serverError}
           </p>
         )}
-        <div>
-          <Button type="submit" disabled={isSubmitting}>
+        <div className="flex justify-end">
+          <Button type="submit" className="h-10 px-5" disabled={isSubmitting}>
             {isSubmitting ? "Comentando…" : "Comentar"}
           </Button>
         </div>
@@ -147,6 +165,6 @@ export function TicketComments({ ticketId }: { ticketId: string }) {
           onConfirm={confirmRemove}
         />
       )}
-    </section>
+    </FormSection>
   );
 }

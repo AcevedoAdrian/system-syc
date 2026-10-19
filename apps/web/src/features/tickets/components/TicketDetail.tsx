@@ -2,7 +2,6 @@ import { formatTicketNumber } from "@syc/contracts";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { useCallback, useId, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { getErrorMessage, isNotFound } from "@/lib/errors";
@@ -10,12 +9,15 @@ import { useTicket } from "../hooks/useTicket";
 import { useRemoveTicket } from "../hooks/useTicketMutations";
 import { ChangeDepartmentDialog } from "./ChangeDepartmentDialog";
 import { ChangeStatusDialog } from "./ChangeStatusDialog";
+import { EstadoPill } from "./TicketBadges";
 import { TicketComments } from "./TicketComments";
 import { TicketForm } from "./TicketForm";
 import { TicketHistory } from "./TicketHistory";
+import { TicketTabs } from "./TicketTabs";
 
-// Pantalla del ticket: encabezado con sus acciones, formulario de datos, comentarios e historial. Las acciones del
-// admin (cambiar departamento y eliminar) se ocultan a un agente; la API las rechaza igual.
+// Pantalla del ticket: encabezado con sus acciones y, debajo, las pestañas Datos (el formulario),
+// Comentarios e Historial. Las acciones del admin (cambiar departamento y eliminar) se ocultan a un
+// agente; la API las rechaza igual.
 export function TicketDetail({ ticketId }: { ticketId: string }) {
   const navigate = useNavigate();
   const { data: user } = useCurrentUser();
@@ -78,47 +80,56 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
   };
 
   return (
-    <section className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold wrap-break-word">
-          {formatTicketNumber(ticket.numero)} · {ticket.titulo}
-        </h1>
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary">{ticket.estado.nombre}</Badge>
+    <section className="mx-auto flex w-full max-w-300 flex-col gap-8">
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="font-heading text-4xl leading-[1.15] font-medium tracking-[-0.02em] wrap-break-word">
+              {formatTicketNumber(ticket.numero)} · {ticket.titulo}
+            </h1>
+            <p className="text-base text-muted-foreground">
+              Actualizá los datos del ticket. Los campos con * son obligatorios.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              className="h-10 px-5"
+              onClick={() => setStatusOpen(true)}
+              disabled={dirty}
+              aria-describedby={dirty ? dirtyHintId : undefined}
+            >
+              Cambiar estado
+            </Button>
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  className="h-10 px-5"
+                  onClick={() => setDepartmentOpen(true)}
+                  disabled={dirty}
+                  aria-describedby={dirty ? dirtyHintId : undefined}
+                >
+                  Cambiar departamento
+                </Button>
+                {/* Se distingue como destructivo con texto y borde rojos sobre el botón `outline`. La variante
+                    `destructive` rellena el fondo con el rojo al 10%: da 4,0:1 en claro (AA pide 4,5:1) y
+                    3,3:1 al pasar el mouse. Acá: 4,8:1, y el hover refuerza el borde en vez del fondo. */}
+                <Button
+                  variant="outline"
+                  className="h-10 border-destructive/50 px-5 text-destructive hover:border-destructive hover:bg-background hover:text-destructive"
+                  onClick={() => setRemoveOpen(true)}
+                >
+                  Eliminar
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+        <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <EstadoPill estado={ticket.estado} />
           {ticket.departamento.nombre}
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setStatusOpen(true)}
-            disabled={dirty}
-            aria-describedby={dirty ? dirtyHintId : undefined}
-          >
-            Cambiar estado
-          </Button>
-          {isAdmin && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setDepartmentOpen(true)}
-                disabled={dirty}
-                aria-describedby={dirty ? dirtyHintId : undefined}
-              >
-                Cambiar departamento
-              </Button>
-              {/* Se distingue como destructivo con texto y borde rojos sobre el botón `outline`. La variante
-                  `destructive` rellena el fondo con el rojo al 10%: da 4,0:1 en claro (AA pide 4,5:1) y
-                  3,3:1 al pasar el mouse. Acá: 4,8:1, y el hover refuerza el borde en vez del fondo. */}
-              <Button
-                variant="outline"
-                className="border-destructive/50 text-destructive hover:border-destructive hover:bg-background hover:text-destructive"
-                onClick={() => setRemoveOpen(true)}
-              >
-                Eliminar
-              </Button>
-            </>
-          )}
-        </div>
         {dirty && (
           <p id={dirtyHintId} className="text-sm text-muted-foreground">
             Guardá o descartá los cambios para cambiar el estado o el departamento.
@@ -131,28 +142,32 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
         )}
       </header>
 
-      {/* Se vuelve a montar con cada versión nueva del ticket (`updatedAt`): así el formulario
-          parte siempre de lo que guardó el servidor, y «Recargar» lo reinicia. */}
-      <div className="flex flex-col gap-2">
-        <TicketForm
-          key={ticket.updatedAt}
-          ticket={ticket}
-          onSaved={() => setNotice("Cambios guardados.")}
-          onReload={reload}
-          onDirtyChange={onDirtyChange}
-        />
-        {/* Pegado al botón «Guardar cambios», que está al final del formulario. Siempre montado y fuera
-            del `key`: una región viva que aparece ya con su texto, o que se recrea con el formulario, no
-            siempre se anuncia. */}
-        <p role="status" className="text-sm text-success">
-          {notice}
-        </p>
-      </div>
+      {/* Siempre montada, invisible y fuera del formulario: una región viva que aparece ya con su texto,
+          o que se recrea con el formulario, no siempre se anuncia. El aviso visible está en la barra de
+          acciones del formulario. */}
+      <p role="status" className="sr-only">
+        {notice}
+      </p>
 
-      {/* Fuera del `key` del formulario: comentar no cambia el ticket y no lo reinicia. */}
-      <TicketComments ticketId={ticket.id} />
-
-      <TicketHistory ticketId={ticket.id} />
+      <TicketTabs
+        panels={{
+          // Se vuelve a montar con cada versión nueva del ticket (`updatedAt`): así el formulario
+          // parte siempre de lo que guardó el servidor, y «Recargar» lo reinicia.
+          datos: (
+            <TicketForm
+              key={ticket.updatedAt}
+              ticket={ticket}
+              notice={notice}
+              onSaved={() => setNotice("Cambios guardados.")}
+              onReload={reload}
+              onDirtyChange={onDirtyChange}
+            />
+          ),
+          // Fuera del `key` del formulario: comentar no cambia el ticket y no lo reinicia.
+          comentarios: <TicketComments ticketId={ticket.id} />,
+          historial: <TicketHistory ticketId={ticket.id} />,
+        }}
+      />
 
       <ChangeStatusDialog
         key={`estado-${ticket.updatedAt}`}

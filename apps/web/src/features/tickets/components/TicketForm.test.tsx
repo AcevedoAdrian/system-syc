@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/client";
 import { hoyArgentina, STALE_TICKET_MESSAGE } from "@syc/contracts";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTicket } from "../ticket-fixtures";
@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   } as Record<string, { id: string; nombre: string }[]>,
 }));
 
+// Los puntos de color salen de los catálogos; su lógica tiene sus propios tests.
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
 vi.mock("../hooks/useTicketMutations", () => ({
   useUpdateTicket: () => ({ mutateAsync: mocks.update }),
 }));
@@ -106,19 +108,187 @@ describe("TicketForm", () => {
     expect(screen.getByLabelText("Prioridad")).toHaveValue("alta");
     expect(screen.getByLabelText("Área")).toHaveValue("sist");
     expect(screen.getByLabelText("Edificio")).toHaveValue("");
-    expect(screen.getByLabelText("Proveedor")).toHaveValue("acme");
+    expect(screen.getByRole("combobox", { name: "Proveedor" })).toHaveValue("acme");
     expect(screen.getByLabelText("Referencia externa")).toHaveValue("19092/2026");
-    expect(screen.getByLabelText("Solución")).toHaveValue("Se reinició");
+    expect(screen.getByLabelText("Descripción de la solución")).toHaveValue("Se reinició");
     expect(screen.getByLabelText("Fecha de recepción")).toHaveValue("2026-10-01");
-    expect(screen.getByRole("checkbox", { name: "Se notificó al usuario" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Notificado" })).toBeChecked();
   });
 
-  it("no tiene el estado ni el departamento: cada uno tiene su propio diálogo", () => {
+  it("muestra el estado y el departamento solo de lectura: cada uno se cambia con su propio diálogo", () => {
     renderForm();
 
-    expect(screen.queryByLabelText("Estado")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Departamento")).not.toBeInTheDocument();
+    const estado = screen.getByLabelText("Estado");
+    expect(estado).toHaveValue("Pendiente");
+    expect(estado).toHaveAttribute("readonly");
+    expect(estado).toHaveAccessibleDescription("Se cambia con «Cambiar estado».");
+    const departamento = screen.getByLabelText("Departamento");
+    expect(departamento).toHaveValue("Técnico");
+    expect(departamento).toHaveAttribute("readonly");
     expect(screen.queryByLabelText("Número")).not.toBeInTheDocument();
+  });
+
+  it("el estado y el departamento no se mandan al guardar: no son parte del formulario", async () => {
+    renderForm();
+
+    await userEvent.type(screen.getByLabelText("Título"), " (urgente)");
+    await save();
+
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+    const sent = mocks.update.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty("estadoId");
+    expect(sent).not.toHaveProperty("departamentoId");
+  });
+
+  describe("diseño (SPEC 09, etapa 9.5)", () => {
+    it("tiene las cuatro secciones de «Datos»", () => {
+      renderForm();
+
+      for (const name of [
+        "Datos del ticket",
+        "Clasificación",
+        "Proveedor",
+        "Solución y seguimiento",
+      ]) {
+        expect(screen.getByRole("region", { name })).toBeInTheDocument();
+      }
+    });
+
+    it("cada campo está dentro de su sección", () => {
+      renderForm();
+
+      const region = (name: string) => within(screen.getByRole("region", { name }));
+      for (const label of ["Título", "Prioridad", "Fecha de recepción", "Descripción"]) {
+        expect(region("Datos del ticket").getByLabelText(label)).toBeInTheDocument();
+      }
+      for (const label of ["Área", "Edificio", "Tipo de ticket", "Módulo"]) {
+        expect(region("Clasificación").getByLabelText(label)).toBeInTheDocument();
+      }
+      expect(region("Proveedor").getByLabelText("Referencia externa")).toBeInTheDocument();
+      expect(
+        region("Solución y seguimiento").getByLabelText("Descripción de la solución"),
+      ).toBeInTheDocument();
+      expect(
+        region("Solución y seguimiento").getByRole("checkbox", { name: "Notificado" }),
+      ).toBeInTheDocument();
+    });
+
+    it("el título, la descripción y la solución cuentan sus caracteres", async () => {
+      renderForm({
+        titulo: "Impresora rota",
+        descripcion: "Piso 2",
+        solucionDescripcion: "Se reinició",
+      });
+
+      expect(screen.getByText("14/200")).toBeInTheDocument();
+      expect(screen.getByText("6/5000")).toBeInTheDocument();
+      expect(screen.getByText("11/5000")).toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+
+      expect(screen.getByText("15/200")).toBeInTheDocument();
+    });
+
+    it("«Usar hoy» pone la fecha de hoy y deja el formulario con cambios", async () => {
+      renderForm({ fechaRecepcion: "2026-10-01" });
+      const guardar = screen.getByRole("button", { name: "Guardar cambios" });
+      expect(guardar).toBeDisabled();
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar hoy" }));
+
+      expect(screen.getByLabelText("Fecha de recepción")).toHaveValue(hoyArgentina());
+      expect(guardar).toBeEnabled();
+    });
+
+    it("las fechas de cierre y reapertura van en un recuadro con su explicación", () => {
+      renderForm({ fechaCierre: "2026-10-03" });
+
+      const cierre = screen.getByLabelText("Fecha de cierre");
+      const recuadro = cierre.closest(".form-callout") as HTMLElement;
+      expect(recuadro).toHaveTextContent("se cargan al cambiar el estado");
+      expect(within(recuadro).queryByLabelText("Fecha de reapertura")).not.toBeInTheDocument();
+    });
+
+    it("sin esas fechas no hay recuadro", () => {
+      const { container } = render(
+        <TicketForm
+          ticket={makeTicket()}
+          onSaved={onSaved}
+          onReload={onReload}
+          onDirtyChange={onDirtyChange}
+        />,
+      );
+
+      expect(container.querySelector(".form-callout")).toBeInTheDocument(); // el de «Notificado»
+      expect(screen.queryByText(/se cargan al cambiar el estado/)).not.toBeInTheDocument();
+    });
+
+    it("«Notificado» explica qué registra, y se puede marcar desde todo el recuadro", async () => {
+      renderForm();
+      const casilla = screen.getByRole("checkbox", { name: "Notificado" });
+      expect(casilla).toHaveAccessibleDescription(
+        /Registra que se avisó a quien hizo el requerimiento/,
+      );
+
+      await userEvent.click(screen.getByText(/Registra que se avisó/));
+
+      expect(casilla).toBeChecked();
+    });
+
+    it("las acciones van en una barra fija al pie, con «Guardar cambios» al final", () => {
+      renderForm();
+
+      const guardar = screen.getByRole("button", { name: "Guardar cambios" });
+      const barra = guardar.parentElement as HTMLElement;
+      expect(barra).toHaveClass("sticky", "bottom-0");
+      expect(barra).toContainElement(screen.getByRole("button", { name: "Descartar cambios" }));
+      expect(barra.lastElementChild).toBe(guardar);
+    });
+
+    it("sin cambios, «Guardar cambios» y «Descartar cambios» están deshabilitados", () => {
+      renderForm();
+
+      expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Descartar cambios" })).toBeDisabled();
+    });
+
+    it("el aviso que manda la pantalla se ve en la barra de acciones", () => {
+      render(
+        <TicketForm
+          ticket={makeTicket()}
+          notice="Cambios guardados."
+          onSaved={onSaved}
+          onReload={onReload}
+          onDirtyChange={onDirtyChange}
+        />,
+      );
+
+      const aviso = screen.getByText("Cambios guardados.");
+      expect(aviso.closest(".sticky")).not.toBeNull();
+      expect(aviso).toHaveClass("text-success");
+      // La región que lo anuncia es de la pantalla, no del formulario.
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("un error del servidor tapa el aviso y sale en la barra de acciones", async () => {
+      mocks.update.mockRejectedValue(new Error("Falló"));
+      render(
+        <TicketForm
+          ticket={makeTicket()}
+          notice="Cambios guardados."
+          onSaved={onSaved}
+          onReload={onReload}
+          onDirtyChange={onDirtyChange}
+        />,
+      );
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+
+      await save();
+
+      const alerta = await screen.findByRole("alert");
+      expect(alerta.closest(".sticky")).not.toBeNull();
+      expect(screen.queryByText("Cambios guardados.")).not.toBeInTheDocument();
+    });
   });
 
   describe("fecha de cierre y de reapertura", () => {
@@ -179,7 +349,13 @@ describe("TicketForm", () => {
       for (const label of ["Título", "Prioridad", "Fecha de recepción"]) {
         expect(screen.getByLabelText(label)).toHaveAttribute("aria-required", "true");
       }
-      for (const label of ["Descripción", "Actuación simple", "Solución"]) {
+      for (const label of [
+        "Descripción",
+        "Actuación simple",
+        "Descripción de la solución",
+        "Estado",
+        "Departamento",
+      ]) {
         expect(screen.getByLabelText(label)).not.toHaveAttribute("aria-required");
       }
     });
@@ -298,7 +474,7 @@ describe("TicketForm", () => {
 
       await userEvent.selectOptions(screen.getByLabelText("Área"), "sist");
       await userEvent.selectOptions(screen.getByLabelText("Edificio"), "ed1");
-      await userEvent.selectOptions(screen.getByLabelText("Tipo"), "inc");
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
       await userEvent.selectOptions(screen.getByLabelText("Módulo"), "mesa");
       await save();
 
@@ -325,10 +501,10 @@ describe("TicketForm", () => {
       expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ descripcion: null, areaId: null });
     });
 
-    it("marca y desmarca «Se notificó al usuario»", async () => {
+    it("marca y desmarca «Notificado»", async () => {
       renderForm();
 
-      await userEvent.click(screen.getByRole("checkbox", { name: "Se notificó al usuario" }));
+      await userEvent.click(screen.getByRole("checkbox", { name: "Notificado" }));
       await save();
 
       await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
@@ -374,7 +550,7 @@ describe("TicketForm", () => {
     it("al cambiar de proveedor se vacía la referencia, y se manda la que se cargue para el nuevo", async () => {
       renderForm({ proveedor: { id: "acme", nombre: "Acme" }, referenciaExterna: "19092/2026" });
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "otro");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "otro");
       expect(screen.getByLabelText("Referencia externa")).toHaveValue("");
       await userEvent.type(screen.getByLabelText("Referencia externa"), "077/2026");
       await save();
@@ -389,7 +565,7 @@ describe("TicketForm", () => {
     it("al cambiar de proveedor sin cargar otra referencia, queda vacía", async () => {
       renderForm({ proveedor: { id: "acme", nombre: "Acme" }, referenciaExterna: "19092/2026" });
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "otro");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "otro");
       await save();
 
       await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
@@ -402,7 +578,7 @@ describe("TicketForm", () => {
     it("quitar el proveedor borra la referencia y la deshabilita", async () => {
       renderForm({ proveedor: { id: "acme", nombre: "Acme" }, referenciaExterna: "19092/2026" });
 
-      await userEvent.selectOptions(screen.getByLabelText("Proveedor"), "");
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "");
 
       expect(screen.getByLabelText("Referencia externa")).toBeDisabled();
       await save();

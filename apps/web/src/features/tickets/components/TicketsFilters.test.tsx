@@ -54,6 +54,8 @@ const renderFilters = (filters: TicketsSearch = {}, isAdmin = false) => {
   return { onChange, ...view };
 };
 
+const openMore = () => userEvent.click(screen.getByRole("button", { name: /^Más filtros/ }));
+
 const optionNames = () => screen.getAllByRole("option").map((o) => o.textContent);
 
 describe("TicketsFilters", () => {
@@ -64,6 +66,13 @@ describe("TicketsFilters", () => {
     expect(buscador).toHaveAttribute("autocomplete", "off");
     expect(buscador).toHaveAttribute("name", "q");
     expect(buscador).toHaveAttribute("placeholder", expect.stringMatching(/…$/));
+  });
+
+  it("el campo de búsqueda va con su lupa decorativa y su etiqueta solo para lectores de pantalla", () => {
+    renderFilters();
+
+    expect(screen.getByText("Buscar")).toHaveClass("sr-only");
+    expect(screen.getByRole("searchbox", { name: "Buscar" })).toBeInTheDocument();
   });
 
   describe("selectores", () => {
@@ -104,8 +113,9 @@ describe("TicketsFilters", () => {
       expect(onChange).toHaveBeenCalledWith({ estadoId: undefined, page: undefined });
     });
 
-    it("muestra el filtro que dice la URL", () => {
+    it("muestra el filtro que dice la URL", async () => {
       renderFilters({ estadoId: "prog" });
+      await openMore();
 
       expect(screen.getByRole("combobox", { name: "Estado" })).toHaveTextContent("En progreso");
       expect(screen.getByRole("combobox", { name: "Área" })).toHaveTextContent("Todos");
@@ -113,30 +123,145 @@ describe("TicketsFilters", () => {
 
     it("ofrece los ítems inactivos al final, marcados «(inactivo)»", async () => {
       renderFilters();
+      await openMore();
 
       await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
 
       expect(optionNames()).toEqual(["Todos", "Sistemas", "Archivo (inactivo)"]);
     });
 
-    it("ofrece un selector por cada catálogo de la bandeja", () => {
+    it("la fila principal tiene Estado y Prioridad; el resto, bajo «Más filtros»", async () => {
       renderFilters();
 
-      const names = screen.getAllByRole("combobox").map((c) => c.getAttribute("id"));
-      expect(names).toEqual([
+      const ids = () => screen.getAllByRole("combobox").map((c) => c.getAttribute("id"));
+      expect(ids()).toEqual(["filtro-estadoId", "filtro-prioridadId"]);
+
+      await openMore();
+
+      expect(ids()).toEqual([
         "filtro-estadoId",
-        "filtro-tipoAreaId",
+        "filtro-prioridadId",
         "filtro-areaId",
+        "filtro-tipoAreaId",
         "filtro-edificioId",
         "filtro-tipoId",
-        "filtro-prioridadId",
         "filtro-proveedorId",
         "filtro-moduloId",
       ]);
     });
   });
 
+  describe("«Más filtros»", () => {
+    const toggle = () => screen.getByRole("button", { name: /^Más filtros/ });
+
+    it("arranca plegado y avisa su estado y qué controla", () => {
+      renderFilters();
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+      expect(toggle()).toHaveAttribute("aria-controls", "filtros-adicionales");
+      expect(screen.queryByLabelText("Recepción desde")).not.toBeInTheDocument();
+    });
+
+    it("se despliega y se pliega", async () => {
+      renderFilters();
+
+      await userEvent.click(toggle());
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "true");
+      expect(document.getElementById("filtros-adicionales")).toBeInTheDocument();
+      expect(screen.getByLabelText("Recepción desde")).toBeInTheDocument();
+
+      await userEvent.click(toggle());
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByLabelText("Recepción desde")).not.toBeInTheDocument();
+    });
+
+    it("no muestra la cuenta si no hay filtros de adentro activos", () => {
+      renderFilters({ estadoId: "prog", q: "x" });
+
+      expect(toggle()).toHaveAccessibleName("Más filtros");
+    });
+
+    it("muestra cuántos filtros de adentro están activos, sin contar los de la fila principal", () => {
+      renderFilters({
+        estadoId: "prog",
+        prioridadId: "alta",
+        areaId: "sis",
+        fechaRecepcionDesde: "2026-10-01",
+        page: 2,
+      });
+
+      expect(toggle()).toHaveAccessibleName("Más filtros (2)");
+    });
+
+    it("cuenta cada uno de los ocho filtros de adentro", () => {
+      renderFilters({
+        areaId: "a",
+        tipoAreaId: "b",
+        edificioId: "c",
+        tipoId: "d",
+        proveedorId: "e",
+        moduloId: "f",
+        fechaRecepcionDesde: "2026-10-01",
+        fechaRecepcionHasta: "2026-10-31",
+      });
+
+      expect(toggle()).toHaveAccessibleName("Más filtros (8)");
+    });
+
+    it("arranca abierto si la URL trae un filtro de adentro", () => {
+      renderFilters({ areaId: "sis" });
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("combobox", { name: "Área" })).toHaveTextContent("Sistemas");
+    });
+
+    it("arranca plegado si la URL solo trae filtros de la fila principal", () => {
+      renderFilters({ estadoId: "prog", prioridadId: "alta" });
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("se abre solo si después llega un filtro de adentro", () => {
+      const { rerender } = renderFilters({});
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+
+      rerender(
+        <TicketsFilters filters={{ edificioId: "x" }} onChange={() => undefined} isAdmin={false} />,
+      );
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("se puede plegar aunque haya filtros activos, y la cuenta lo sigue mostrando", async () => {
+      renderFilters({ areaId: "sis" });
+
+      await userEvent.click(toggle());
+
+      expect(toggle()).toHaveAttribute("aria-expanded", "false");
+      expect(toggle()).toHaveAccessibleName("Más filtros (1)");
+    });
+
+    it("el panel trae las dos fechas, cada una acotada por la otra", async () => {
+      renderFilters({ fechaRecepcionDesde: "2026-10-05", fechaRecepcionHasta: "2026-10-20" });
+
+      expect(screen.getByLabelText("Recepción desde")).toHaveAttribute("max", "2026-10-20");
+      expect(screen.getByLabelText("Recepción hasta")).toHaveAttribute("min", "2026-10-05");
+    });
+  });
+
   describe("departamento", () => {
+    it("el admin lo ve en la fila principal, junto a Estado y Prioridad", () => {
+      renderFilters({}, true);
+
+      expect(screen.getAllByRole("combobox").map((c) => c.getAttribute("id"))).toEqual([
+        "filtro-estadoId",
+        "filtro-prioridadId",
+        "filtro-departamentoId",
+      ]);
+    });
+
     it("un agente no ve el filtro", () => {
       renderFilters({}, false);
 
@@ -155,8 +280,9 @@ describe("TicketsFilters", () => {
   });
 
   describe("fechas de recepción", () => {
-    it("cambiar una fecha avisa y vuelve a la página 1", () => {
+    it("cambiar una fecha avisa y vuelve a la página 1", async () => {
       const { onChange } = renderFilters({ page: 2 });
+      await openMore();
 
       fireEvent.change(screen.getByLabelText("Recepción desde"), {
         target: { value: "2026-10-01" },
@@ -166,6 +292,7 @@ describe("TicketsFilters", () => {
     });
 
     it("borrar una fecha quita el filtro", () => {
+      // La URL ya trae la fecha: el panel arranca abierto.
       const { onChange } = renderFilters({ fechaRecepcionHasta: "2026-10-31" });
 
       fireEvent.change(screen.getByLabelText("Recepción hasta"), { target: { value: "" } });

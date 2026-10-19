@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada; 9.4 a 9.6 pendientes
+> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada; 9.6 pendiente
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -24,8 +24,8 @@ Decisiones del usuario del 2026-10-16:
 | 9.1 | Tema: tokens de color, tipografías, radio, sombras y regla de uso | Hecha |
 | 9.2 | Login: panel de marca, logo «system·syc», interruptor claro/oscuro con persistencia (`.dark` en `<html>`) | Hecha |
 | 9.3 | Layout autenticado: sidebar y topbar | Hecha |
-| 9.4 | Bandeja y tarjetas KPI; color de estados y prioridades | Pendiente |
-| 9.5 | Formulario y detalle de ticket (secciones de color, pestañas) | Pendiente |
+| 9.4 | Bandeja de tickets; color de estados y prioridades (las tarjetas de resumen quedan para una etapa aparte) | Hecha |
+| 9.5 | Formulario y detalle de ticket (secciones de color, pestañas, comentarios e historial) | Hecha |
 | 9.6 | Administración: departamentos, usuarios y catálogos | Pendiente |
 
 Las etapas 9.2 a 9.6 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
@@ -171,6 +171,117 @@ Referencia: `SIDEBAR` y `TOPBAR` de `docs/Maqueta-Dashboard/Main.dc.html`. Es el
 - [x] **09.15** Ningún componente del layout usa colores sueltos (lo cubre el 09.4) y la tarjeta «Próximamente» usa los tokens `--note-*`.
 
 A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas en claro, oscuro y 700px de ancho): recorrer Tickets, Departamentos, Usuarios y los catálogos; claro y oscuro; achicar la ventana por debajo de 808px. Falta recorrerlo con un agente (la prueba automática ya cubre que no ve «Administración»).
+
+## Etapa 9.4 — Bandeja de tickets
+
+Referencia: `TICKETS EXTERNOS: LISTA` de `docs/Maqueta-Dashboard/Main.dc.html`. Rediseña `/tickets` (`TicketsList`, `TicketsFilters`, `TicketsTable`); la API, los contratos y la URL (búsqueda, filtros y página) no cambian.
+
+### Alcance
+
+**Dentro:**
+
+- **Encabezado.** «Tickets» en `font-heading` 36px, la bajada «Seguimiento de solicitudes y su estado.» y el botón «Nuevo ticket» con un «+». La bandeja se centra con un ancho máximo de 1200px.
+- **Listado en una tarjeta** (borde, radio 12px, fondo `--background`) con tres partes: la barra de filtros, la tabla y el pie de paginación.
+- **Barra de filtros.**
+  - Fila principal: búsqueda con lupa, Estado, Prioridad, Departamento (solo el admin), «Más filtros» y «Limpiar filtros». La etiqueta de cada selector va a su izquierda.
+  - «Más filtros (N)» despliega Área, Tipo de área, Edificio, Tipo, Proveedor, Módulo y las dos fechas de recepción; N es la cantidad de esos filtros que están activos. Arranca plegado, salvo que la URL ya traiga alguno de ellos.
+  - Los filtros, la búsqueda con pausa de 300 ms y la página siguen viviendo en la URL, igual que hoy.
+- **Tabla.** Cabecera en `--muted`; filas de 56px con separador `--line-soft`. El **número** (`TE-000013`) es el enlace al ticket, en `font-mono` y `--link`; el título es texto. El **estado** va en una píldora con un punto de color y la **prioridad** con un punto y su nombre. Las columnas son las de hoy (Número, Título, Departamento, Estado, Prioridad, Área, Fecha de recepción).
+- **Pie.** «Mostrando 21–40 de 134 · Página 2 de 7» y los botones «Anterior» y «Siguiente» de 40px, que siguen siendo enlaces (el deshabilitado, un botón).
+- **Color de estados y prioridades**, derivado en la web (ver más abajo).
+
+**Fuera:**
+
+- Las **tarjetas de resumen** (Pendientes, En progreso, Finalizados, Alta y urgente). Piden conteos que la API no entrega y una definición de «pendiente» que los estados editables no dan. Se hacen en una etapa aparte, con su propio SPEC.
+- La columna «Acciones» (editar y eliminar desde la fila): el sistema edita y elimina desde el detalle del ticket.
+- El aviso con «Deshacer» de la maqueta: el sistema no deshace.
+- El formulario y el detalle (9.5) y los cambios en la API, los contratos y la base.
+
+### Color de estados y prioridades
+
+Se calcula en `features/tickets/ticket-colors.ts` a partir de los catálogos que ya trae `useCatalog` (que vienen en el orden de la administración). No se guarda nada en la base.
+
+| Estado | Punto |
+|---|---|
+| `FINALIZADO` | lleno, `--foreground` |
+| `CERRADO` | aro de `--neutral-dot` |
+| `CANCELADO` | lleno, `--neutral-dot` |
+| `REABIERTO` | lleno, `--brand` |
+| Sin clave (los que crea el admin) | por su posición entre los estados sin clave: 1.º aro de `--foreground`, 2.º `--teal`, 3.º `--amber`, 4.º `--blue`, 5.º `--violet`; del 6.º en adelante vuelve a empezar |
+
+| Prioridad | Punto |
+|---|---|
+| La última del catálogo (la más urgente) | `--destructive` |
+| La anterior | `--brand` |
+| La que le precede | `--warning` |
+| Las demás | `--neutral-dot` |
+
+Con una sola prioridad el punto es neutro. El nombre siempre acompaña al punto: el color no es la única señal. El catálogo de prioridades tiene que estar ordenado de la menos a la más urgente (así viene del seed: Baja, Media, Alta, Urgente); el admin lo controla con las flechas de la pantalla de catálogos. Mientras el catálogo carga, o si el ítem no está en él (un estado eliminado), el punto es neutro.
+
+### Decisiones
+
+- **Color derivado, no guardado.** Se eligió derivarlo en la web antes que agregar un color a cada estado y prioridad (migración, API y selector en el ABM, como la rama `spec-10`). Costo: el admin no elige el color; si reordena un catálogo, los colores siguen la posición. Si molesta, se hace el color guardado en una etapa aparte.
+- **El número es el enlace**, como en la maqueta, y el título pasa a texto. Antes era al revés. Así hay un solo enlace por fila y el título largo ya no se parte como enlace.
+- **La variante `link` de `Button` usa `--link`**, no `--primary`. El primario sirve de fondo de botón pero sobre el fondo oscuro da 3,5:1 como texto; `--link` llega a 7,9:1. Lo usa «Ir a la página 1» y cualquier enlace-botón futuro.
+- **«Más filtros» arranca plegado** para que la fila principal quede corta. Un enlace compartido con un filtro secundario activo lo abre solo, para que no haya filtros activos escondidos.
+
+### Criterios de aceptación (9.4)
+
+- [x] **09.16** El color de cada estado y de cada prioridad sale de las tablas de arriba: las claves de sistema, la posición entre los estados sin clave (con vuelta al 6.º), las prioridades desde la última, y neutro si el catálogo no cargó o el ítem no está.
+- [x] **09.17** La fila muestra el número como único enlace al ticket, el estado en una píldora con su punto y la prioridad con su punto y su nombre; el orden de las filas es el de la API.
+- [x] **09.18** La barra de filtros tiene la fila principal (y Departamento solo para el admin); «Más filtros» muestra N, despliega los otros seis filtros y las fechas, y arranca abierto si la URL trae alguno.
+- [x] **09.19** Los filtros, la búsqueda con pausa y «Limpiar filtros» siguen funcionando contra la URL, con los mismos resultados que antes.
+- [x] **09.20** El pie muestra «Mostrando a–b de N · Página p de n» y «Anterior»/«Siguiente» como enlaces que conservan los filtros (o botones deshabilitados en los extremos).
+- [x] **09.21** El encabezado ofrece «Nuevo ticket» y la bandeja conserva sus estados: cargando, error con «Reintentar», sin resultados con «Limpiar filtros», vacía y página inexistente.
+
+A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas en claro, oscuro y 700px de ancho): bandeja con un ticket, página inexistente y filtro secundario en la URL. Falta recorrerla con un agente y con varios tickets de distintos estados y prioridades (la base de desarrollo tiene uno solo); la lógica de color está cubierta por tests.
+
+## Etapa 9.5 — Formulario y detalle de ticket
+
+Referencia: `TICKETS: ALTA / EDICIÓN` de `docs/Maqueta-Dashboard/Main.dc.html`. Rediseña `/tickets/nuevo` (`CreateTicketForm`) y `/tickets/$ticketId` (`TicketDetail`, `TicketForm`, `TicketComments`, `TicketHistory`). Los campos, las reglas, los mensajes de error, los diálogos de estado y departamento, el bloqueo optimista y la protección contra salir con cambios sin guardar no cambian.
+
+### Alcance
+
+**Dentro:**
+
+- **Secciones de color** (`FormSection`): tarjeta con una franja de 4px arriba en el color de la sección, fondo y borde teñidos, un ícono en un cuadro de 40px, título de 18px y una línea de descripción. Los colores salen de los tokens: Datos del ticket `--brand`, Clasificación `--amber`, Proveedor `--violet`, Solución y seguimiento `--teal`, Comentarios `--blue`, Historial `--amber`.
+- **Etiquetas con ícono** en el color de la sección, el asterisco de obligatorio en `--brand`, contador `n/200`, `n/5000` y `n/2000` junto a los campos de texto largo y «Usar hoy» junto a la fecha de recepción.
+- **Alta** (`/tickets/nuevo`): título «Nuevo ticket», la bajada «Completá los datos del requerimiento. Los campos con * son obligatorios.» y dos secciones: «Datos del ticket» (actuación simple y departamento en la primera fila, título, prioridad, fecha de recepción, descripción) y «Proveedor» (proveedor y referencia externa). Sin clasificación: se completa al editar (SPEC 05, Feature 5.1). El agente ve su departamento de solo lectura y con un candado; el admin lo elige.
+- **Edición** (`/tickets/$ticketId`): encabezado con el número y el título, el estado y el departamento, y las acciones «Cambiar estado», «Cambiar departamento» y «Eliminar»; debajo, **pestañas** «Datos», «Comentarios» e «Historial», cada una con su punto de color y una raya de 3px del mismo color en la activa. «Datos» tiene cuatro secciones (Datos del ticket, Clasificación, Proveedor, Solución y seguimiento). Las fechas de cierre y de reapertura, cuando el ticket ya las tiene, van en un recuadro dentro de «Datos del ticket».
+- **Barra de acciones fija** al pie del formulario: «Cancelar» y «Crear ticket» en el alta; «Descartar cambios» y «Guardar cambios» en la edición. A la izquierda lleva el aviso «Cambios guardados.» o el error del servidor (con «Recargar» si el ticket cambió).
+- **Comentarios:** la lista como conversación, con un avatar de iniciales y un globo por comentario; el formulario de «Nuevo comentario» con contador y el botón «Comentar».
+- **Historial:** la línea de tiempo con una raya izquierda de 3px en el color de la sección.
+- **Prioridad con su punto de color** dentro del selector (el mismo color que en la bandeja, 9.4).
+- Anchura: el contenido se centra con un máximo de 1200px, como la bandeja.
+
+**Fuera:**
+
+- El selector de estado de la maqueta: el estado se sigue cambiando con el diálogo «Cambiar estado», que valida las fechas de cierre y reapertura. Tampoco hay selector de departamento en la edición (ídem «Cambiar departamento»).
+- El color de foco por sección: el foco usa el token `--ring` en todo el sistema.
+- Los diálogos de estado, departamento y eliminación (se rediseñan con el resto de los diálogos, en 9.6), y todo cambio en la API, los contratos o la base.
+
+### Decisiones
+
+- **Pestañas sin desmontar.** Los tres paneles quedan montados y los inactivos ocultos: cambiar de pestaña no pierde lo escrito en el formulario ni en el comentario a medio escribir.
+- **El título del encabezado sigue siendo «TE-000013 · título»**, no «Editar ticket» como en la maqueta: identifica el ticket de un vistazo, y la bajada trae las instrucciones.
+- **El aviso «Cambios guardados.»** se ve en la barra fija, y además una región `role="status"` invisible, siempre montada y fuera del formulario, lo anuncia a los lectores de pantalla (el formulario se vuelve a montar al guardar y una región recién creada no siempre se anuncia).
+- **Etiquetas de la maqueta:** «Tipo» pasa a «Tipo de ticket», «Solución» a «Descripción de la solución» y «Se notificó al usuario» a «Notificado», con su explicación al lado.
+- **Estado y departamento, de solo lectura en la edición.** El formulario los muestra (con un candado el departamento, con su punto el estado) para que la pantalla se parezca a la maqueta, pero no forman parte de lo que se envía: se siguen cambiando con sus diálogos.
+- **El selector de prioridad muestra su punto de color**, con el valor pegado a él y la flecha a la derecha (`leading` en `CatalogOptionSelect`).
+- **Voseo** («Completá», «Elegí»), como en el resto de la aplicación.
+
+### Criterios de aceptación (9.5)
+
+- [x] **09.22** El alta muestra las dos secciones con sus campos, los contadores y «Usar hoy»; el admin elige el departamento y el agente lo ve de solo lectura; valida y envía como antes y navega al ticket creado.
+- [x] **09.23** La edición muestra las cuatro secciones de «Datos» con sus campos, las fechas de cierre y reapertura solo si el ticket ya las tiene, y guarda, descarta y avisa del conflicto (409) como antes.
+- [x] **09.24** Las pestañas Datos, Comentarios e Historial cambian de panel con el mouse y las flechas, y no desmontan los otros paneles (lo escrito en el formulario se conserva).
+- [x] **09.25** La barra fija tiene las acciones de cada formulario, con «Guardar cambios» y «Descartar cambios» deshabilitados sin cambios, y muestra el aviso de guardado y los errores del servidor.
+- [x] **09.26** El encabezado muestra número y título, estado y departamento; «Cambiar estado» y «Cambiar departamento» se deshabilitan con cambios sin guardar; «Cambiar departamento» y «Eliminar» son solo del admin.
+- [x] **09.27** Los comentarios se ven como conversación con avatar y globo; comentar valida, envía y limpia; solo el admin elimina.
+- [x] **09.28** El historial muestra cada movimiento con su fecha, su autor y sus cambios, del más reciente al más antiguo.
+- [x] **09.29** La prioridad muestra su punto de color dentro del selector, con la misma regla que la bandeja.
+
+A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas de la pantalla de alta, el detalle y las tres pestañas en claro y oscuro, y del alta a 430px de ancho): falta recorrerlo con un agente y probar guardar con cambios, el conflicto 409 y un comentario real. Los tests cubren esos casos.
 
 ## Decisiones
 
