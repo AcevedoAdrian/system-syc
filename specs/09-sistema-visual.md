@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** In progress — etapa 9.1 (tema) implementada; 9.2 a 9.6 pendientes
+> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada; 9.3 a 9.6 pendientes
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -22,7 +22,7 @@ Decisiones del usuario del 2026-10-16:
 | Etapa | Contenido | Estado |
 |---|---|---|
 | 9.1 | Tema: tokens de color, tipografías, radio, sombras y regla de uso | Hecha |
-| 9.2 | Login: panel de marca, logo «system·syc», interruptor claro/oscuro con persistencia (`.dark` en `<html>`) | Pendiente |
+| 9.2 | Login: panel de marca, logo «system·syc», interruptor claro/oscuro con persistencia (`.dark` en `<html>`) | Hecha |
 | 9.3 | Layout autenticado: sidebar y topbar | Pendiente |
 | 9.4 | Bandeja y tarjetas KPI; color de estados y prioridades | Pendiente |
 | 9.5 | Formulario y detalle de ticket (secciones de color, pestañas) | Pendiente |
@@ -107,6 +107,35 @@ Los componentes usan solo tokens (`bg-background`, `text-body`, `bg-primary`, `t
 - [x] **09.5** Las cuatro fuentes están en `package.json` y se importan en `index.css`; Geist ya no está y no se carga nada de Google.
 
 A mano, con `docker compose up`: el login y `/tickets` toman el fondo `#faf9f5`, los botones `#a9583e` y los títulos salen en Cormorant; con la clase `dark` en `<html>`, el fondo pasa a `#181715`.
+
+## Etapa 9.2 — Login
+
+Referencia: la sección `LOGIN` de `docs/Maqueta-Dashboard/Main.dc.html`.
+
+### Alcance
+
+**Dentro:**
+
+- **Disposición.** Dos paneles: el de marca (`--muted`, ancho 5/11) y el del formulario (`--background`, 6/11). Debajo de 960px se apilan, sin la línea de corte. El de marca lleva, centrados, el logo y «Gestión interna y seguimiento de tickets.» (18px, `--muted-foreground`). Entre los dos paneles va una línea de corte discontinua con una muesca arriba y otra abajo, a modo de ticket partido.
+- **Logo «system·syc»** (`components/common/Logo.tsx`): dos piezas con muescas en las esquinas, una de tinta (`--foreground`) y otra de acento (`--brand`) encastrada, en `font-brand` 800. Tamaño por la altura (`--h`, 72px en el login). Es `role="img"` con `aria-label="system-syc"`.
+- **Formulario.** Sin tarjeta. Título «Iniciar sesión» en `font-heading` 36px y la bajada «Ingresá con tu usuario y contraseña.». Campos de 40px de alto, radio 8px, texto de 16px y etiqueta de 13px. La contraseña tiene un botón «Mostrar»/«Ocultar» dentro del campo. El error de cada campo sale debajo en `--destructive`, con el borde del campo también en `--destructive`. El botón «Ingresar» ocupa todo el ancho y, mientras envía, pasa a «Ingresando…» deshabilitado. Al pie, separada por una línea discontinua: «¿No tenés acceso? Un administrador da de alta a cada usuario.».
+- **Aviso de error** (`role="alert"`, borde `--destructive`): un título y un detalle. «Usuario o contraseña incorrectos.» con «Revisá los datos e intentá de nuevo.»; «Tu usuario está desactivado.» con «Pedí a un administrador que lo reactive.»; «Demasiados intentos.» con «Esperá un minuto antes de volver a intentar.»; «No se pudo conectar con el servidor.», sin detalle.
+- **Interruptor claro/oscuro** (`components/common/ThemeToggle.tsx`, lógica en `lib/theme.ts`). Un botón redondo de 40px, arriba a la derecha del panel del formulario, con la luna en claro y el sol en oscuro. La clase `dark` en `<html>` es la única fuente de verdad. La elección se guarda en `localStorage` (clave `syc-theme`); sin elección previa se usa `prefers-color-scheme`. `main.tsx` la aplica antes de renderizar, para no parpadear. Si `localStorage` no está disponible, el interruptor igual funciona en esa sesión.
+- Token nuevo `--brand-foreground` (`#ffffff` en los dos temas): el texto de la pieza de acento del logo.
+
+**Fuera:** el layout autenticado (9.3, donde el interruptor se reutiliza en la barra superior), cambiar los tamaños de los primitivos de `components/ui` (el login fija los suyos con `className`; se alinean a la maqueta cuando una etapa lo necesite), el flujo de autenticación y los textos de los demás errores.
+
+Se mantiene el voseo del proyecto («Ingresá», «Revisá»); la maqueta está en tuteo.
+
+### Criterios de aceptación (9.2)
+
+- [x] **09.6** El login muestra el logo, el título y los campos; el envío vacío marca los dos campos y no llama a la API; el envío completo manda `{ username, password }`.
+- [x] **09.7** Cada fallo (`invalid`, `rate-limited`, `disabled`, `unreachable`) muestra su aviso con título y detalle.
+- [x] **09.8** «Mostrar»/«Ocultar» alterna el tipo del campo de contraseña y su etiqueta accesible.
+- [x] **09.9** El interruptor pone o saca la clase `dark` de `<html>`, guarda la elección, la restaura al iniciar y cae en `prefers-color-scheme` sin elección o con `localStorage` roto.
+- [x] **09.10** `main.tsx` aplica el tema antes de renderizar; `routes/login.tsx` usa el layout del login.
+
+A mano (revisado el 2026-10-19 con capturas en 1440×900 y 400px de ancho): en el login, claro y oscuro con el interruptor; al recargar se conserva; por debajo de 960px los paneles se apilan; el logo se ve nítido en los dos temas.
 
 ## Decisiones
 

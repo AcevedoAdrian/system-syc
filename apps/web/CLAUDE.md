@@ -19,6 +19,8 @@ La referencia es la maqueta `docs/Maqueta-Dashboard/Main.dc.html` (SPEC 09, `spe
 - `--success` es el texto de confirmación (AA); `--teal` es decorativo (secciones, interruptor).
 - Tipografías: `font-sans` (Inter), `font-heading` (Cormorant Garamond, títulos), `font-mono` (JetBrains Mono, número de ticket) y `font-brand` (Bricolage Grotesque, logo). Alojadas con `@fontsource`; no se usa Google Fonts.
 - Se reutiliza `components/ui` antes de crear estilos propios.
+- **Tema claro/oscuro**: la clase `dark` en `<html>` es la única fuente de verdad. `lib/theme.ts` la aplica (`initTheme()` en `main.tsx`, antes de renderizar), la guarda en `localStorage` (`syc-theme`) y cae en `prefers-color-scheme`. Se cambia con `<ThemeToggle />` (`components/common`); no se lee ni se escribe la clase a mano. Los componentes no ramifican por tema: usan tokens, y el `.dark` de `index.css` los cambia solo.
+- `<Logo height={…} />` (`components/common/Logo.tsx`) es el logotipo; sus estilos están en `index.css` (`.logo-*`).
 
 ## Particularidades
 

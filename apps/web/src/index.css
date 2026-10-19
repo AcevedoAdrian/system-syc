@@ -48,6 +48,7 @@
   --color-background: var(--background);
   --color-body: var(--body);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-link: var(--link);
   --color-line-soft: var(--line-soft);
   --color-feature: var(--feature);
@@ -101,6 +102,7 @@
   --input: #e6dfd8;
   --ring: #cc785c;
   --brand: #cc785c;
+  --brand-foreground: #ffffff;
   --link: #c2410c;
   --feature: #181715;
   --feature-foreground: #faf9f5;
@@ -151,6 +153,7 @@
   --input: #34322d;
   --ring: #cc785c;
   --brand: #cc785c;
+  --brand-foreground: #ffffff;
   --link: #fb923c;
   --feature: #faf9f5;
   --feature-foreground: #141413;
@@ -190,5 +193,82 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/*
+ * Logotipo «system·syc» (componente Logo): pieza de tinta con muescas en las esquinas exteriores y
+ * pieza de acento encastrada. Todo se mide con --h, el alto de las piezas.
+ */
+@layer components {
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-brand);
+    font-size: calc(var(--h) * 0.44);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .logo-system {
+    display: inline-flex;
+    align-items: center;
+    height: var(--h);
+    padding: 0 calc(var(--h) * 0.3) 0 calc(var(--h) * 0.34);
+    color: var(--background);
+    background:
+      radial-gradient(
+        circle at 0 0,
+        transparent calc(var(--h) * 0.12),
+        var(--foreground) calc(var(--h) * 0.125)
+      )
+      left top / calc(50% + 1px) calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 0 100%,
+        transparent calc(var(--h) * 0.12),
+        var(--foreground) calc(var(--h) * 0.125)
+      )
+      left bottom / calc(50% + 1px) calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 100% 50%,
+        transparent calc(var(--h) * 0.19),
+        var(--foreground) calc(var(--h) * 0.195)
+      )
+      right / 50% 100% no-repeat;
+  }
+  .logo-syc {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: var(--h);
+    margin-left: calc(var(--h) * 0.06);
+    padding: 0 calc(var(--h) * 0.34) 0 calc(var(--h) * 0.3);
+    color: var(--brand-foreground);
+    background:
+      linear-gradient(var(--brand), var(--brand)) left / calc(50% + 1px) 100% no-repeat,
+      radial-gradient(
+        circle at 100% 0,
+        transparent calc(var(--h) * 0.12),
+        var(--brand) calc(var(--h) * 0.125)
+      )
+      right top / 50% calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 100% 100%,
+        transparent calc(var(--h) * 0.12),
+        var(--brand) calc(var(--h) * 0.125)
+      )
+      right bottom / 50% calc(50% + 1px) no-repeat;
+  }
+  .logo-syc::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: calc(var(--h) * -0.185);
+    width: calc(var(--h) * 0.25);
+    height: calc(var(--h) * 0.25);
+    margin-top: calc(var(--h) * -0.125);
+    border-radius: 50%;
+    background: var(--brand);
   }
 }

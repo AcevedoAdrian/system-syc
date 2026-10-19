@@ -4,7 +4,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { queryClient, setUnauthorizedHandler } from "./lib/query-client";
+import { initTheme } from "./lib/theme";
 import { routeTree } from "./routeTree.gen";
+
+// El tema se aplica antes de pintar nada, para que no haya un destello del claro al abrir en oscuro.
+initTheme();
 
 const router = createRouter({ routeTree });
 
