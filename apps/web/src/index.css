@@ -49,6 +49,10 @@
   --color-body: var(--body);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-note: var(--note);
+  --color-note-foreground: var(--note-foreground);
+  --color-note-muted: var(--note-muted);
+  --color-note-border: var(--note-border);
   --color-link: var(--link);
   --color-line-soft: var(--line-soft);
   --color-feature: var(--feature);
@@ -103,6 +107,10 @@
   --ring: #cc785c;
   --brand: #cc785c;
   --brand-foreground: #ffffff;
+  --note: #181715;
+  --note-foreground: #faf9f5;
+  --note-muted: #a09d96;
+  --note-border: #181715;
   --link: #c2410c;
   --feature: #181715;
   --feature-foreground: #faf9f5;
@@ -154,6 +162,10 @@
   --ring: #cc785c;
   --brand: #cc785c;
   --brand-foreground: #ffffff;
+  --note: #252320;
+  --note-foreground: #faf9f5;
+  --note-muted: #a09d96;
+  --note-border: #34322d;
   --link: #fb923c;
   --feature: #faf9f5;
   --feature-foreground: #141413;

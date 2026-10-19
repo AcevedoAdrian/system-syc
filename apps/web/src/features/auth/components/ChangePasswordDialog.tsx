@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Lock } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -107,8 +108,14 @@ export function ChangePasswordDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
-          Cambiar mi contraseña
+        <Button
+          type="button"
+          variant="outline"
+          className="size-10 rounded-full text-foreground"
+          aria-label="Cambiar mi contraseña"
+          title="Cambiar mi contraseña"
+        >
+          <Lock aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent>

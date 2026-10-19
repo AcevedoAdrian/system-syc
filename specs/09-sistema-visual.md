@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada; 9.3 a 9.6 pendientes
+> **Status:** In progress — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada; 9.4 a 9.6 pendientes
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -23,7 +23,7 @@ Decisiones del usuario del 2026-10-16:
 |---|---|---|
 | 9.1 | Tema: tokens de color, tipografías, radio, sombras y regla de uso | Hecha |
 | 9.2 | Login: panel de marca, logo «system·syc», interruptor claro/oscuro con persistencia (`.dark` en `<html>`) | Hecha |
-| 9.3 | Layout autenticado: sidebar y topbar | Pendiente |
+| 9.3 | Layout autenticado: sidebar y topbar | Hecha |
 | 9.4 | Bandeja y tarjetas KPI; color de estados y prioridades | Pendiente |
 | 9.5 | Formulario y detalle de ticket (secciones de color, pestañas) | Pendiente |
 | 9.6 | Administración: departamentos, usuarios y catálogos | Pendiente |
@@ -136,6 +136,41 @@ Se mantiene el voseo del proyecto («Ingresá», «Revisá»); la maqueta está 
 - [x] **09.10** `main.tsx` aplica el tema antes de renderizar; `routes/login.tsx` usa el layout del login.
 
 A mano (revisado el 2026-10-19 con capturas en 1440×900 y 400px de ancho): en el login, claro y oscuro con el interruptor; al recargar se conserva; por debajo de 960px los paneles se apilan; el logo se ve nítido en los dos temas.
+
+## Etapa 9.3 — Layout autenticado
+
+Referencia: `SIDEBAR` y `TOPBAR` de `docs/Maqueta-Dashboard/Main.dc.html`. Es el marco de todas las pantallas autenticadas; el contenido de cada una se rediseña en 9.4 a 9.6.
+
+### Alcance
+
+**Dentro:**
+
+- **Disposición** (`AppShell`). Barra lateral de 248px a la izquierda y, a su derecha, la barra superior sobre el contenido (padding de 32px). Por debajo de 808px la barra lateral pasa arriba, a todo el ancho, y el contenido queda debajo.
+- **Barra lateral** (`Sidebar`). Fondo `--background` con borde derecho. Arriba, el `Logo` de 40px. Debajo, la sección «Módulos» con «Tickets» y, solo para el admin, la sección «Administración» con «Departamentos», «Usuarios» y «Catálogos». Cada entrada es un enlace de 40px con ícono de 18px (`lucide`); la activa lleva `--card` y `--foreground`, y las demás `--muted-foreground`. Los títulos de sección van en 12px, mayúsculas y con 1,5px de separación entre letras.
+- **Submenú de catálogos.** «Catálogos» es un botón que despliega los 8 catálogos, en el orden de `CATALOG_KINDS`; cada uno enlaza a `/admin/catalogos?catalogo=<ruta>` y el catálogo abierto queda marcado. Fuera de los catálogos, el botón lleva al primero; dentro, pliega y despliega el submenú. Las pestañas de `CatalogsAdmin` siguen hasta la etapa 9.6, que las reemplaza.
+- **Tarjeta «Próximamente»** al pie, oscura en los dos temas (tokens `--note-*`), y debajo, el `HealthIndicator` que ya estaba.
+- **Barra superior** (`Topbar`). Alto mínimo de 64px, con borde inferior. A la izquierda, las migas de pan «Módulos / Tickets», «Tickets / Nuevo ticket», «Tickets / Detalle del ticket», «Administración / Departamentos», «Administración / Usuarios» y «Catálogos / <catálogo>». A la derecha: el `ThemeToggle` de 9.2, el avatar con las iniciales y el nombre del usuario, y dos botones redondos de 40px con ícono, «Cambiar mi contraseña» (candado) y «Cerrar sesión».
+- Token nuevo: `--note`, `--note-foreground`, `--note-muted` y `--note-border` (la tarjeta «Próximamente»).
+
+**Fuera:** el contenido de las pantallas (9.4 a 9.6), el rediseño del diálogo de cambio de contraseña, el contador de tickets en la barra lateral y las rutas nuevas.
+
+### Decisiones
+
+- **Sin «Tickets internos».** La maqueta tiene dos módulos de tickets; el sistema solo tiene uno. «Tickets externos» pasa a llamarse «Tickets» y no se agrega «Tickets internos»: la tarjeta «Próximamente» ya anticipa los módulos que vengan.
+- **El avatar muestra el nombre del usuario**, no el rol (la maqueta pone «Administrador»/«Agente»). Las iniciales salen de las dos primeras palabras del nombre.
+- **Una sola «página actual».** TanStack Router pone `aria-current="page"` a todo enlace que considera activo y no se puede evitar desde afuera. Por eso el logo apunta a `/` (que redirige a los tickets y nunca figura como activo) y «Catálogos» es un botón y no un enlace: así queda marcado un solo enlace en la barra lateral, el de la página donde está el usuario.
+- **Migas de pan de «Catálogos»:** como `/admin/catalogos` siempre abre un catálogo concreto (el primero si no hay otro en la URL), la miga es «Catálogos / <catálogo>», sin la vista general que la maqueta tiene.
+- El apilado por debajo de 808px es fiel a la maqueta, pero deja un menú alto sobre el contenido en un teléfono. El sistema se usa en escritorio; si molesta, se cambia por un menú plegable en una etapa posterior.
+
+### Criterios de aceptación (9.3)
+
+- [x] **09.11** La barra lateral muestra «Tickets» a todos y «Administración» (con sus tres enlaces) solo al admin; el catálogo abierto queda marcado y la página actual lleva `aria-current="page"`.
+- [x] **09.12** «Catálogos» despliega los 8 catálogos solo dentro de `/admin/catalogos`, cada uno con su enlace.
+- [x] **09.13** Las migas de pan de cada ruta son las de la lista de arriba.
+- [x] **09.14** La barra superior muestra el avatar con las iniciales y el nombre, el interruptor de tema, «Cambiar mi contraseña» y «Cerrar sesión» (que llama al cierre de sesión y se deshabilita mientras corre).
+- [x] **09.15** Ningún componente del layout usa colores sueltos (lo cubre el 09.4) y la tarjeta «Próximamente» usa los tokens `--note-*`.
+
+A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas en claro, oscuro y 700px de ancho): recorrer Tickets, Departamentos, Usuarios y los catálogos; claro y oscuro; achicar la ventana por debajo de 808px. Falta recorrerlo con un agente (la prueba automática ya cubre que no ve «Administración»).
 
 ## Decisiones
 

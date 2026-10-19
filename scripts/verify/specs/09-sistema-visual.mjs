@@ -28,6 +28,7 @@ const REQUIRED_TOKENS = [
   "input",
   "ring",
   "brand",
+  "brand-foreground",
   "link",
   "feature",
   "feature-foreground",
@@ -38,6 +39,10 @@ const REQUIRED_TOKENS = [
   "violet",
   "scrim",
   "neutral-dot",
+  "note",
+  "note-foreground",
+  "note-muted",
+  "note-border",
   "sidebar",
 ];
 
@@ -201,6 +206,67 @@ export default defineSpec({
         assert(render !== -1 && init < render, "initTheme() debe ir antes de renderizar");
         const login = readFileSync(path.join(WEB, "src/routes/login.tsx"), "utf8");
         assert(login.includes("<LoginLayout>"), "routes/login.tsx no usa LoginLayout");
+      },
+    ),
+
+    // Etapa 9.3 — layout autenticado. Se verifica con los tests de los componentes (jsdom).
+    criterion(
+      11,
+      "La barra lateral muestra Tickets a todos y Administración solo al admin; la página actual lleva aria-current",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La barra lateral",
+          "src/components/layout/Sidebar.test.tsx",
+          "src/components/layout/AppShell.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      12,
+      "«Catálogos» despliega los 8 catálogos solo dentro de /admin/catalogos",
+      async () => {
+        vitest("@syc/web", "El submenú de catálogos", "src/components/layout/Sidebar.test.tsx");
+      },
+    ),
+
+    criterion(13, "Las migas de pan de cada ruta son las del SPEC", async () => {
+      vitest(
+        "@syc/web",
+        "Las migas de pan",
+        "src/components/layout/navigation.test.ts",
+        "src/components/layout/Topbar.test.tsx",
+      );
+    }),
+
+    criterion(
+      14,
+      "La barra superior muestra avatar, nombre, tema, cambio de contraseña y cierre de sesión",
+      async () => {
+        vitest("@syc/web", "La barra superior", "src/components/layout/Topbar.test.tsx");
+      },
+    ),
+
+    criterion(
+      15,
+      "La tarjeta «Próximamente» usa los tokens --note-* y no hay colores sueltos",
+      async () => {
+        const sidebar = readFileSync(path.join(WEB, "src/components/layout/Sidebar.tsx"), "utf8");
+        for (const token of [
+          "bg-note",
+          "text-note-foreground",
+          "text-note-muted",
+          "border-note-border",
+        ]) {
+          assert(sidebar.includes(token), `Sidebar.tsx no usa \`${token}\``);
+        }
+        const css = readFileSync(CSS, "utf8");
+        const light = declared(block(css, ":root"));
+        const dark = declared(block(css, ".dark"));
+        for (const token of ["note", "note-foreground", "note-muted", "note-border"]) {
+          assert(light.has(token) && dark.has(token), `--${token} falta en :root o en .dark`);
+        }
       },
     ),
   ],

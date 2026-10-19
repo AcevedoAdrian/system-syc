@@ -20,6 +20,7 @@ La referencia es la maqueta `docs/Maqueta-Dashboard/Main.dc.html` (SPEC 09, `spe
 - Tipografías: `font-sans` (Inter), `font-heading` (Cormorant Garamond, títulos), `font-mono` (JetBrains Mono, número de ticket) y `font-brand` (Bricolage Grotesque, logo). Alojadas con `@fontsource`; no se usa Google Fonts.
 - Se reutiliza `components/ui` antes de crear estilos propios.
 - **Tema claro/oscuro**: la clase `dark` en `<html>` es la única fuente de verdad. `lib/theme.ts` la aplica (`initTheme()` en `main.tsx`, antes de renderizar), la guarda en `localStorage` (`syc-theme`) y cae en `prefers-color-scheme`. Se cambia con `<ThemeToggle />` (`components/common`); no se lee ni se escribe la clase a mano. Los componentes no ramifican por tema: usan tokens, y el `.dark` de `index.css` los cambia solo.
+- **Layout autenticado** (`components/layout`): `AppShell` arma `Sidebar` (248px) y `Topbar`. Las migas de pan y las iniciales del avatar salen de `navigation.ts`; una ruta nueva suma su miga ahí y su enlace en `Sidebar.tsx`. El router marca `aria-current="page"` en todo enlace activo por su cuenta: no se agregan enlaces que apunten a una ruta padre de la página actual (por eso el logo va a `/` y «Catálogos» es un botón).
 - `<Logo height={…} />` (`components/common/Logo.tsx`) es el logotipo; sus estilos están en `index.css` (`.logo-*`).
 
 ## Particularidades
