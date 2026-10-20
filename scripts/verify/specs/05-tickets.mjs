@@ -204,7 +204,7 @@ export default defineSpec({
           numeros.every((n) => Number.isInteger(n) && n > 0),
           "algún número no es un entero positivo",
         );
-        vitest("@syc/contracts", "El formato del número", "src/tickets.spec.ts");
+        vitest("@syc/contracts", "El formato del número", "test/tickets.test.ts");
       },
     ),
 
@@ -878,13 +878,13 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Las pruebas de la pantalla de tickets",
-          "src/features/tickets/components/CreateTicketForm.test.tsx",
-          "src/features/tickets/components/TicketsList.test.tsx",
-          "src/features/tickets/components/ChangeStatusDialog.test.tsx",
-          "src/features/tickets/components/TicketHistory.test.tsx",
-          "src/features/tickets/components/TicketDetail.test.tsx",
-          "src/features/tickets/components/TicketForm.test.tsx",
-          "src/components/layout/Sidebar.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/tickets/components/TicketsList.test.tsx",
+          "test/tickets/components/ChangeStatusDialog.test.tsx",
+          "test/tickets/components/TicketHistory.test.tsx",
+          "test/tickets/components/TicketDetail.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
+          "test/layout/Sidebar.test.tsx",
         );
       },
       { infra: false },

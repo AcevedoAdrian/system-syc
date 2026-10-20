@@ -30,6 +30,10 @@ La referencia es la maqueta `docs/Maqueta-Dashboard/Main.dc.html` (SPEC 09, `spe
 - `Button` con `variant="link"` usa `--link`: el primario no sirve de color de texto en oscuro.
 - `<Logo height={…} />` (`components/common/Logo.tsx`) es el logotipo; sus estilos están en `index.css` (`.logo-*`).
 
+## Tests
+
+Viven en `apps/web/test/<característica>/*.test.ts(x)` (`auth`, `tickets` con `components/` y `hooks/`, `comments`, `catalogs`, `users`, `organizations`, `health`, `layout`, `ui`, `theme`, `lib`), nunca en `src`: el `include` de Vitest solo mira `test/`. Los tests de una ruta van con su dominio (`test/tickets/tickets-route.test.ts`). Importan con el alias `@/`. `test/setup.ts` carga jest-dom, el stub de `ResizeObserver` y `cleanup`; `test/fixtures/` guarda los datos compartidos (`makeTicket`).
+
 ## Particularidades
 
 - **El cliente oRPC usa `OpenAPILink`**: la API expone el contrato como OpenAPI/REST, no como RPC.

@@ -503,7 +503,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "el selector de área agrupado",
-          "src/features/tickets/components/CatalogOptionSelect.test.tsx",
+          "test/tickets/components/CatalogOptionSelect.test.tsx",
         );
       },
       { infra: false },
@@ -516,10 +516,10 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "la bandeja y sus filtros",
-          "src/features/tickets/components/TicketsList.test.tsx",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
-          "src/features/tickets/tickets-search.test.ts",
-          "src/routes/_authenticated/tickets/index.test.ts",
+          "test/tickets/components/TicketsList.test.tsx",
+          "test/tickets/components/TicketsFilters.test.tsx",
+          "test/tickets/tickets-search.test.ts",
+          "test/tickets/tickets-route.test.ts",
         );
       },
       { infra: false },
@@ -532,8 +532,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "la administración de catálogos",
-          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
-          "src/features/catalogs/components/CatalogTable.test.tsx",
+          "test/catalogs/CatalogsAdmin.test.tsx",
+          "test/catalogs/CatalogTable.test.tsx",
         );
       },
       { infra: false },

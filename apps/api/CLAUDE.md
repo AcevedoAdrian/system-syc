@@ -11,6 +11,10 @@ Un módulo por dominio de negocio, autocontenido: controla sus propias entidades
 - Todo exige sesión salvo lo marcado con `@Public()` (`AuthGuard` global, denegar por defecto). Hoy son públicos `health.check` y los endpoints de Better Auth de la allowlist.
 - Un router oRPC se implementa **completo** (`@Implement(contract.<módulo>)` devolviendo todos los procedimientos): así el compilador marca cualquiera que falte. Si un procedimiento necesita otro permiso que el resto (como `users.me`), va en su propio controller.
 
+## Tests
+
+Viven en `apps/api/test/<característica>/*.test.ts` (`auth`, `permissions`, `audit`, `catalogs`, `tickets`, `comments`, `users`, `organizations`, `health`, `seed`, `common`), nunca en `src`: el `include` de Vitest solo mira `test/`. Importan el código con el alias `@/` (→ `src`, definido en `vitest.config.ts` y `tsconfig.json`); es solo para los tests, el código de producción sigue con rutas relativas y el bundle de `tsdown` no lo conoce. Un test nuevo va en la carpeta de su característica.
+
 ## Particularidades
 
 - **Se empaqueta con `tsdown`** (ESM: `dist/main.mjs` y `dist/seed.mjs`). `@syc/contracts` y `@syc/db` son `devDependencies` que entran en el bundle porque exportan su fuente `.ts`. Prisma, Better Auth y `@orpc/*` van como `dependencies` (externos al bundle). Emite la decorator metadata que Nest necesita.
