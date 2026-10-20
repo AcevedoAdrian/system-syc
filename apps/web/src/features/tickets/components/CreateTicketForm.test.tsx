@@ -242,13 +242,26 @@ describe("CreateTicketForm", () => {
       expect(alerta.closest(".sticky")).not.toBeNull();
     });
 
-    it("la actuación simple es corta y va en tipografía monoespaciada", () => {
+    it("la actuación simple arranca con el año en curso y va en tipografía monoespaciada", () => {
       render(<CreateTicketForm />);
 
       const actuacion = screen.getByLabelText("Actuación simple");
-      expect(actuacion).toHaveAttribute("placeholder", "Ej.: 1023/2026");
+      expect(actuacion).toHaveValue(`/${hoyArgentina().slice(0, 4)}`);
+      expect(actuacion).not.toHaveAttribute("placeholder");
       expect(actuacion).toHaveClass("font-mono");
-      expect(actuacion).toHaveAccessibleDescription("Suele ser corta.");
+      expect(actuacion).toHaveAccessibleDescription("Escribí el número antes de la barra.");
+    });
+
+    it("al entrar al campo sin tocarlo, el cursor queda delante de la barra", async () => {
+      render(<CreateTicketForm />);
+      const actuacion = screen.getByLabelText<HTMLInputElement>("Actuación simple");
+
+      actuacion.focus();
+      await waitFor(() => expect(actuacion.selectionStart).toBe(0));
+      expect(actuacion.selectionEnd).toBe(0);
+
+      await userEvent.keyboard("1023");
+      expect(actuacion).toHaveValue(`1023/${hoyArgentina().slice(0, 4)}`);
     });
 
     it("el agente ve por qué no puede cambiar el departamento", () => {
@@ -303,6 +316,51 @@ describe("CreateTicketForm", () => {
           params: { ticketId: "t-77" },
         }),
       );
+    });
+  });
+
+  describe("actuación simple en el envío", () => {
+    it("con el número escrito manda número/año", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Impresora");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      screen.getByLabelText<HTMLInputElement>("Actuación simple").focus();
+      await userEvent.keyboard("1023");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({
+        actuacionSimple: `1023/${hoyArgentina().slice(0, 4)}`,
+      });
+    });
+
+    it("si queda solo «/año» (también tras borrar lo escrito), manda null", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Impresora");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      const actuacion = screen.getByLabelText<HTMLInputElement>("Actuación simple");
+      actuacion.focus();
+      await userEvent.keyboard("1023{Backspace}{Backspace}{Backspace}{Backspace}");
+      expect(actuacion).toHaveValue(`/${hoyArgentina().slice(0, 4)}`);
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({ actuacionSimple: null });
+    });
+
+    it("si el usuario cambia el año, lo manda tal cual", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Impresora");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.clear(screen.getByLabelText("Actuación simple"));
+      await userEvent.type(screen.getByLabelText("Actuación simple"), "88/2024");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({ actuacionSimple: "88/2024" });
     });
   });
 

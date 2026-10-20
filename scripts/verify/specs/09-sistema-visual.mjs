@@ -578,5 +578,18 @@ export default defineSpec({
         );
       },
     ),
+
+    criterion(
+      41,
+      "El alta precarga la actuación simple con «/{año}», deja el cursor delante de la barra y manda null si no se toca",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La actuación simple del alta",
+          "src/features/tickets/components/CreateTicketForm.test.tsx",
+          "src/features/tickets/components/TicketForm.test.tsx",
+        );
+      },
+    ),
   ],
 });

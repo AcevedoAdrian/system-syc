@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** Completed (con tarjetas de resumen de la bandeja pendientes, ver 9.4) — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada, 9.6 (administración) implementada, 9.7 (ajustes) implementada, 9.8 (actuación simple con el año) pendiente
+> **Status:** Completed (con tarjetas de resumen de la bandeja pendientes, ver 9.4) — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada, 9.6 (administración) implementada, 9.7 (ajustes) implementada, 9.8 (actuación simple con el año) implementada
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -28,7 +28,7 @@ Decisiones del usuario del 2026-10-16:
 | 9.5 | Formulario y detalle de ticket (secciones de color, pestañas, comentarios e historial) | Hecha |
 | 9.6 | Administración: departamentos, usuarios, catálogos y diálogos | Hecha |
 | 9.7 | Ajustes: filtro de área agrupado, aviso de errores del formulario, página no encontrada | Hecha |
-| 9.8 | Actuación simple con el año en curso precargado en el alta | Pendiente |
+| 9.8 | Actuación simple con el año en curso precargado en el alta | Hecha |
 
 Las etapas 9.2 a 9.7 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
 
@@ -393,9 +393,9 @@ Una actuación simple tiene la forma `número/año` y, por lo general, las que l
 
 ### Criterios de aceptación (9.8)
 
-- [ ] **09.41** El alta muestra «Actuación simple» con `/{año en curso}`; al entrar sin haberlo tocado, el cursor queda delante de la barra; enviar con el número da `número/año`; enviar sin tocarlo manda la actuación vacía (`null`). La edición no cambia.
+- [x] **09.41** El alta muestra «Actuación simple» con `/{año en curso}`; al entrar sin haberlo tocado, el cursor queda delante de la barra; enviar con el número da `número/año`; enviar sin tocarlo manda la actuación vacía (`null`). La edición no cambia.
 
-Se verifica con los tests de `CreateTicketForm.test.tsx`; al implementar, se agrega el criterio 41 a `scripts/verify/specs/09-sistema-visual.mjs`.
+`pnpm verify --spec 09` lo cubre con los tests de `CreateTicketForm.test.tsx` (y que la edición no cambia, con los de `TicketForm.test.tsx`).
 
 ## Decisiones
 

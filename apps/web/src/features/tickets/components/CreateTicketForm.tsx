@@ -79,6 +79,16 @@ function AdminDepartmentSelect({
 const hasFinePointer = () =>
   typeof window.matchMedia === "function" && window.matchMedia("(pointer: fine)").matches;
 
+// Con el valor precargado sin tocar, el cursor va delante de la barra para escribir el número directo.
+// Se difiere un cuadro porque el clic y el Tab colocan el cursor (o seleccionan todo) después del foco.
+function putCaretFirst(input: HTMLInputElement, prefijo: string) {
+  if (input.value !== prefijo) return;
+  input.setSelectionRange(0, 0);
+  requestAnimationFrame(() => {
+    if (document.activeElement === input && input.value === prefijo) input.setSelectionRange(0, 0);
+  });
+}
+
 const DATE_ERROR = "Ingresá una fecha válida, de hoy o anterior.";
 const REFERENCIA_ERROR =
   "Usá el formato número/año, por ejemplo 19092/2026 (el año va de 2000 a 2100).";
@@ -94,6 +104,8 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
   const navigate = useNavigate();
   const create = useCreateTicket();
   const [serverError, setServerError] = useState<string>();
+  // Casi todas las actuaciones simples son del año en curso: el campo arranca en «/2026» y se escribe el número.
+  const [actuacionPrefijo] = useState(() => `/${hoyArgentina().slice(0, 4)}`);
   const {
     register,
     control,
@@ -109,7 +121,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       descripcion: "",
       prioridadId: "",
       fechaRecepcion: hoyArgentina(),
-      actuacionSimple: "",
+      actuacionSimple: actuacionPrefijo,
       proveedorId: "",
       referenciaExterna: "",
     },
@@ -119,7 +131,10 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
   const submit = handleSubmit(async (values) => {
     setServerError(undefined);
     try {
-      const ticket = await create.mutateAsync(values);
+      // Un campo que sigue en «/2026» no tiene ninguna actuación: se guarda como vacío.
+      const actuacionSimple =
+        values.actuacionSimple === actuacionPrefijo ? null : values.actuacionSimple;
+      const ticket = await create.mutateAsync({ ...values, actuacionSimple });
       await navigate({ to: "/tickets/$ticketId", params: { ticketId: ticket.id } });
     } catch (error) {
       setServerError(getErrorMessage(error));
@@ -143,15 +158,15 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             id="actuacionSimple"
             label="Actuación simple"
             icon={FileText}
-            hint="Suele ser corta."
+            hint="Escribí el número antes de la barra."
             error={errors.actuacionSimple && "Hasta 500 caracteres."}
           >
             {(aria) => (
               <Input
                 id="actuacionSimple"
                 autoComplete="off"
-                placeholder="Ej.: 1023/2026"
                 className={`${controlClass} font-mono text-[15px] md:text-[15px]`}
+                onFocus={(e) => putCaretFirst(e.currentTarget, actuacionPrefijo)}
                 {...aria}
                 {...register("actuacionSimple")}
               />
