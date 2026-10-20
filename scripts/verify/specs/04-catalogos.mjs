@@ -150,8 +150,8 @@ export default defineSpec({
       async () => {
         webTests(
           "la pantalla de catálogos",
-          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
-          "src/routes/_authenticated/admin/catalogos.test.ts",
+          "test/catalogs/CatalogsAdmin.test.tsx",
+          "test/catalogs/catalogos-route.test.ts",
         );
       },
       { infra: false },
@@ -570,8 +570,8 @@ export default defineSpec({
       async () => {
         webTests(
           "la tabla de catálogos o el menú",
-          "src/features/catalogs/components/CatalogTable.test.tsx",
-          "src/components/layout/Sidebar.test.tsx",
+          "test/catalogs/CatalogTable.test.tsx",
+          "test/layout/Sidebar.test.tsx",
         );
       },
       { infra: false },

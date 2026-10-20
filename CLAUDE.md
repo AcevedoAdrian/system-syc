@@ -82,6 +82,7 @@ El `.env` es opcional con Docker en desarrollo (las variables de la API y la web
 
 ## Particularidades que no son obvias
 
+- **Tests**: viven en `test/` de cada paquete (`apps/api`, `apps/web`, `packages/contracts`), no en `src`, agrupados por característica (`test/tickets/`, `test/auth/`…) y con el sufijo `.test.ts(x)`. El `include` de Vitest solo mira `test/`, así que uno dentro de `src` no corre. `scripts/verify` nombra tests por ruta: mover uno exige actualizar el verify.
 - **`turbo.json`**: `typecheck`, `test` y `build` dependen de `^typecheck`; sin eso Turbo da cache hit al cambiar un contrato y no detecta el error en los consumidores.
 - **pnpm 11 bloquea scripts de build** por defecto: `allowBuilds` en `pnpm-workspace.yaml` autoriza solo `prisma` y `@prisma/engines`. pnpm también agrega entradas a `minimumReleaseAgeExclude` por su cuenta; es esperable.
 - **Versiones exactas** (sin `^`) en todos los `package.json`.

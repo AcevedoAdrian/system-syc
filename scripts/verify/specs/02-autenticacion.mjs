@@ -584,7 +584,7 @@ export default defineSpec({
           "exec",
           "vitest",
           "run",
-          "src/routes/_authenticated/guards.test.ts",
+          "test/auth/guards.test.ts",
         ]);
         assert(result.status === 0, `las guardas de ruta fallan:\n${tail(result.output, 40)}`);
       },

@@ -1,0 +1,622 @@
+import { ORPCError } from "@orpc/client";
+import type { Ticket, User } from "@syc/contracts";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTicket } from "../../fixtures/ticket-fixtures";
+
+const mocks = vi.hoisted(() => ({
+  user: undefined as unknown,
+  ticket: {
+    data: undefined,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  } as {
+    data: Ticket | undefined;
+    isPending: boolean;
+    isError: boolean;
+    error: unknown;
+    refetch: ReturnType<typeof vi.fn>;
+  },
+  remove: vi.fn(),
+  navigate: vi.fn(),
+  formMounts: 0,
+  // Lo que la pantalla le pide a `useBlocker`, y el resolver que se le devuelve (idle por defecto).
+  blockerOpts: undefined as
+    | { shouldBlockFn: () => boolean; enableBeforeUnload: () => boolean; withResolver: boolean }
+    | undefined,
+  blocker: { status: "idle" } as { status: "idle" | "blocked"; proceed?: unknown; reset?: unknown },
+}));
+
+// Los puntos de color salen de los catálogos; su lógica tiene sus propios tests.
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
+vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
+  useCurrentUser: () => ({ data: mocks.user }),
+}));
+vi.mock("@/features/tickets/hooks/useTicket", () => ({ useTicket: () => mocks.ticket }));
+vi.mock("@/features/tickets/hooks/useTicketMutations", () => ({
+  useRemoveTicket: () => ({ mutateAsync: mocks.remove }),
+}));
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+  useNavigate: () => mocks.navigate,
+  useBlocker: (opts: NonNullable<typeof mocks.blockerOpts>) => {
+    mocks.blockerOpts = opts;
+    return mocks.blocker;
+  },
+}));
+// Las piezas con su propia prueba se reemplazan por stubs que dejan ver lo que la pantalla les pasa.
+vi.mock("@/features/tickets/components/TicketHistory", () => ({
+  TicketHistory: ({ ticketId }: { ticketId: string }) => (
+    <div data-testid="historial">historial de {ticketId}</div>
+  ),
+}));
+vi.mock("@/features/tickets/components/TicketComments", () => ({
+  TicketComments: ({ ticketId }: { ticketId: string }) => (
+    <div data-testid="comentarios">comentarios de {ticketId}</div>
+  ),
+}));
+vi.mock("@/features/tickets/components/TicketForm", async () => {
+  const { useEffect } = await import("react");
+  return {
+    TicketForm: (props: {
+      ticket: Ticket;
+      onSaved: () => void;
+      onReload: () => Promise<unknown>;
+      onDirtyChange: (dirty: boolean) => void;
+      notice?: string;
+    }) => {
+      useEffect(() => {
+        mocks.formMounts += 1;
+      }, []);
+      return (
+        <div data-testid="formulario" data-version={props.ticket.updatedAt}>
+          <p data-testid="aviso-visible">{props.notice}</p>
+          <button type="button" onClick={() => props.onDirtyChange(true)}>
+            ensuciar
+          </button>
+          <button type="button" onClick={() => props.onDirtyChange(false)}>
+            limpiar
+          </button>
+          <button type="button" onClick={() => props.onSaved()}>
+            guardado
+          </button>
+          <button type="button" onClick={() => props.onReload()}>
+            recargar
+          </button>
+        </div>
+      );
+    },
+  };
+});
+vi.mock("@/features/tickets/components/ChangeStatusDialog", () => ({
+  ChangeStatusDialog: ({
+    open,
+    ticket,
+    onReload,
+  }: {
+    open: boolean;
+    ticket: Ticket;
+    onReload: () => Promise<unknown>;
+  }) =>
+    open ? (
+      <div data-testid="dialogo-estado" data-version={ticket.updatedAt}>
+        <button type="button" onClick={() => onReload()}>
+          recargar-estado
+        </button>
+      </div>
+    ) : null,
+}));
+vi.mock("@/features/tickets/components/ChangeDepartmentDialog", () => ({
+  ChangeDepartmentDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="dialogo-departamento" /> : null,
+}));
+
+import { TicketDetail } from "@/features/tickets/components/TicketDetail";
+
+const agente: User = {
+  id: "u1",
+  username: "ana",
+  name: "Ana",
+  email: null,
+  role: "agente",
+  activo: true,
+  department: { id: "tec", nombre: "Técnico" },
+};
+const admin: User = { ...agente, id: "u0", role: "admin", department: null };
+
+function show(ticket: Ticket | undefined, extra: Partial<typeof mocks.ticket> = {}) {
+  mocks.ticket = {
+    data: ticket,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: mocks.ticket.refetch,
+    ...extra,
+  };
+  return render(<TicketDetail ticketId="t-13" />);
+}
+
+describe("TicketDetail", () => {
+  beforeEach(() => {
+    mocks.user = agente;
+    mocks.formMounts = 0;
+    mocks.ticket.refetch = vi.fn().mockResolvedValue(undefined);
+    mocks.remove.mockReset();
+    mocks.remove.mockResolvedValue(undefined);
+    mocks.navigate.mockReset();
+    mocks.blockerOpts = undefined;
+    mocks.blocker = { status: "idle" };
+  });
+
+  describe("diseño (SPEC 09, etapa 9.5)", () => {
+    it("el título lleva el número y el título del ticket, y la bajada explica los campos obligatorios", () => {
+      show(makeTicket({ numero: 13, titulo: "Impresora rota" }));
+
+      expect(
+        screen.getByRole("heading", { level: 1, name: "TE-000013 · Impresora rota" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Actualizá los datos del ticket. Los campos con * son obligatorios."),
+      ).toBeInTheDocument();
+    });
+
+    it("bajo el título muestra el estado, como píldora, y el departamento", () => {
+      show(makeTicket());
+
+      const encabezado = screen.getByRole("banner");
+      expect(within(encabezado).getByText("Pendiente")).toHaveClass("rounded-full");
+      expect(within(encabezado).getByText("Técnico")).toBeInTheDocument();
+    });
+
+    it("tiene las pestañas Datos, Comentarios e Historial, con Datos activa", () => {
+      show(makeTicket());
+
+      expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+        "Datos",
+        "Comentarios",
+        "Historial",
+      ]);
+      expect(screen.getByRole("tab", { name: "Datos" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("el formulario está en «Datos», los comentarios en «Comentarios» y el historial en «Historial»", async () => {
+      show(makeTicket());
+      const panelDe = (nombre: string) =>
+        document.getElementById(
+          screen.getByRole("tab", { name: nombre }).getAttribute("aria-controls") as string,
+        ) as HTMLElement;
+
+      expect(panelDe("Datos")).toContainElement(screen.getByTestId("formulario"));
+      expect(panelDe("Comentarios")).toContainElement(screen.getByTestId("comentarios"));
+      expect(panelDe("Historial")).toContainElement(screen.getByTestId("historial"));
+      expect(panelDe("Comentarios")).toHaveAttribute("hidden");
+
+      await userEvent.click(screen.getByRole("tab", { name: "Comentarios" }));
+
+      expect(panelDe("Comentarios")).not.toHaveAttribute("hidden");
+      expect(panelDe("Datos")).toHaveAttribute("hidden");
+    });
+
+    it("cambiar de pestaña no vuelve a montar el formulario", async () => {
+      show(makeTicket());
+      expect(mocks.formMounts).toBe(1);
+
+      await userEvent.click(screen.getByRole("tab", { name: "Historial" }));
+      await userEvent.click(screen.getByRole("tab", { name: "Datos" }));
+
+      expect(mocks.formMounts).toBe(1);
+    });
+
+    it("con cambios sin guardar, cambiar de pestaña no los descarta ni pide confirmar", async () => {
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      await userEvent.click(screen.getByRole("tab", { name: "Comentarios" }));
+
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeDisabled();
+      expect(screen.queryByText("Descartar cambios")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("estados de la carga", () => {
+    it("mientras carga", () => {
+      show(undefined, { isPending: true });
+
+      expect(screen.getByText("Cargando ticket…")).toBeInTheDocument();
+    });
+
+    it("un 404 dice «El ticket no existe» y vuelve a la lista, sin depender del mensaje", () => {
+      show(undefined, {
+        isError: true,
+        error: new ORPCError("NOT_FOUND", { status: 404, message: "Malformed response" }),
+      });
+
+      expect(screen.getByRole("alert")).toHaveTextContent("El ticket no existe.");
+      expect(screen.getByRole("link", { name: "Volver a los tickets" })).toHaveAttribute(
+        "href",
+        "/tickets",
+      );
+      expect(screen.queryByTestId("formulario")).not.toBeInTheDocument();
+    });
+
+    it("cualquier otro error pide reintentar", () => {
+      show(undefined, { isError: true, error: new Error("network") });
+
+      expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar el ticket");
+    });
+  });
+
+  describe("encabezado y partes", () => {
+    it("muestra el número formateado, el título, el estado y el departamento", () => {
+      show(makeTicket({ numero: 13 }));
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        "TE-000013 · Impresora rota",
+      );
+      expect(screen.getByText("Pendiente")).toBeInTheDocument();
+      expect(screen.getByText("Técnico")).toBeInTheDocument();
+    });
+
+    it("un título larguísimo se parte en líneas en vez de desbordar la pantalla", () => {
+      show(makeTicket({ titulo: "y".repeat(400) }));
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveClass("wrap-break-word");
+    });
+
+    it("compone el formulario de datos, los comentarios y el historial del mismo ticket", () => {
+      show(makeTicket());
+
+      expect(screen.getByTestId("formulario")).toBeInTheDocument();
+      expect(screen.getByTestId("comentarios")).toHaveTextContent("comentarios de t-13");
+      expect(screen.getByTestId("historial")).toHaveTextContent("historial de t-13");
+    });
+
+    it("los comentarios van entre el formulario y el historial", () => {
+      show(makeTicket());
+
+      const order = screen
+        .getAllByTestId(/^(formulario|comentarios|historial)$/)
+        .map((element) => element.dataset.testid);
+      expect(order).toEqual(["formulario", "comentarios", "historial"]);
+    });
+
+    it("comentar no reinicia el formulario: sigue siendo la misma versión del ticket", () => {
+      show(makeTicket());
+
+      expect(mocks.formMounts).toBe(1);
+      expect(screen.getByTestId("comentarios")).toBeInTheDocument();
+    });
+  });
+
+  describe("acciones según el rol", () => {
+    it("un agente solo ve «Cambiar estado»: no cambia el departamento ni elimina", () => {
+      mocks.user = agente;
+      show(makeTicket());
+
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Cambiar departamento" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Eliminar" })).not.toBeInTheDocument();
+    });
+
+    it("el admin ve las tres acciones", () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cambiar departamento" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+    });
+
+    it("«Eliminar» se distingue de las otras acciones con texto y borde rojos", () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      const eliminar = screen.getByRole("button", { name: "Eliminar" });
+      expect(eliminar).toHaveClass("text-destructive", "border-destructive/50");
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveClass("text-destructive");
+      }
+    });
+
+    it("el hover de «Eliminar» no rellena el fondo: el texto rojo mantiene su contraste", () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      const eliminar = screen.getByRole("button", { name: "Eliminar" });
+      expect(eliminar).toHaveClass("hover:bg-background", "hover:text-destructive");
+      expect(eliminar).not.toHaveClass("hover:bg-destructive/10");
+      // Las clases del `outline` que chocan con las de arriba se descartan: si no, ganaría el estilo viejo.
+      expect(eliminar).not.toHaveClass("border-border");
+      expect(eliminar).not.toHaveClass("hover:bg-muted");
+    });
+
+    it("abre el diálogo de estado, y el de departamento solo para el admin", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "Cambiar estado" }));
+      expect(screen.getByTestId("dialogo-estado")).toBeInTheDocument();
+      expect(screen.queryByTestId("dialogo-departamento")).not.toBeInTheDocument();
+    });
+
+    it("el admin abre el diálogo de departamento", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "Cambiar departamento" }));
+
+      expect(screen.getByTestId("dialogo-departamento")).toBeInTheDocument();
+    });
+  });
+
+  describe("cambios sin guardar", () => {
+    it("bloquean el cambio de estado y de departamento, y avisan por qué", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeEnabled();
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cambiar departamento" })).toBeDisabled();
+      expect(screen.getByText(/Guardá o descartá los cambios/)).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "limpiar" }));
+      expect(screen.getByRole("button", { name: "Cambiar estado" })).toBeEnabled();
+      expect(screen.queryByText(/Guardá o descartá los cambios/)).not.toBeInTheDocument();
+    });
+
+    it("cada botón deshabilitado queda ligado al texto que explica por qué", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+      const explicacion = "Guardá o descartá los cambios para cambiar el estado o el departamento.";
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveAccessibleDescription();
+      }
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).toHaveAccessibleDescription(explicacion);
+      }
+      // «Eliminar» sigue disponible: no tiene nada que explicar.
+      expect(screen.getByRole("button", { name: "Eliminar" })).not.toHaveAccessibleDescription();
+
+      await userEvent.click(screen.getByRole("button", { name: "limpiar" }));
+      for (const name of ["Cambiar estado", "Cambiar departamento"]) {
+        expect(screen.getByRole("button", { name })).not.toHaveAccessibleDescription();
+      }
+    });
+
+    it("eliminar sigue disponible: no depende de lo que haya en el formulario", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      expect(screen.getByRole("button", { name: "Eliminar" })).toBeEnabled();
+    });
+  });
+
+  describe("salir con cambios sin guardar", () => {
+    const bloquea = () => mocks.blockerOpts?.shouldBlockFn();
+    const bloqueaAlCerrarLaPestaña = () => mocks.blockerOpts?.enableBeforeUnload();
+
+    it("solo frena la salida (y el cierre de la pestaña) cuando el formulario tiene cambios", async () => {
+      show(makeTicket());
+      expect(mocks.blockerOpts?.withResolver).toBe(true);
+      expect(bloquea()).toBe(false);
+      expect(bloqueaAlCerrarLaPestaña()).toBe(false);
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+      expect(bloquea()).toBe(true);
+      expect(bloqueaAlCerrarLaPestaña()).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "limpiar" }));
+      expect(bloquea()).toBe(false);
+    });
+
+    it("no muestra el aviso mientras la navegación no esté bloqueada", () => {
+      show(makeTicket());
+
+      expect(screen.queryByText("Descartar cambios")).not.toBeInTheDocument();
+    });
+
+    it("una navegación bloqueada pide confirmar, y «Salir sin guardar» la deja seguir", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mocks.blocker = { status: "blocked", proceed, reset };
+      show(makeTicket());
+
+      expect(await screen.findByText("Descartar cambios")).toBeInTheDocument();
+      expect(screen.getByText(/Hay cambios sin guardar en el ticket/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Salir sin guardar" }));
+
+      expect(proceed).toHaveBeenCalledTimes(1);
+    });
+
+    it("«Cancelar» se queda en el ticket", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mocks.blocker = { status: "blocked", proceed, reset };
+      show(makeTicket());
+
+      await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+
+      expect(reset).toHaveBeenCalledTimes(1);
+      expect(proceed).not.toHaveBeenCalled();
+    });
+
+    it("eliminar el ticket no queda frenado por sus propios cambios sin guardar", async () => {
+      mocks.user = admin;
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+      expect(bloquea()).toBe(true);
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      // Al navegar el ticket ya se eliminó: en ese instante el bloqueo tiene que estar apagado. Se
+      // registra acá y se afirma después: `confirmRemove` captura lo que lance `navigate`.
+      const alNavegar: boolean[] = [];
+      mocks.navigate.mockImplementationOnce(async () => {
+        alNavegar.push(bloquea() ?? true, bloqueaAlCerrarLaPestaña() ?? true);
+      });
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ to: "/tickets" }));
+      expect(alNavegar).toEqual([false, false]);
+    });
+
+    it("si eliminar falla, el bloqueo vuelve a estar activo", async () => {
+      mocks.user = admin;
+      mocks.remove.mockRejectedValue(new Error("falló"));
+      show(makeTicket());
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      await waitFor(() => expect(mocks.remove).toHaveBeenCalled());
+      expect(mocks.navigate).not.toHaveBeenCalled();
+      expect(bloquea()).toBe(true);
+    });
+  });
+
+  describe("aviso de guardado", () => {
+    it("confirma «Cambios guardados.» y lo quita al volver a editar", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "guardado" }));
+      expect(screen.getByRole("status")).toHaveTextContent("Cambios guardados.");
+      expect(screen.getByTestId("aviso-visible")).toHaveTextContent("Cambios guardados.");
+
+      await userEvent.click(screen.getByRole("button", { name: "ensuciar" }));
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(screen.getByTestId("aviso-visible")).toBeEmptyDOMElement();
+    });
+
+    it("sin aviso la región queda vacía, pero montada: el lector solo anuncia lo que cambia en una ya existente", () => {
+      show(makeTicket());
+
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    });
+
+    it("el aviso visible va en el formulario (en su barra de acciones) y la región que lo anuncia, fuera de él", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "guardado" }));
+
+      const region = screen.getByRole("status");
+      // La región es solo para lectores de pantalla: el aviso que se ve lo dibuja el formulario.
+      expect(region).toHaveClass("sr-only");
+      expect(screen.getByTestId("formulario")).toContainElement(
+        screen.getByTestId("aviso-visible"),
+      );
+      expect(screen.getByTestId("formulario")).not.toContainElement(region);
+      expect(screen.getByRole("banner")).not.toContainElement(region);
+    });
+
+    it("es el mismo elemento antes y después de guardar, aunque el formulario se vuelva a montar", async () => {
+      const { rerender } = show(makeTicket({ updatedAt: "2026-10-06T13:00:00.000Z" }));
+      const region = screen.getByRole("status");
+
+      await userEvent.click(screen.getByRole("button", { name: "guardado" }));
+      // Guardar cambia `updatedAt`: el formulario se vuelve a montar con la versión nueva.
+      mocks.ticket.data = makeTicket({ updatedAt: "2026-10-06T14:00:00.000Z" });
+      rerender(<TicketDetail ticketId="t-13" />);
+
+      expect(mocks.formMounts).toBe(2);
+      expect(screen.getByRole("status")).toBe(region);
+      expect(region).toHaveTextContent("Cambios guardados.");
+    });
+
+    it("mientras carga el ticket, el estado de carga es una región de estado", () => {
+      show(undefined, { isPending: true });
+
+      expect(screen.getByRole("status")).toHaveTextContent("Cargando ticket…");
+    });
+  });
+
+  describe("versión del ticket", () => {
+    it("el formulario se vuelve a montar con cada versión nueva, y no con la misma", () => {
+      const { rerender } = show(makeTicket({ updatedAt: "2026-10-06T13:00:00.000Z" }));
+      expect(mocks.formMounts).toBe(1);
+
+      rerender(<TicketDetail ticketId="t-13" />);
+      expect(mocks.formMounts).toBe(1);
+
+      mocks.ticket.data = makeTicket({ updatedAt: "2026-10-06T14:00:00.000Z" });
+      rerender(<TicketDetail ticketId="t-13" />);
+
+      expect(mocks.formMounts).toBe(2);
+      expect(screen.getByTestId("formulario")).toHaveAttribute(
+        "data-version",
+        "2026-10-06T14:00:00.000Z",
+      );
+    });
+
+    it("«Recargar» del formulario y de los diálogos vuelve a leer el ticket", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "recargar" }));
+      await userEvent.click(screen.getByRole("button", { name: "Cambiar estado" }));
+      await userEvent.click(screen.getByRole("button", { name: "recargar-estado" }));
+
+      expect(mocks.ticket.refetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("eliminar", () => {
+    beforeEach(() => {
+      mocks.user = admin;
+    });
+
+    it("pide confirmación con el número del ticket, y no elimina todavía", async () => {
+      show(makeTicket({ numero: 13 }));
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+
+      expect(await screen.findByText(/Se eliminará el ticket TE-000013/)).toBeInTheDocument();
+      expect(mocks.remove).not.toHaveBeenCalled();
+    });
+
+    it("al confirmar elimina y vuelve a la lista", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({ ticketId: "t-13" }));
+      await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith({ to: "/tickets" }));
+    });
+
+    it("cancelar no elimina nada", async () => {
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+
+      expect(mocks.remove).not.toHaveBeenCalled();
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it("si la API rechaza, muestra el mensaje y no navega", async () => {
+      mocks.remove.mockRejectedValue(new ORPCError("FORBIDDEN", { status: 403 }));
+      show(makeTicket());
+
+      await userEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Eliminar", hidden: false }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "No tenés permiso para realizar esta acción.",
+      );
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+  });
+});

@@ -656,11 +656,11 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Las pruebas de la bandeja y los comentarios",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
-          "src/features/tickets/components/TicketsList.test.tsx",
-          "src/features/tickets/components/TicketComments.test.tsx",
-          "src/features/tickets/components/TicketDetail.test.tsx",
-          "src/features/tickets/hooks/useCommentMutations.test.tsx",
+          "test/tickets/components/TicketsFilters.test.tsx",
+          "test/tickets/components/TicketsList.test.tsx",
+          "test/comments/TicketComments.test.tsx",
+          "test/tickets/components/TicketDetail.test.tsx",
+          "test/comments/useCommentMutations.test.tsx",
         );
       },
       { infra: false },
@@ -673,9 +673,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Las pruebas de la URL de la bandeja",
-          "src/features/tickets/tickets-search.test.ts",
-          "src/routes/_authenticated/tickets/index.test.ts",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
+          "test/tickets/tickets-search.test.ts",
+          "test/tickets/tickets-route.test.ts",
+          "test/tickets/components/TicketsFilters.test.tsx",
         );
       },
       { infra: false },
@@ -688,9 +688,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Las pruebas de eliminar un comentario",
-          "src/features/tickets/components/TicketComments.test.tsx",
-          "src/features/tickets/components/TicketHistory.test.tsx",
-          "src/features/tickets/hooks/useCommentMutations.test.tsx",
+          "test/comments/TicketComments.test.tsx",
+          "test/tickets/components/TicketHistory.test.tsx",
+          "test/comments/useCommentMutations.test.tsx",
         );
       },
       { infra: false },

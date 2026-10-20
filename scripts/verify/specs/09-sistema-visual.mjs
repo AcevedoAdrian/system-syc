@@ -156,9 +156,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los tests del formulario de login",
-          "src/features/auth/components/LoginForm.test.tsx",
-          "src/features/auth/components/LoginLayout.test.tsx",
-          "src/components/common/Logo.test.tsx",
+          "test/auth/LoginForm.test.tsx",
+          "test/auth/LoginLayout.test.tsx",
+          "test/ui/Logo.test.tsx",
         );
       },
     ),
@@ -167,20 +167,12 @@ export default defineSpec({
       7,
       "Cada fallo del login (invalid, rate-limited, disabled, unreachable) muestra su aviso con título y detalle",
       async () => {
-        vitest(
-          "@syc/web",
-          "Los avisos de error del login",
-          "src/features/auth/components/LoginForm.test.tsx",
-        );
+        vitest("@syc/web", "Los avisos de error del login", "test/auth/LoginForm.test.tsx");
       },
     ),
 
     criterion(8, "«Mostrar»/«Ocultar» alterna el tipo del campo de contraseña", async () => {
-      vitest(
-        "@syc/web",
-        "El botón de mostrar la contraseña",
-        "src/features/auth/components/LoginForm.test.tsx",
-      );
+      vitest("@syc/web", "El botón de mostrar la contraseña", "test/auth/LoginForm.test.tsx");
     }),
 
     criterion(
@@ -190,8 +182,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El tema claro/oscuro",
-          "src/lib/theme.test.ts",
-          "src/components/common/ThemeToggle.test.tsx",
+          "test/theme/theme.test.ts",
+          "test/theme/ThemeToggle.test.tsx",
         );
       },
     ),
@@ -218,8 +210,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La barra lateral",
-          "src/components/layout/Sidebar.test.tsx",
-          "src/components/layout/AppShell.test.tsx",
+          "test/layout/Sidebar.test.tsx",
+          "test/layout/AppShell.test.tsx",
         );
       },
     ),
@@ -228,7 +220,7 @@ export default defineSpec({
       12,
       "«Catálogos» despliega los 8 catálogos solo dentro de /admin/catalogos",
       async () => {
-        vitest("@syc/web", "El submenú de catálogos", "src/components/layout/Sidebar.test.tsx");
+        vitest("@syc/web", "El submenú de catálogos", "test/layout/Sidebar.test.tsx");
       },
     ),
 
@@ -236,8 +228,8 @@ export default defineSpec({
       vitest(
         "@syc/web",
         "Las migas de pan",
-        "src/components/layout/navigation.test.ts",
-        "src/components/layout/Topbar.test.tsx",
+        "test/layout/navigation.test.ts",
+        "test/layout/Topbar.test.tsx",
       );
     }),
 
@@ -245,7 +237,7 @@ export default defineSpec({
       14,
       "La barra superior muestra avatar, nombre, tema, cambio de contraseña y cierre de sesión",
       async () => {
-        vitest("@syc/web", "La barra superior", "src/components/layout/Topbar.test.tsx");
+        vitest("@syc/web", "La barra superior", "test/layout/Topbar.test.tsx");
       },
     ),
 
@@ -279,7 +271,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El color de estados y prioridades",
-          "src/features/tickets/ticket-colors.test.ts",
+          "test/tickets/ticket-colors.test.ts",
         );
       },
     ),
@@ -291,7 +283,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La tabla de la bandeja",
-          "src/features/tickets/components/TicketsList.test.tsx",
+          "test/tickets/components/TicketsList.test.tsx",
         );
       },
     ),
@@ -303,7 +295,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los filtros de la bandeja",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
+          "test/tickets/components/TicketsFilters.test.tsx",
         );
       },
     ),
@@ -315,10 +307,10 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La bandeja con los filtros en la URL",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
-          "src/features/tickets/components/TicketsList.router.test.tsx",
-          "src/features/tickets/tickets-search.test.ts",
-          "src/routes/_authenticated/tickets/index.test.ts",
+          "test/tickets/components/TicketsFilters.test.tsx",
+          "test/tickets/components/TicketsList.router.test.tsx",
+          "test/tickets/tickets-search.test.ts",
+          "test/tickets/tickets-route.test.ts",
         );
       },
     ),
@@ -330,8 +322,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La paginación de la bandeja",
-          "src/features/tickets/components/TicketsList.test.tsx",
-          "src/features/tickets/components/TicketsList.router.test.tsx",
+          "test/tickets/components/TicketsList.test.tsx",
+          "test/tickets/components/TicketsList.router.test.tsx",
         );
       },
     ),
@@ -343,7 +335,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los estados de la bandeja",
-          "src/features/tickets/components/TicketsList.test.tsx",
+          "test/tickets/components/TicketsList.test.tsx",
         );
       },
     ),
@@ -356,8 +348,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El formulario de alta",
-          "src/features/tickets/components/CreateTicketForm.test.tsx",
-          "src/features/tickets/components/Field.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/ui/Field.test.tsx",
         );
       },
     ),
@@ -369,7 +361,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El formulario de edición",
-          "src/features/tickets/components/TicketForm.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
         );
       },
     ),
@@ -381,8 +373,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Las pestañas del ticket",
-          "src/features/tickets/components/TicketTabs.test.tsx",
-          "src/features/tickets/components/TicketDetail.test.tsx",
+          "test/tickets/components/TicketTabs.test.tsx",
+          "test/tickets/components/TicketDetail.test.tsx",
         );
       },
     ),
@@ -394,10 +386,10 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La barra de acciones",
-          "src/components/common/FormSection.test.tsx",
-          "src/features/tickets/components/CreateTicketForm.test.tsx",
-          "src/features/tickets/components/TicketForm.test.tsx",
-          "src/features/tickets/components/TicketDetail.test.tsx",
+          "test/ui/FormSection.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
+          "test/tickets/components/TicketDetail.test.tsx",
         );
       },
     ),
@@ -409,7 +401,7 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El encabezado del ticket",
-          "src/features/tickets/components/TicketDetail.test.tsx",
+          "test/tickets/components/TicketDetail.test.tsx",
         );
       },
     ),
@@ -418,11 +410,7 @@ export default defineSpec({
       27,
       "Los comentarios se ven como conversación; comentar valida, envía y limpia; solo el admin elimina",
       async () => {
-        vitest(
-          "@syc/web",
-          "Los comentarios",
-          "src/features/tickets/components/TicketComments.test.tsx",
-        );
+        vitest("@syc/web", "Los comentarios", "test/comments/TicketComments.test.tsx");
       },
     ),
 
@@ -430,11 +418,7 @@ export default defineSpec({
       28,
       "El historial muestra cada movimiento con su fecha, su autor y sus cambios",
       async () => {
-        vitest(
-          "@syc/web",
-          "El historial",
-          "src/features/tickets/components/TicketHistory.test.tsx",
-        );
+        vitest("@syc/web", "El historial", "test/tickets/components/TicketHistory.test.tsx");
       },
     ),
 
@@ -445,9 +429,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El punto de la prioridad",
-          "src/features/tickets/components/TicketBadges.test.tsx",
-          "src/features/tickets/components/CatalogOptionSelect.test.tsx",
-          "src/features/tickets/ticket-colors.test.ts",
+          "test/tickets/components/TicketBadges.test.tsx",
+          "test/tickets/components/CatalogOptionSelect.test.tsx",
+          "test/tickets/ticket-colors.test.ts",
         );
       },
     ),
@@ -460,8 +444,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los diálogos",
-          "src/components/ui/dialog.test.tsx",
-          "src/components/common/ConfirmDialog.test.tsx",
+          "test/ui/dialog.test.tsx",
+          "test/ui/ConfirmDialog.test.tsx",
         );
       },
     ),
@@ -470,23 +454,19 @@ export default defineSpec({
       31,
       "El panel lateral muestra título, cuerpo y acciones, se cierra con «×», «Cancelar» y Escape, y atrapa el foco",
       async () => {
-        vitest("@syc/web", "El panel lateral", "src/components/common/FormDrawer.test.tsx");
+        vitest("@syc/web", "El panel lateral", "test/ui/FormDrawer.test.tsx");
       },
     ),
 
     criterion(32, "El interruptor es un role=switch con etiqueta, estado y teclado", async () => {
-      vitest("@syc/web", "El interruptor", "src/components/ui/switch.test.tsx");
+      vitest("@syc/web", "El interruptor", "test/ui/switch.test.tsx");
     }),
 
     criterion(
       33,
       "Departamentos: lista con interruptor, renombrar y eliminar; el panel valida y muestra los errores del servidor",
       async () => {
-        vitest(
-          "@syc/web",
-          "Los departamentos",
-          "src/features/organizations/components/OrganizationsAdmin.test.tsx",
-        );
+        vitest("@syc/web", "Los departamentos", "test/organizations/OrganizationsAdmin.test.tsx");
       },
     ),
 
@@ -494,7 +474,7 @@ export default defineSpec({
       34,
       "Usuarios: lista con sus columnas, interruptor (sin desactivarse a uno mismo), edición y reseteo de contraseña en el panel",
       async () => {
-        vitest("@syc/web", "Los usuarios", "src/features/users/components/UsersAdmin.test.tsx");
+        vitest("@syc/web", "Los usuarios", "test/users/UsersAdmin.test.tsx");
       },
     ),
 
@@ -505,10 +485,10 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los catálogos",
-          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
-          "src/features/catalogs/components/CatalogTable.test.tsx",
-          "src/features/catalogs/catalog-view.test.ts",
-          "src/routes/_authenticated/admin/catalogos.test.ts",
+          "test/catalogs/CatalogsAdmin.test.tsx",
+          "test/catalogs/CatalogTable.test.tsx",
+          "test/catalogs/catalog-view.test.ts",
+          "test/catalogs/catalogos-route.test.ts",
         );
       },
     ),
@@ -520,8 +500,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Los formularios de catálogo",
-          "src/features/catalogs/components/CatalogsAdmin.test.tsx",
-          "src/features/catalogs/components/ProveedorFormDialog.test.tsx",
+          "test/catalogs/CatalogsAdmin.test.tsx",
+          "test/catalogs/ProveedorFormDialog.test.tsx",
         );
       },
     ),
@@ -533,9 +513,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "Cambiar mi contraseña y las confirmaciones",
-          "src/features/auth/components/ChangePasswordDialog.test.tsx",
-          "src/components/common/ConfirmDialog.test.tsx",
-          "src/components/common/lists.test.tsx",
+          "test/auth/ChangePasswordDialog.test.tsx",
+          "test/ui/ConfirmDialog.test.tsx",
+          "test/ui/lists.test.tsx",
         );
       },
     ),
@@ -547,9 +527,9 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El filtro de área agrupado",
-          "src/features/tickets/components/TicketsFilters.test.tsx",
-          "src/features/catalogs/area-groups.test.ts",
-          "src/features/tickets/components/CatalogOptionSelect.test.tsx",
+          "test/tickets/components/TicketsFilters.test.tsx",
+          "test/catalogs/area-groups.test.ts",
+          "test/tickets/components/CatalogOptionSelect.test.tsx",
         );
       },
     ),
@@ -561,8 +541,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "El aviso de errores",
-          "src/features/tickets/components/CreateTicketForm.test.tsx",
-          "src/features/tickets/components/TicketForm.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
         );
       },
     ),
@@ -571,11 +551,7 @@ export default defineSpec({
       40,
       "Una dirección inexistente (también anidada) muestra «Página no encontrada» con «Ir al inicio»",
       async () => {
-        vitest(
-          "@syc/web",
-          "La página no encontrada",
-          "src/components/layout/NotFound.router.test.tsx",
-        );
+        vitest("@syc/web", "La página no encontrada", "test/layout/NotFound.router.test.tsx");
       },
     ),
 
@@ -586,8 +562,8 @@ export default defineSpec({
         vitest(
           "@syc/web",
           "La actuación simple del alta",
-          "src/features/tickets/components/CreateTicketForm.test.tsx",
-          "src/features/tickets/components/TicketForm.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
         );
       },
     ),

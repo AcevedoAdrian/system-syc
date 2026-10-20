@@ -93,10 +93,10 @@ apps/api/
         <dominio>.controller.ts # o router oRPC vía @orpc/nest
         <dominio>.service.ts    # lógica de negocio
         <dominio>.repository.ts # acceso a datos vía Prisma (packages/db)
-        <dominio>.service.spec.ts
       audit/                     # servicio inyectable: audit.log({ entityType, entityId, action, actorId, payload })
       custom-fields/             # solo si hace falta (ver "Cómo crecen los campos")
-  test/                          # e2e (Supertest; Playwright pendiente)
+  test/                          # tests de Vitest (*.test.ts), una carpeta por característica: test/tickets/, test/auth/…
+                                 # importan el código con el alias @/ (→ src); e2e con Supertest, pendiente
 ```
 
 Reglas del módulo:
@@ -138,9 +138,15 @@ apps/web/
       auth-client.ts             # cliente Better Auth
       utils.ts
     stores/                      # estado de UI puro, si hace falta (ej. sidebar colapsado)
+  test/                         # tests de Vitest (*.test.ts[x]), una carpeta por característica
+    setup.ts                    # jest-dom, ResizeObserver y cleanup
+    fixtures/                   # datos de prueba compartidos (makeTicket)
+    tickets/ comments/ catalogs/ auth/ layout/ ui/ …
   index.html
   vite.config.ts
 ```
+
+Los tests viven fuera de `src`, en `test/` de cada paquete (`apps/api`, `apps/web` y `packages/contracts`), agrupados por característica y con el sufijo `.test.ts`. El `include` de Vitest solo mira `test/`: un test dentro de `src` no corre.
 
 Reglas del feature:
 
