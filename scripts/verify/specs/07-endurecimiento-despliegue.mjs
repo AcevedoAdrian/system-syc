@@ -522,7 +522,7 @@ export default defineSpec({
 
     criterion(
       8,
-      "`GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404",
+      "`GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404. `GET /` trae `Cache-Control: no-cache`, un asset del `index.html` trae `max-age` y un asset inexistente responde 404",
       async () => {
         await ensureStack();
         const home = await (await fetch(`${PUBLIC_URL}/`)).text();
@@ -536,6 +536,21 @@ export default defineSpec({
           body: JSON.stringify({ email: "x@y.z", password: "12345678", name: "x" }),
         });
         assert(signUp.status === 404, `POST /api/auth/sign-up/email respondió ${signUp.status}`);
+
+        // Caché: el documento se revalida siempre, los assets con hash duran, y uno que ya no existe es 404.
+        const rootCache = (await fetch(`${PUBLIC_URL}/`)).headers.get("cache-control") ?? "";
+        assert(/no-cache/.test(rootCache), `GET / : Cache-Control = "${rootCache}"`);
+        const assetPath = home.match(/(?:src|href)="(\/assets\/[^"]+)"/)?.[1];
+        assert(assetPath, "el index.html no referencia ningún /assets/*");
+        const asset = await fetch(`${PUBLIC_URL}${assetPath}`);
+        assert(asset.status === 200, `GET ${assetPath} respondió ${asset.status}`);
+        const assetCache = asset.headers.get("cache-control") ?? "";
+        assert(
+          /max-age=\d{6,}/.test(assetCache),
+          `GET ${assetPath}: Cache-Control = "${assetCache}"`,
+        );
+        const missing = await fetch(`${PUBLIC_URL}/assets/no-existe.js`);
+        assert(missing.status === 404, `GET /assets/no-existe.js respondió ${missing.status}`);
       },
     ),
 
