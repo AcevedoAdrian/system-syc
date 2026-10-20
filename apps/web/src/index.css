@@ -1,13 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
+@import "@fontsource/cormorant-garamond/500.css";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/bricolage-grotesque";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: "Geist Variable", sans-serif;
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Cormorant Garamond", "EB Garamond", "Times New Roman", serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+  --font-brand: "Bricolage Grotesque Variable", "Segoe UI", system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -25,7 +30,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -40,6 +47,26 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-body: var(--body);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-note: var(--note);
+  --color-note-foreground: var(--note-foreground);
+  --color-note-muted: var(--note-muted);
+  --color-note-border: var(--note-border);
+  --color-link: var(--link);
+  --color-line-soft: var(--line-soft);
+  --color-feature: var(--feature);
+  --color-feature-foreground: var(--feature-foreground);
+  --color-feature-muted: var(--feature-muted);
+  --color-teal: var(--teal);
+  --color-amber: var(--amber);
+  --color-blue: var(--blue);
+  --color-violet: var(--violet);
+  --color-scrim: var(--scrim);
+  --color-neutral-dot: var(--neutral-dot);
+  --shadow-dialog: 0 12px 32px rgb(20 20 19 / 0.2);
+  --shadow-focus: 0 0 0 3px rgb(204 120 92 / 0.15);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,76 +76,122 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Sistema visual: sale de docs/Maqueta-Dashboard/Main.dc.html (SPEC 09).
+ * Único lugar donde viven los colores; los componentes solo usan estos tokens.
+ * Todo token declarado en :root tiene su par en .dark.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* Texto de confirmación: 4,9:1 sobre el fondo claro (AA). El verde-600 de Tailwind daba 3,2:1. */
-  --success: oklch(0.527 0.154 150.069);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #faf9f5;
+  --foreground: #141413;
+  --body: #3d3d3a;
+  --card: #efe9de;
+  --card-foreground: #141413;
+  --popover: #faf9f5;
+  --popover-foreground: #141413;
+  /* Botón principal: #a9583e con texto blanco da 5,1:1 (AA). El #cc785c de la maqueta daba 3,3:1; queda como --brand. */
+  --primary: #a9583e;
+  --primary-foreground: #ffffff;
+  --secondary: #efe9de;
+  --secondary-foreground: #141413;
+  --muted: #f5f0e8;
+  --muted-foreground: #6c6a64;
+  --accent: #f5f0e8;
+  --accent-foreground: #141413;
+  --destructive: #b73a3a;
+  --destructive-foreground: #ffffff;
+  /* Texto de confirmación: 4,9:1 sobre el fondo claro (AA). El teal de la maqueta (--teal) da 3,7:1 y queda para uso decorativo. */
+  --success: #287a69;
+  --warning: #d4a017;
+  --border: #e6dfd8;
+  --line-soft: #ebe6df;
+  --input: #e6dfd8;
+  --ring: #cc785c;
+  --brand: #cc785c;
+  --brand-foreground: #ffffff;
+  --note: #181715;
+  --note-foreground: #faf9f5;
+  --note-muted: #a09d96;
+  --note-border: #181715;
+  --link: #c2410c;
+  --feature: #181715;
+  --feature-foreground: #faf9f5;
+  --feature-muted: #a09d96;
+  --teal: #2f8f7c;
+  --amber: #a86a0f;
+  --blue: #3f78b5;
+  --violet: #7156b0;
+  --scrim: rgb(20 20 19 / 0.4);
+  --neutral-dot: #8e8b82;
+  --chart-1: #2f8f7c;
+  --chart-2: #a86a0f;
+  --chart-3: #3f78b5;
+  --chart-4: #7156b0;
+  --chart-5: #c2410c;
+  --radius: 0.5rem;
+  --sidebar: #faf9f5;
+  --sidebar-foreground: #141413;
+  --sidebar-primary: #a9583e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f5f0e8;
+  --sidebar-accent-foreground: #141413;
+  --sidebar-border: #e6dfd8;
+  --sidebar-ring: #cc785c;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.792 0.209 151.711);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #181715;
+  --foreground: #faf9f5;
+  --body: #d4d1c9;
+  --card: #252320;
+  --card-foreground: #faf9f5;
+  --popover: #252320;
+  --popover-foreground: #faf9f5;
+  --primary: #a9583e;
+  --primary-foreground: #ffffff;
+  --secondary: #252320;
+  --secondary-foreground: #faf9f5;
+  --muted: #1f1e1b;
+  --muted-foreground: #a09d96;
+  --accent: #1f1e1b;
+  --accent-foreground: #faf9f5;
+  --destructive: #ef8a85;
+  --destructive-foreground: #181715;
+  --success: #5db8a6;
+  --warning: #d4a017;
+  --border: #34322d;
+  --line-soft: #2a2825;
+  --input: #34322d;
+  --ring: #cc785c;
+  --brand: #cc785c;
+  --brand-foreground: #ffffff;
+  --note: #252320;
+  --note-foreground: #faf9f5;
+  --note-muted: #a09d96;
+  --note-border: #34322d;
+  --link: #fb923c;
+  --feature: #faf9f5;
+  --feature-foreground: #141413;
+  --feature-muted: #6c6a64;
+  --teal: #5db8a6;
+  --amber: #e8a55a;
+  --blue: #7aa8d8;
+  --violet: #b39ddb;
+  --scrim: rgb(0 0 0 / 0.6);
+  --neutral-dot: #8e8b82;
+  --chart-1: #5db8a6;
+  --chart-2: #e8a55a;
+  --chart-3: #7aa8d8;
+  --chart-4: #b39ddb;
+  --chart-5: #fb923c;
+  --sidebar: #181715;
+  --sidebar-foreground: #faf9f5;
+  --sidebar-primary: #a9583e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1f1e1b;
+  --sidebar-accent-foreground: #faf9f5;
+  --sidebar-border: #34322d;
+  --sidebar-ring: #cc785c;
 }
 
 @layer base {
@@ -126,9 +199,162 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-body;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-foreground;
   }
   html {
     @apply font-sans;
+  }
+}
+
+/*
+ * Logotipo «system·syc» (componente Logo): pieza de tinta con muescas en las esquinas exteriores y
+ * pieza de acento encastrada. Todo se mide con --h, el alto de las piezas.
+ */
+@layer components {
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-brand);
+    font-size: calc(var(--h) * 0.44);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .logo-system {
+    display: inline-flex;
+    align-items: center;
+    height: var(--h);
+    padding: 0 calc(var(--h) * 0.3) 0 calc(var(--h) * 0.34);
+    color: var(--background);
+    background:
+      radial-gradient(
+        circle at 0 0,
+        transparent calc(var(--h) * 0.12),
+        var(--foreground) calc(var(--h) * 0.125)
+      )
+      left top / calc(50% + 1px) calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 0 100%,
+        transparent calc(var(--h) * 0.12),
+        var(--foreground) calc(var(--h) * 0.125)
+      )
+      left bottom / calc(50% + 1px) calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 100% 50%,
+        transparent calc(var(--h) * 0.19),
+        var(--foreground) calc(var(--h) * 0.195)
+      )
+      right / 50% 100% no-repeat;
+  }
+  .logo-syc {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: var(--h);
+    margin-left: calc(var(--h) * 0.06);
+    padding: 0 calc(var(--h) * 0.34) 0 calc(var(--h) * 0.3);
+    color: var(--brand-foreground);
+    background:
+      linear-gradient(var(--brand), var(--brand)) left / calc(50% + 1px) 100% no-repeat,
+      radial-gradient(
+        circle at 100% 0,
+        transparent calc(var(--h) * 0.12),
+        var(--brand) calc(var(--h) * 0.125)
+      )
+      right top / 50% calc(50% + 1px) no-repeat,
+      radial-gradient(
+        circle at 100% 100%,
+        transparent calc(var(--h) * 0.12),
+        var(--brand) calc(var(--h) * 0.125)
+      )
+      right bottom / 50% calc(50% + 1px) no-repeat;
+  }
+  .logo-syc::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: calc(var(--h) * -0.185);
+    width: calc(var(--h) * 0.25);
+    height: calc(var(--h) * 0.25);
+    margin-top: calc(var(--h) * -0.125);
+    border-radius: 50%;
+    background: var(--brand);
+  }
+}
+
+/*
+ * Secciones de color de los formularios y del detalle del ticket (componente FormSection). Cada una
+ * toma su color de --sc, que fija la clase `tone-*`; el fondo y el borde son una mezcla de ese color
+ * con el fondo de la página, así que funcionan igual en claro y en oscuro.
+ */
+@layer components {
+  .tone-brand {
+    --sc: var(--brand);
+  }
+  .tone-amber {
+    --sc: var(--amber);
+  }
+  .tone-violet {
+    --sc: var(--violet);
+  }
+  .tone-teal {
+    --sc: var(--teal);
+  }
+  .tone-blue {
+    --sc: var(--blue);
+  }
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.25rem 1.25rem 1.5rem;
+    border-radius: 0.75rem;
+    background: var(--background);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 4px 0 var(--sc);
+  }
+  @media (min-width: 600px) {
+    .form-section {
+      padding: 1.75rem 2rem 2rem;
+    }
+  }
+  .form-section-icon {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.625rem;
+    color: var(--sc);
+    background: var(--card);
+  }
+  .form-callout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    border-radius: 0.5rem;
+    background: var(--muted);
+    border: 1px solid var(--line-soft);
+  }
+  @supports (background: color-mix(in srgb, red 10%, white)) {
+    .form-section {
+      background: color-mix(in srgb, var(--sc) 5%, var(--background));
+      border-color: color-mix(in srgb, var(--sc) 26%, var(--border));
+    }
+    .form-section-icon {
+      background: color-mix(in srgb, var(--sc) 16%, var(--background));
+    }
+    .form-callout {
+      background: color-mix(in srgb, var(--sc) 9%, var(--background));
+      border-color: color-mix(in srgb, var(--sc) 30%, var(--border));
+    }
   }
 }

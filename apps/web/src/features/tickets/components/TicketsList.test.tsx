@@ -26,6 +26,23 @@ vi.mock("../hooks/useTickets", () => ({
 vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({ data: { role: hook.role } }),
 }));
+// Los puntos de color de estados y prioridades salen de los catálogos; la lógica tiene sus propios tests.
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({
+  useCatalog: (ruta: string) => ({
+    data:
+      ruta === "estados"
+        ? [
+            { id: "pend", nombre: "Pendiente", orden: 1, activo: true, clave: null },
+            { id: "prog", nombre: "En progreso", orden: 2, activo: true, clave: null },
+            { id: "fin", nombre: "Finalizado", orden: 3, activo: true, clave: "FINALIZADO" },
+          ]
+        : [
+            { id: "baja", nombre: "Baja", orden: 1, activo: true },
+            { id: "alta", nombre: "Alta", orden: 2, activo: true },
+            { id: "urgente", nombre: "Urgente", orden: 3, activo: true },
+          ],
+  }),
+}));
 // Los filtros tienen sus propios tests: acá solo importa lo que la lista les pasa.
 vi.mock("./TicketsFilters", () => ({
   TicketsFilters: ({ isAdmin }: { isAdmin: boolean }) => (
@@ -119,6 +136,14 @@ describe("TicketsList", () => {
       "/tickets/nuevo",
     );
     expect(screen.getByText("Cargando tickets…")).toBeInTheDocument();
+  });
+
+  it("tiene el título, su bajada y el listado en una región con nombre", () => {
+    renderList();
+
+    expect(screen.getByRole("heading", { level: 1, name: "Tickets" })).toBeInTheDocument();
+    expect(screen.getByText("Seguimiento de solicitudes y su estado.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Listado" })).toBeInTheDocument();
   });
 
   it("pide los tickets con los filtros de la URL", () => {
@@ -335,38 +360,89 @@ describe("TicketsList", () => {
       ready(page([ticket(13, { titulo: largo })]));
       renderList();
 
-      const enlace = screen.getByRole("link", { name: largo });
-      expect(enlace).toHaveClass("whitespace-normal", "wrap-break-word", "max-w-md");
+      const titulo = screen.getByText(largo);
+      expect(titulo).toHaveClass("whitespace-normal", "wrap-break-word", "max-w-md");
     });
 
-    it("el título abre el ticket, y es el único enlace de la fila", () => {
+    it("el número abre el ticket, y es el único enlace de la fila", () => {
       ready(page([ticket(13)]));
       renderList();
 
       const enlaces = within(screen.getByTestId("ticket-row-13")).getAllByRole("link");
       expect(enlaces).toHaveLength(1);
-      expect(enlaces[0]).toHaveAccessibleName("Ticket 13");
+      expect(enlaces[0]).toHaveAccessibleName("TE-000013");
       expect(enlaces[0]).toHaveAttribute("href", "/tickets/t-13");
     });
 
-    it("el número se lee como texto de la fila, no como un segundo enlace al mismo destino", () => {
+    it("el título es texto, no un segundo enlace al mismo destino", () => {
       ready(page([ticket(13)]));
       renderList();
 
-      expect(screen.queryByRole("link", { name: "TE-000013" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Ticket 13" })).not.toBeInTheDocument();
       expect(
-        within(screen.getByTestId("ticket-row-13")).getByText("TE-000013"),
+        within(screen.getByTestId("ticket-row-13")).getByText("Ticket 13"),
       ).toBeInTheDocument();
     });
 
-    it("el título también se subraya al enfocarlo con el teclado, no solo al pasar el mouse", () => {
+    it("el número va en tipografía monoespaciada, con el color de enlace, y se subraya también con el teclado", () => {
       ready(page([ticket(13)]));
       renderList();
 
-      expect(screen.getByRole("link", { name: "Ticket 13" })).toHaveClass(
+      expect(screen.getByRole("link", { name: "TE-000013" })).toHaveClass(
+        "font-mono",
+        "text-link",
         "hover:underline",
         "focus-visible:underline",
       );
+    });
+
+    describe("estado y prioridad", () => {
+      it("el estado va en una píldora con su punto, y el punto no se lee en voz alta", () => {
+        ready(page([ticket(13, { estado: { id: "prog", nombre: "En progreso", clave: null } })]));
+        renderList();
+
+        const pastilla = screen.getByText("En progreso");
+        expect(pastilla).toHaveClass("rounded-full", "bg-card");
+        const punto = pastilla.firstElementChild as HTMLElement;
+        expect(punto).toHaveAttribute("aria-hidden", "true");
+        expect(punto).toHaveClass("bg-teal");
+      });
+
+      it("el estado de sistema se pinta por su clave", () => {
+        ready(
+          page([ticket(13, { estado: { id: "fin", nombre: "Finalizado", clave: "FINALIZADO" } })]),
+        );
+        renderList();
+
+        expect(screen.getByText("Finalizado").firstElementChild).toHaveClass("bg-foreground");
+      });
+
+      it("la prioridad lleva su punto, con el color de su lugar en el catálogo", () => {
+        ready(
+          page([
+            ticket(1, { prioridad: { id: "urgente", nombre: "Urgente" } }),
+            ticket(2, { prioridad: { id: "alta", nombre: "Alta" } }),
+            ticket(3, { prioridad: { id: "baja", nombre: "Baja" } }),
+          ]),
+        );
+        renderList();
+
+        const punto = (nombre: string) => screen.getByText(nombre).firstElementChild;
+        expect(punto("Urgente")).toHaveClass("bg-destructive");
+        expect(punto("Alta")).toHaveClass("bg-brand");
+        // Con tres prioridades, la primera es la tercera desde el final: ámbar.
+        expect(punto("Baja")).toHaveClass("bg-warning");
+        expect(punto("Alta")).toHaveAttribute("aria-hidden", "true");
+      });
+
+      it("el nombre acompaña siempre al punto: el color no es la única señal", () => {
+        ready(page([ticket(13)]));
+        renderList();
+
+        const fila = within(screen.getByTestId("ticket-row-13"));
+        expect(fila.getByText("Pendiente")).toBeInTheDocument();
+        expect(fila.getByText("Alta")).toBeInTheDocument();
+      });
     });
   });
 
@@ -379,18 +455,30 @@ describe("TicketsList", () => {
         ),
       );
 
-    it("muestra la página, el total de páginas y el de tickets", () => {
+    it("muestra el tramo, el total, la página y el total de páginas", () => {
       twentyOnPage2();
       renderList({ page: 2 });
 
-      expect(screen.getByText("Página 2 de 7 · 134 tickets")).toBeInTheDocument();
+      expect(screen.getByText("Mostrando 21–40 de 134 · Página 2 de 7")).toBeInTheDocument();
     });
 
-    it("usa el singular con un solo ticket", () => {
+    it("en la última página el tramo termina en el último ticket recibido", () => {
+      ready(
+        page(
+          Array.from({ length: 14 }, (_, i) => ticket(i + 1)),
+          { total: 134, page: 7 },
+        ),
+      );
+      renderList({ page: 7 });
+
+      expect(screen.getByText("Mostrando 121–134 de 134 · Página 7 de 7")).toBeInTheDocument();
+    });
+
+    it("con un solo ticket, el tramo es 1–1", () => {
       ready(page([ticket(1)]));
       renderList();
 
-      expect(screen.getByText("Página 1 de 1 · 1 ticket")).toBeInTheDocument();
+      expect(screen.getByText("Mostrando 1–1 de 1 · Página 1 de 1")).toBeInTheDocument();
     });
 
     it("«Siguiente» y «Anterior» son enlaces a la página vecina y conservan los filtros", () => {

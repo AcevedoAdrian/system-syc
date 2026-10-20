@@ -1,8 +1,16 @@
 import type { Organization } from "@syc/contracts";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
+import { cn } from "cn";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  tableBodyRowClass,
+  tableCellClass,
+  tableHeadCellClass,
+  tableHeadRowClass,
+} from "@/components/common/data-table";
+import { RowAction } from "@/components/common/RowAction";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -31,31 +39,54 @@ export function OrganizationsTable({
   const columns = useMemo(
     () =>
       column.columns([
-        column.accessor("nombre", { header: "Nombre" }),
-        column.accessor("activo", {
-          header: "Estado",
-          cell: ({ row }) =>
-            row.original.activo ? (
-              <Badge variant="secondary">Activo</Badge>
-            ) : (
-              <Badge variant="destructive">Desactivado</Badge>
-            ),
+        column.accessor("nombre", {
+          header: "Nombre",
+          cell: ({ row }) => (
+            <span
+              className={cn(
+                "font-medium",
+                row.original.activo ? "text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {row.original.nombre}
+            </span>
+          ),
         }),
-        column.accessor("agentes", { header: "Agentes" }),
+        column.accessor("agentes", {
+          header: "Agentes asignados",
+          cell: ({ row }) => <span className="text-body">{row.original.agentes}</span>,
+        }),
+        column.accessor("activo", {
+          header: "Activo",
+          cell: ({ row }) => (
+            <span className="flex items-center gap-2.5">
+              <Switch
+                checked={row.original.activo}
+                aria-label={`Departamento «${row.original.nombre}» activo`}
+                onCheckedChange={() => onToggleActive(row.original)}
+              />
+              <span className="text-[13px] text-muted-foreground">
+                {row.original.activo ? "Activo" : "Desactivado"}
+              </span>
+            </span>
+          ),
+        }),
         column.display({
           id: "acciones",
-          header: () => <span className="sr-only">Acciones</span>,
+          header: () => <span className="block text-right">Acciones</span>,
           cell: ({ row }) => (
-            <div className="flex justify-end gap-1">
-              <Button variant="ghost" size="sm" onClick={() => onRename(row.original)}>
-                Renombrar
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onToggleActive(row.original)}>
-                {row.original.activo ? "Desactivar" : "Reactivar"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onRemove(row.original)}>
-                Eliminar
-              </Button>
+            <div className="flex justify-end">
+              <RowAction
+                label={`Renombrar «${row.original.nombre}»`}
+                icon={PencilIcon}
+                onClick={() => onRename(row.original)}
+              />
+              <RowAction
+                label={`Eliminar «${row.original.nombre}»`}
+                icon={Trash2Icon}
+                destructive
+                onClick={() => onRemove(row.original)}
+              />
             </div>
           ),
         }),
@@ -68,9 +99,9 @@ export function OrganizationsTable({
     <Table>
       <TableHeader>
         {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
+          <TableRow key={group.id} className={tableHeadRowClass}>
             {group.headers.map((header) => (
-              <TableHead key={header.id}>
+              <TableHead key={header.id} className={tableHeadCellClass}>
                 {header.isPlaceholder ? null : <table.FlexRender header={header} />}
               </TableHead>
             ))}
@@ -79,9 +110,13 @@ export function OrganizationsTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id} data-testid={`org-row-${row.original.nombre}`}>
+          <TableRow
+            key={row.id}
+            data-testid={`org-row-${row.original.nombre}`}
+            className={tableBodyRowClass}
+          >
             {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
+              <TableCell key={cell.id} className={tableCellClass}>
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}

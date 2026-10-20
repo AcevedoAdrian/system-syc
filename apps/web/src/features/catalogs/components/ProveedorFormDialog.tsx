@@ -3,17 +3,9 @@ import { type ProveedorInput, proveedorInputSchema } from "@syc/contracts";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { controlClass, Field } from "@/components/common/Field";
+import { DrawerForm, FormDrawer } from "@/components/common/FormDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/errors";
 import type { CatalogEntry } from "../hooks/catalog-api";
 
@@ -23,7 +15,13 @@ type ProveedorFormInput = z.input<typeof proveedorInputSchema>;
 
 type OptionalField = "contacto" | "telefono" | "correo" | "sitioWeb";
 
-const OPTIONAL_FIELDS: { name: OptionalField; label: string; error: string; type?: string }[] = [
+const OPTIONAL_FIELDS: {
+  name: OptionalField;
+  label: string;
+  error: string;
+  type?: string;
+  placeholder?: string;
+}[] = [
   { name: "contacto", label: "Contacto", error: "Hasta 120 caracteres." },
   { name: "telefono", label: "Teléfono", error: "Hasta 50 caracteres." },
   {
@@ -36,6 +34,7 @@ const OPTIONAL_FIELDS: { name: OptionalField; label: string; error: string; type
     name: "sitioWeb",
     label: "Sitio web",
     error: "Ingresá una dirección que empiece con http:// o https://.",
+    placeholder: "https://",
   },
 ];
 
@@ -81,47 +80,56 @@ function ProveedorForm({
   });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="nombre">Nombre</Label>
-        <Input
-          id="nombre"
-          autoFocus
-          aria-invalid={errors.nombre ? true : undefined}
-          {...register("nombre")}
-        />
-        {errors.nombre && (
-          <p className="text-sm text-destructive">
-            El nombre es obligatorio (hasta 120 caracteres).
-          </p>
-        )}
-      </div>
-      {OPTIONAL_FIELDS.map((field) => (
-        <div key={field.name} className="flex flex-col gap-1.5">
-          <Label htmlFor={field.name}>{field.label}</Label>
+    <DrawerForm
+      onSubmit={submit}
+      submitLabel={submitLabel}
+      submitting={isSubmitting}
+      error={serverError}
+    >
+      <Field
+        id="nombre"
+        label="Nombre"
+        required
+        hint="Solo el nombre es obligatorio y no puede repetirse entre proveedores."
+        error={errors.nombre && "El nombre es obligatorio (hasta 120 caracteres)."}
+      >
+        {(aria) => (
           <Input
-            id={field.name}
-            type={field.type}
-            aria-invalid={errors[field.name] ? true : undefined}
-            {...register(field.name)}
+            id="nombre"
+            autoFocus
+            maxLength={120}
+            placeholder="Nombre del registro"
+            className={controlClass}
+            {...aria}
+            {...register("nombre")}
           />
-          {errors[field.name] && <p className="text-sm text-destructive">{field.error}</p>}
-        </div>
+        )}
+      </Field>
+      {OPTIONAL_FIELDS.map((field) => (
+        <Field
+          key={field.name}
+          id={field.name}
+          label={field.label}
+          hint={errors[field.name] ? undefined : "Opcional."}
+          error={errors[field.name] && field.error}
+        >
+          {(aria) => (
+            <Input
+              id={field.name}
+              type={field.type}
+              placeholder={field.placeholder}
+              className={controlClass}
+              {...aria}
+              {...register(field.name)}
+            />
+          )}
+        </Field>
       ))}
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">
-          {serverError}
-        </p>
-      )}
-      <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
-          {submitLabel}
-        </Button>
-      </DialogFooter>
-    </form>
+    </DrawerForm>
   );
 }
 
+// Un panel lateral (SPEC 09, 9.6) para dar de alta o editar un proveedor.
 export function ProveedorFormDialog({
   open,
   onOpenChange,
@@ -129,16 +137,13 @@ export function ProveedorFormDialog({
   ...formProps
 }: ProveedorFormDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            Solo el nombre es obligatorio y no puede repetirse entre proveedores.
-          </DialogDescription>
-        </DialogHeader>
-        <ProveedorForm {...formProps} onDone={() => onOpenChange(false)} />
-      </DialogContent>
-    </Dialog>
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description="Alta o edición de un proveedor."
+    >
+      <ProveedorForm {...formProps} onDone={() => onOpenChange(false)} />
+    </FormDrawer>
   );
 }

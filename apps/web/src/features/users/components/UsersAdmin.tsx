@@ -1,5 +1,8 @@
 import type { User } from "@syc/contracts";
+import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
+import { listCardClass } from "@/components/common/data-table";
+import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
 import { useOrganizations } from "@/features/organizations/hooks/useOrganizations";
@@ -42,28 +45,41 @@ export function UsersAdmin() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Usuarios</h1>
-        <Button onClick={() => setCreating(true)}>Nuevo usuario</Button>
-      </div>
+    <section className="mx-auto flex w-full max-w-300 flex-col gap-8">
+      <PageHeader
+        title="Usuarios"
+        description="Cuentas de acceso. Los agentes pertenecen a un departamento; los administradores ven todo."
+        action={
+          <Button className="h-10 px-5" onClick={() => setCreating(true)}>
+            <Plus aria-hidden="true" />
+            Nuevo usuario
+          </Button>
+        }
+      />
 
       {actionError && (
         <p role="alert" className="text-sm text-destructive">
           {actionError}
         </p>
       )}
-      {isPending && <p>Cargando usuarios…</p>}
-      {isError && <p role="alert">No se pudieron cargar los usuarios.</p>}
-      {users && (
-        <UsersTable
-          users={users}
-          currentUserId={me?.id}
-          onEdit={setEditing}
-          onToggleActive={toggleActive}
-          onResetPassword={setResetting}
-        />
-      )}
+
+      <section aria-label="Listado de usuarios" className={listCardClass}>
+        {isPending && <p className="px-5 py-8 text-muted-foreground">Cargando usuarios…</p>}
+        {isError && (
+          <p role="alert" className="px-5 py-8 text-destructive">
+            No se pudieron cargar los usuarios.
+          </p>
+        )}
+        {users && (
+          <UsersTable
+            users={users}
+            currentUserId={me?.id}
+            onEdit={setEditing}
+            onToggleActive={toggleActive}
+            onResetPassword={setResetting}
+          />
+        )}
+      </section>
 
       <CreateUserDialog
         open={creating}
@@ -82,6 +98,6 @@ export function UsersAdmin() {
         onOpenChange={(open) => !open && setResetting(null)}
         onSubmit={(values) => resetPassword.mutateAsync(values)}
       />
-    </div>
+    </section>
   );
 }

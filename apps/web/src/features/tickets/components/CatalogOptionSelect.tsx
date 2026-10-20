@@ -1,4 +1,7 @@
 import { areaLabel, type CatalogRuta } from "@syc/contracts";
+import { cn } from "cn";
+import type { ReactNode } from "react";
+import { type FieldControlProps, selectClass } from "@/components/common/Field";
 import {
   Select,
   SelectContent,
@@ -8,9 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { groupAreasByTipo } from "@/features/catalogs/area-groups";
 import { useCatalog } from "@/features/catalogs/hooks/useCatalog";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
-import type { FieldControlProps } from "./Field";
+
+// Con un punto delante, el valor queda pegado a él y la flecha se va a la derecha (sin esto, `justify-between`
+// reparte los tres y centra el valor).
+const leadingClass = "justify-start gap-2.5 [&>svg:last-child]:ml-auto";
 
 // Radix no admite un ítem con valor "": el "sin valor" viaja con este centinela y se traduce a "".
 const NONE = "__none__";
@@ -32,6 +39,8 @@ interface CatalogOptionSelectProps extends FieldControlProps {
   // Un ítem que no se ofrece (el estado actual al cambiar de estado).
   excludeId?: string;
   disabled?: boolean;
+  // Algo que va dentro del botón, antes del valor (el punto de color de la prioridad).
+  leading?: ReactNode;
 }
 
 // Los selectores de catálogo de los formularios de ticket: ofrece solo los ítems activos
@@ -50,6 +59,7 @@ function FlatOptionSelect({
   current,
   excludeId,
   disabled,
+  leading,
   ...aria
 }: CatalogOptionSelectProps) {
   const { data: allOptions = [], isPending } = useCatalogOptions(ruta);
@@ -65,7 +75,8 @@ function FlatOptionSelect({
       onValueChange={(next) => onChange(next === NONE ? "" : next)}
       disabled={disabled}
     >
-      <SelectTrigger id={id} className="w-full" {...aria}>
+      <SelectTrigger id={id} className={cn(selectClass, leading && leadingClass)} {...aria}>
+        {leading}
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
@@ -97,6 +108,7 @@ function AreaOptionSelect({
   current,
   excludeId,
   disabled,
+  leading,
   ruta: _ruta,
   ...aria
 }: CatalogOptionSelectProps) {
@@ -104,12 +116,7 @@ function AreaOptionSelect({
   const { data: tipos = [] } = useCatalog("tiposArea");
   const options = allOptions.filter((option) => option.id !== excludeId);
 
-  const groups = tipos
-    .map((tipo) => ({
-      tipo,
-      areas: options.filter((option) => option.tipo?.id === tipo.id),
-    }))
-    .filter((group) => group.areas.length > 0);
+  const { groups } = groupAreasByTipo(options, tipos);
 
   const currentIsOutOfOptions =
     !isPending && current && !options.some((option) => option.id === current.id);
@@ -132,7 +139,8 @@ function AreaOptionSelect({
       onValueChange={(next) => onChange(next === NONE ? "" : next)}
       disabled={disabled}
     >
-      <SelectTrigger id={id} className="w-full" {...aria}>
+      <SelectTrigger id={id} className={cn(selectClass, leading && leadingClass)} {...aria}>
+        {leading}
         <SelectValue placeholder={placeholder}>
           {value === "" ? undefined : selectedLabel}
         </SelectValue>

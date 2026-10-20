@@ -1,8 +1,8 @@
 import type { CatalogRuta } from "@syc/contracts";
 
-// Textos de cada catálogo en la pantalla de administración: una pestaña por catálogo.
+// Textos de cada catálogo en la pantalla de administración (el menú lateral abre cada uno).
 export interface CatalogKind {
-  tab: string;
+  description: string; // la bajada del encabezado
   title: string;
   newLabel: string; // botón y título del diálogo de alta
   editLabel: string; // título del diálogo de edición
@@ -12,7 +12,7 @@ export interface CatalogKind {
 
 export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
   areas: {
-    tab: "Áreas",
+    description: "Áreas que generan o reciben tickets.",
     title: "Áreas",
     newLabel: "Nueva área",
     editLabel: "Editar área",
@@ -20,7 +20,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar las áreas.",
   },
   tiposArea: {
-    tab: "Tipos de área",
+    description: "Clasificación que se asigna a cada área.",
     title: "Tipos de área",
     newLabel: "Nuevo tipo de área",
     editLabel: "Editar tipo de área",
@@ -28,7 +28,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar los tipos de área.",
   },
   edificios: {
-    tab: "Edificios",
+    description: "Edificios y sedes de la organización.",
     title: "Edificios",
     newLabel: "Nuevo edificio",
     editLabel: "Editar edificio",
@@ -36,7 +36,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar los edificios.",
   },
   tipos: {
-    tab: "Tipos",
+    description: "Tipos de ticket disponibles.",
     title: "Tipos de ticket",
     newLabel: "Nuevo tipo",
     editLabel: "Editar tipo",
@@ -44,7 +44,8 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar los tipos.",
   },
   prioridades: {
-    tab: "Prioridades",
+    description:
+      "Niveles de prioridad, de la menos a la más urgente. Siempre debe quedar al menos una activa.",
     title: "Prioridades",
     newLabel: "Nueva prioridad",
     editLabel: "Editar prioridad",
@@ -52,7 +53,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar las prioridades.",
   },
   modulos: {
-    tab: "Módulos",
+    description: "Partes del sistema donde puede estar el problema.",
     title: "Módulos",
     newLabel: "Nuevo módulo",
     editLabel: "Editar módulo",
@@ -60,7 +61,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar los módulos.",
   },
   proveedores: {
-    tab: "Proveedores",
+    description: "Proveedores asociados al servicio.",
     title: "Proveedores",
     newLabel: "Nuevo proveedor",
     editLabel: "Editar proveedor",
@@ -68,7 +69,7 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar los proveedores.",
   },
   estados: {
-    tab: "Estados",
+    description: "Estados del ticket. Se pueden renombrar, reordenar y desactivar.",
     title: "Estados",
     newLabel: "Nuevo estado",
     editLabel: "Editar estado",

@@ -1,9 +1,16 @@
 import type { CatalogRuta } from "@syc/contracts";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, PencilIcon, PowerIcon, Trash2Icon } from "lucide-react";
 import { useMemo } from "react";
+import { ActivePill } from "@/components/common/ActivePill";
+import {
+  tableBodyRowClass,
+  tableCellClass,
+  tableHeadCellClass,
+  tableHeadRowClass,
+} from "@/components/common/data-table";
+import { RowAction } from "@/components/common/RowAction";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -19,14 +26,19 @@ const column = createColumnHelper<typeof features, CatalogEntry>();
 
 interface CatalogTableProps {
   ruta: CatalogRuta;
+  // Las filas que se muestran (una página, o lo que dejan la búsqueda y el filtro).
   items: CatalogEntry[];
+  // Los ids de la lista completa, en su orden: la primera fila no puede subir y la última no puede bajar,
+  // aunque la página mostrada sea otra. Sin esto, se toman las de `items`.
+  orderIds?: string[];
+  // Con una búsqueda o un filtro activos la lista es parcial y mover una fila no tiene sentido.
+  canReorder?: boolean;
   onMove: (item: CatalogEntry, direccion: "subir" | "bajar") => void;
   onEdit: (item: CatalogEntry) => void;
   onToggleActive: (item: CatalogEntry) => void;
   onRemove: (item: CatalogEntry) => void;
 }
 
-// `items` llega en el orden de `list`: la primera fila no puede subir y la última no puede bajar.
 // Proveedores suma sus datos de contacto; un campo sin cargar se muestra como "—".
 const CONTACT_COLUMNS = [
   { key: "contacto", header: "Contacto" },
@@ -38,23 +50,58 @@ const CONTACT_COLUMNS = [
 export function CatalogTable({
   ruta,
   items,
+  orderIds,
+  canReorder = true,
   onMove,
   onEdit,
   onToggleActive,
   onRemove,
 }: CatalogTableProps) {
+  const order = orderIds ?? items.map((item) => item.id);
+
   const columns = useMemo(
     () =>
       column.columns([
-        // Las áreas se agrupan a la vista por su tipo: la primera columna (SPEC 08).
+        column.display({
+          id: "orden",
+          header: "Orden",
+          cell: ({ row }) => {
+            const { id, nombre } = row.original;
+            return (
+              <div className="-ml-2 flex">
+                <RowAction
+                  label={`Subir «${nombre}»`}
+                  icon={ArrowUpIcon}
+                  disabled={!canReorder || order[0] === id}
+                  onClick={() => onMove(row.original, "subir")}
+                />
+                <RowAction
+                  label={`Bajar «${nombre}»`}
+                  icon={ArrowDownIcon}
+                  disabled={!canReorder || order[order.length - 1] === id}
+                  onClick={() => onMove(row.original, "bajar")}
+                />
+              </div>
+            );
+          },
+        }),
+        // Las áreas se muestran con su tipo en la primera columna de datos (SPEC 08).
         ...(ruta === "areas"
-          ? [column.accessor((item) => item.tipo?.nombre ?? "—", { id: "tipo", header: "Tipo" })]
+          ? [
+              column.accessor((item) => item.tipo?.nombre ?? "—", {
+                id: "tipo",
+                header: "Tipo",
+                cell: ({ row }) => (
+                  <span className="text-body">{row.original.tipo?.nombre ?? "—"}</span>
+                ),
+              }),
+            ]
           : []),
         // Los estados de sistema (los que tienen `clave`) se marcan, pero la clave no se muestra.
         column.accessor("nombre", {
           header: "Nombre",
           cell: ({ row }) => (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 font-medium text-foreground">
               {row.original.nombre}
               {row.original.clave && <Badge variant="outline">De sistema</Badge>}
             </span>
@@ -62,57 +109,47 @@ export function CatalogTable({
         }),
         ...(ruta === "proveedores"
           ? CONTACT_COLUMNS.map(({ key, header }) =>
-              column.accessor(key, { header, cell: ({ row }) => row.original[key] || "—" }),
+              column.accessor(key, {
+                header,
+                cell: ({ row }) => <span className="text-body">{row.original[key] || "—"}</span>,
+              }),
             )
           : []),
         column.accessor("activo", {
           header: "Estado",
-          cell: ({ row }) =>
-            row.original.activo ? (
-              <Badge variant="secondary">Activo</Badge>
-            ) : (
-              <Badge variant="destructive">Desactivado</Badge>
-            ),
+          cell: ({ row }) => <ActivePill active={row.original.activo} />,
         }),
         column.display({
           id: "acciones",
-          header: () => <span className="sr-only">Acciones</span>,
-          cell: ({ row }) => (
-            <div className="flex justify-end gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Subir ${row.original.nombre}`}
-                disabled={row.index === 0}
-                onClick={() => onMove(row.original, "subir")}
-              >
-                <ArrowUpIcon />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Bajar ${row.original.nombre}`}
-                disabled={row.index === items.length - 1}
-                onClick={() => onMove(row.original, "bajar")}
-              >
-                <ArrowDownIcon />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onEdit(row.original)}>
-                Editar
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => onToggleActive(row.original)}>
-                {row.original.activo ? "Desactivar" : "Reactivar"}
-              </Button>
-              {!row.original.clave && (
-                <Button variant="ghost" size="sm" onClick={() => onRemove(row.original)}>
-                  Eliminar
-                </Button>
-              )}
-            </div>
-          ),
+          header: () => <span className="block text-right">Acciones</span>,
+          cell: ({ row }) => {
+            const { nombre, activo, clave } = row.original;
+            return (
+              <div className="flex justify-end">
+                <RowAction
+                  label={`Editar «${nombre}»`}
+                  icon={PencilIcon}
+                  onClick={() => onEdit(row.original)}
+                />
+                <RowAction
+                  label={`${activo ? "Desactivar" : "Reactivar"} «${nombre}»`}
+                  icon={PowerIcon}
+                  onClick={() => onToggleActive(row.original)}
+                />
+                {!clave && (
+                  <RowAction
+                    label={`Eliminar «${nombre}»`}
+                    icon={Trash2Icon}
+                    destructive
+                    onClick={() => onRemove(row.original)}
+                  />
+                )}
+              </div>
+            );
+          },
         }),
       ]),
-    [ruta, items.length, onMove, onEdit, onToggleActive, onRemove],
+    [ruta, order, canReorder, onMove, onEdit, onToggleActive, onRemove],
   );
   const table = useTable({ features, columns, data: items });
 
@@ -120,9 +157,9 @@ export function CatalogTable({
     <Table>
       <TableHeader>
         {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id}>
+          <TableRow key={group.id} className={tableHeadRowClass}>
             {group.headers.map((header) => (
-              <TableHead key={header.id}>
+              <TableHead key={header.id} className={tableHeadCellClass}>
                 {header.isPlaceholder ? null : <table.FlexRender header={header} />}
               </TableHead>
             ))}
@@ -131,9 +168,13 @@ export function CatalogTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id} data-testid={`catalog-row-${row.original.nombre}`}>
+          <TableRow
+            key={row.id}
+            data-testid={`catalog-row-${row.original.nombre}`}
+            className={tableBodyRowClass}
+          >
             {row.getAllCells().map((cell) => (
-              <TableCell key={cell.id}>
+              <TableCell key={cell.id} className={tableCellClass}>
                 <table.FlexRender cell={cell} />
               </TableCell>
             ))}

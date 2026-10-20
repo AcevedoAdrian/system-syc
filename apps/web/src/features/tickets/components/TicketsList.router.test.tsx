@@ -32,6 +32,7 @@ vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({ data: { role: "agente" } }),
 }));
 vi.mock("./TicketsFilters", () => ({ TicketsFilters: () => null }));
+vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
 
 import { TicketsList } from "./TicketsList";
 

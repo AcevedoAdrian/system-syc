@@ -2,17 +2,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type CreateUserInput, createUserInputSchema, type Organization } from "@syc/contracts";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { controlClass, Field, selectClass } from "@/components/common/Field";
+import { DrawerForm, FormDrawer } from "@/components/common/FormDrawer";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/errors";
 import { DepartmentSelect } from "./DepartmentSelect";
 import { RoleSelect } from "./RoleSelect";
@@ -56,114 +48,144 @@ function CreateUserForm({
   });
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="username">Usuario</Label>
-        <Input
-          id="username"
-          autoComplete="off"
-          autoFocus
-          aria-invalid={errors.username ? true : undefined}
-          {...register("username")}
-        />
-        <p className="text-xs text-muted-foreground">
-          De 3 a 30 caracteres: letras, números, guion bajo y punto.
-        </p>
-        {errors.username && <p className="text-sm text-destructive">El usuario no es válido.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="name">Nombre</Label>
-        <Input id="name" aria-invalid={errors.name ? true : undefined} {...register("name")} />
-        {errors.name && <p className="text-sm text-destructive">El nombre es obligatorio.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="email">Email (opcional)</Label>
-        <Input
-          id="email"
-          type="email"
-          autoComplete="off"
-          aria-invalid={errors.email ? true : undefined}
-          {...register("email", { setValueAs: emptyToUndefined })}
-        />
-        {errors.email && <p className="text-sm text-destructive">El email no es válido.</p>}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="password">Contraseña</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          aria-invalid={errors.password ? true : undefined}
-          {...register("password")}
-        />
-        {errors.password && (
-          <p className="text-sm text-destructive">Debe tener entre 8 y 128 caracteres.</p>
+    <DrawerForm
+      onSubmit={submit}
+      submitLabel="Crear usuario"
+      submitting={isSubmitting}
+      error={serverError}
+    >
+      <Field
+        id="username"
+        label="Usuario"
+        required
+        hint="De 3 a 30 caracteres: letras, números, guion bajo y punto."
+        error={errors.username && "El usuario no es válido."}
+      >
+        {(aria) => (
+          <Input
+            id="username"
+            autoComplete="off"
+            autoFocus
+            maxLength={30}
+            className={`${controlClass} font-mono text-[15px] md:text-[15px]`}
+            {...aria}
+            {...register("username")}
+          />
         )}
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="role">Rol</Label>
-        <Controller
-          control={control}
-          name="role"
-          render={({ field }) => (
-            <RoleSelect
-              id="role"
-              value={field.value}
-              onChange={(next) => {
-                field.onChange(next);
-                if (next === "admin") setValue("organizationId", undefined);
-              }}
-            />
-          )}
-        />
-      </div>
-      {role === "agente" && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="organizationId">Departamento</Label>
+      </Field>
+      <Field id="name" label="Nombre" required error={errors.name && "El nombre es obligatorio."}>
+        {(aria) => (
+          <Input
+            id="name"
+            maxLength={120}
+            className={controlClass}
+            {...aria}
+            {...register("name")}
+          />
+        )}
+      </Field>
+      <Field
+        id="email"
+        label="Email (opcional)"
+        hint="Si lo dejás vacío se usa uno interno, sin uso funcional."
+        error={errors.email && "El email no es válido."}
+      >
+        {(aria) => (
+          <Input
+            id="email"
+            type="email"
+            autoComplete="off"
+            maxLength={254}
+            className={controlClass}
+            {...aria}
+            {...register("email", { setValueAs: emptyToUndefined })}
+          />
+        )}
+      </Field>
+      <Field
+        id="password"
+        label="Contraseña"
+        required
+        hint="Vos definís la contraseña; el usuario puede cambiarla después."
+        error={errors.password && "Debe tener entre 8 y 128 caracteres."}
+      >
+        {(aria) => (
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            maxLength={128}
+            className={controlClass}
+            {...aria}
+            {...register("password")}
+          />
+        )}
+      </Field>
+      <Field
+        id="role"
+        label="Rol"
+        required
+        hint="Un agente tiene exactamente un departamento; un administrador, ninguno."
+      >
+        {(aria) => (
           <Controller
             control={control}
-            name="organizationId"
+            name="role"
             render={({ field }) => (
-              <DepartmentSelect
-                id="organizationId"
+              <RoleSelect
+                id="role"
+                {...aria}
                 value={field.value}
-                onChange={field.onChange}
-                departments={departments}
-                invalid={Boolean(errors.organizationId)}
+                onChange={(next) => {
+                  field.onChange(next);
+                  if (next === "admin") setValue("organizationId", undefined);
+                }}
               />
             )}
           />
-          {errors.organizationId && (
-            <p className="text-sm text-destructive">Un agente debe tener un departamento.</p>
+        )}
+      </Field>
+      {role === "agente" && (
+        <Field
+          id="organizationId"
+          label="Departamento"
+          required
+          error={errors.organizationId && "Un agente debe tener un departamento."}
+        >
+          {(aria) => (
+            <Controller
+              control={control}
+              name="organizationId"
+              render={({ field }) => (
+                <DepartmentSelect
+                  id="organizationId"
+                  value={field.value}
+                  onChange={field.onChange}
+                  departments={departments}
+                  invalid={Boolean(errors.organizationId)}
+                  aria-describedby={aria["aria-describedby"]}
+                  aria-required={aria["aria-required"]}
+                  className={selectClass}
+                />
+              )}
+            />
           )}
-        </div>
+        </Field>
       )}
-      {serverError && (
-        <p role="alert" className="text-sm text-destructive">
-          {serverError}
-        </p>
-      )}
-      <DialogFooter>
-        <Button type="submit" disabled={isSubmitting}>
-          Crear usuario
-        </Button>
-      </DialogFooter>
-    </form>
+    </DrawerForm>
   );
 }
 
+// Un panel lateral (SPEC 09, 9.6) para dar de alta un usuario.
 export function CreateUserDialog({ open, onOpenChange, ...formProps }: CreateUserDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nuevo usuario</DialogTitle>
-          <DialogDescription>
-            Vos definís la contraseña; el usuario puede cambiarla después.
-          </DialogDescription>
-        </DialogHeader>
-        <CreateUserForm {...formProps} onDone={() => onOpenChange(false)} />
-      </DialogContent>
-    </Dialog>
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Nuevo usuario"
+      description="Alta de una cuenta de acceso al sistema."
+    >
+      <CreateUserForm {...formProps} onDone={() => onOpenChange(false)} />
+    </FormDrawer>
   );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { z } from "zod";
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { LoginLayout } from "@/features/auth/components/LoginLayout";
 import { safeRedirectPath } from "@/features/auth/redirect";
 
 function LoginPage() {
@@ -8,9 +9,9 @@ function LoginPage() {
   const { redirect } = Route.useSearch();
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <LoginLayout>
       <LoginForm onSuccess={() => router.history.push(safeRedirectPath(redirect) ?? "/")} />
-    </main>
+    </LoginLayout>
   );
 }
 

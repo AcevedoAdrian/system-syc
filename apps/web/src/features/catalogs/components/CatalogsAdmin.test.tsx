@@ -99,14 +99,19 @@ beforeAll(() => {
 });
 
 function renderAdmin(ruta: CatalogRuta = "areas") {
-  const onRutaChange = vi.fn();
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
-      <CatalogsAdmin ruta={ruta} onRutaChange={onRutaChange} />
+      <CatalogsAdmin ruta={ruta} />
     </QueryClientProvider>,
   );
-  return { onRutaChange };
+  const show = (next: CatalogRuta) =>
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <CatalogsAdmin ruta={next} />
+      </QueryClientProvider>,
+    );
+  return { show };
 }
 
 const rowNames = () =>
@@ -139,25 +144,12 @@ describe("CatalogsAdmin", () => {
     fake.table("edificios").push({ id: "e1", nombre: "Sistemas", orden: 1, activo: true });
   });
 
-  it("muestra las 8 pestañas en orden y avisa al cambiar de pestaña", async () => {
-    const { onRutaChange } = renderAdmin();
+  it("no tiene pestañas: el catálogo lo elige el menú lateral", async () => {
+    renderAdmin();
 
-    const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
-    expect(tabs).toEqual([
-      "Áreas",
-      "Tipos de área",
-      "Edificios",
-      "Tipos",
-      "Prioridades",
-      "Módulos",
-      "Proveedores",
-      "Estados",
-    ]);
-    expect(await screen.findByRole("heading", { name: "Áreas" })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("tab", { name: "Tipos de área" }));
-
-    expect(onRutaChange).toHaveBeenCalledWith("tiposArea");
+    expect(await screen.findByRole("heading", { level: 1, name: "Áreas" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
   it("deshabilita Subir en la primera fila y Bajar en la última", async () => {
@@ -180,7 +172,7 @@ describe("CatalogsAdmin", () => {
     await waitFor(() => expect(rowNames()).toEqual(["Diputado", "Bloque", "Comisión", "Oficina"]));
 
     // Editar
-    await userEvent.click(within(row("Oficina")).getByRole("button", { name: "Editar" }));
+    await userEvent.click(within(row("Oficina")).getByRole("button", { name: /^Editar/ }));
     const input = screen.getByLabelText("Nombre");
     expect(input).toHaveValue("Oficina");
     await userEvent.clear(input);
@@ -195,13 +187,13 @@ describe("CatalogsAdmin", () => {
     await waitFor(() => expect(rowNames()).toEqual(["Bloque", "Diputado", "Despacho", "Comisión"]));
 
     // Desactivar y reactivar
-    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Desactivar" }));
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: /^Desactivar/ }));
     expect(await within(row("Bloque")).findByText("Desactivado")).toBeInTheDocument();
-    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Reactivar" }));
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: /^Reactivar/ }));
     expect(await within(row("Bloque")).findByText("Activo")).toBeInTheDocument();
 
     // Eliminar, con confirmación
-    await userEvent.click(within(row("Bloque")).getByRole("button", { name: "Eliminar" }));
+    await userEvent.click(within(row("Bloque")).getByRole("button", { name: /^Eliminar/ }));
     const confirm = await screen.findByRole("alertdialog");
     expect(confirm).toHaveTextContent(
       "Se eliminará «Bloque». No se puede deshacer desde la pantalla; si solo querés ocultarlo, desactivalo.",
@@ -215,6 +207,7 @@ describe("CatalogsAdmin", () => {
     await screen.findByText("Sistemas");
 
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Orden",
       "Tipo",
       "Nombre",
       "Estado",
@@ -242,7 +235,7 @@ describe("CatalogsAdmin", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Nueva área" }));
     await userEvent.type(screen.getByLabelText("Nombre"), "Soporte");
-    await userEvent.click(screen.getByRole("combobox", { name: "Tipo" }));
+    await userEvent.click(screen.getByRole("combobox", { name: "Tipo de área" }));
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["Diputado", "Bloque"]);
     await userEvent.click(screen.getByRole("option", { name: "Bloque" }));
     await userEvent.click(screen.getByRole("button", { name: "Crear" }));
@@ -263,8 +256,10 @@ describe("CatalogsAdmin", () => {
     renderAdmin();
     await screen.findByText("Comisión de salud");
 
-    await userEvent.click(within(row("Comisión de salud")).getByRole("button", { name: "Editar" }));
-    const tipo = screen.getByRole("combobox", { name: "Tipo" });
+    await userEvent.click(
+      within(row("Comisión de salud")).getByRole("button", { name: /^Editar/ }),
+    );
+    const tipo = screen.getByRole("combobox", { name: "Tipo de área" });
     expect(tipo).toHaveTextContent("Comisión (inactivo)");
     await userEvent.click(tipo);
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
@@ -297,7 +292,7 @@ describe("CatalogsAdmin", () => {
     expect(rowNames()).toEqual(["Sistemas"]);
   });
 
-  it("muestra el error 409 de la API dentro del diálogo", async () => {
+  it("muestra el error 409 de la API dentro del panel", async () => {
     fake.state.createError = new ORPCError("CONFLICT", {
       status: 409,
       message: "Ya existe un edificio con ese nombre",
@@ -328,7 +323,7 @@ describe("CatalogsAdmin", () => {
     renderAdmin("proveedores");
     await screen.findByText("Acme");
 
-    await userEvent.click(within(row("Acme")).getByRole("button", { name: "Editar" }));
+    await userEvent.click(within(row("Acme")).getByRole("button", { name: /^Editar/ }));
     expect(screen.getByLabelText("Contacto")).toHaveValue("Ana");
     await userEvent.type(screen.getByLabelText("Correo"), "soporte@acme.com");
     await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
@@ -356,7 +351,386 @@ describe("CatalogsAdmin", () => {
     await screen.findByText("Cerrado");
 
     expect(within(row("Cerrado")).getByText("De sistema")).toBeInTheDocument();
-    expect(within(row("Cerrado")).queryByRole("button", { name: "Eliminar" })).toBeNull();
-    expect(within(row("Pendiente")).getByRole("button", { name: "Eliminar" })).toBeInTheDocument();
+    expect(within(row("Cerrado")).queryByRole("button", { name: /^Eliminar/ })).toBeNull();
+    expect(within(row("Pendiente")).getByRole("button", { name: /^Eliminar/ })).toBeInTheDocument();
+  });
+});
+
+describe("CatalogsAdmin: encabezado, búsqueda, filtros y paginación", () => {
+  const seed = (count: number, inactive: number[] = []) => {
+    fake.state.tables.clear();
+    fake.state.nextId = 1000;
+    for (let i = 1; i <= count; i++) {
+      fake.table("edificios").push({
+        id: `e${i}`,
+        nombre: `Edificio ${String(i).padStart(2, "0")}`,
+        orden: i,
+        activo: !inactive.includes(i),
+      });
+    }
+  };
+  const names = () =>
+    screen
+      .queryAllByTestId(/^catalog-row-/)
+      .map((r) => r.getAttribute("data-testid")?.replace("catalog-row-", ""));
+
+  beforeEach(() => {
+    fake.state.createError = null;
+    fake.state.updates = [];
+    fake.state.creates = [];
+  });
+
+  it("el encabezado trae el nombre del catálogo, su descripción y la acción de alta", async () => {
+    seed(2);
+    renderAdmin("edificios");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Edificios" })).toBeInTheDocument();
+    expect(screen.getByText("Edificios y sedes de la organización.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nuevo edificio" })).toBeInTheDocument();
+  });
+
+  describe("filtros de estado", () => {
+    it("muestran la cantidad de cada uno, sobre la lista completa", async () => {
+      seed(5, [2, 4]);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      expect(screen.getByRole("button", { name: "Todos 5" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: "Activos 3" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      expect(screen.getByRole("button", { name: "Desactivados 2" })).toBeInTheDocument();
+    });
+
+    it("«Desactivados» deja solo los desactivados, y «Activos» los activos", async () => {
+      seed(5, [2, 4]);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(screen.getByRole("button", { name: "Desactivados 2" }));
+      expect(names()).toEqual(["Edificio 02", "Edificio 04"]);
+      expect(screen.getByRole("button", { name: "Desactivados 2" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Activos 3" }));
+      expect(names()).toEqual(["Edificio 01", "Edificio 03", "Edificio 05"]);
+
+      await userEvent.click(screen.getByRole("button", { name: "Todos 5" }));
+      expect(names()).toHaveLength(5);
+    });
+
+    it("las cantidades no cambian al buscar: cuentan sobre la lista completa", async () => {
+      seed(5, [2]);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Buscar en el catálogo" }), "03");
+
+      expect(names()).toEqual(["Edificio 03"]);
+      expect(screen.getByRole("button", { name: "Todos 5" })).toBeInTheDocument();
+    });
+
+    it("forman un grupo con nombre", async () => {
+      seed(1);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      expect(screen.getByRole("group", { name: "Filtrar por estado" })).toBeInTheDocument();
+    });
+  });
+
+  describe("búsqueda", () => {
+    it("filtra por nombre sin distinguir mayúsculas ni acentos", async () => {
+      fake.state.tables.clear();
+      fake
+        .table("edificios")
+        .push(
+          { id: "e1", nombre: "Anexo Córdoba", orden: 1, activo: true },
+          { id: "e2", nombre: "Central", orden: 2, activo: true },
+        );
+      renderAdmin("edificios");
+      await screen.findByText("Central");
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "Buscar en el catálogo" }),
+        "CORDOBA",
+      );
+
+      expect(names()).toEqual(["Anexo Córdoba"]);
+    });
+
+    it("sin coincidencias lo dice y no deja la tabla ni el pie", async () => {
+      seed(3);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.type(screen.getByRole("searchbox", { name: "Buscar en el catálogo" }), "zzz");
+
+      expect(
+        screen.getByText("No hay registros que coincidan con los filtros."),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("table")).not.toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "Paginación" })).not.toBeInTheDocument();
+    });
+
+    it("borrar la búsqueda vuelve a mostrar todo", async () => {
+      seed(3);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      const campo = screen.getByRole("searchbox", { name: "Buscar en el catálogo" });
+
+      await userEvent.type(campo, "02");
+      expect(names()).toEqual(["Edificio 02"]);
+      await userEvent.clear(campo);
+
+      expect(names()).toHaveLength(3);
+    });
+
+    it("en Áreas también busca por el tipo", async () => {
+      fake.state.tables.clear();
+      const diputado = { id: "t1", nombre: "Diputado" };
+      fake
+        .table("tiposArea")
+        .push(
+          { ...diputado, orden: 1, activo: true },
+          { id: "t2", nombre: "Bloque", orden: 2, activo: true },
+        );
+      fake.table("areas").push(
+        { id: "a1", nombre: "Sistemas", orden: 1, activo: true, tipo: diputado },
+        { id: "a2", nombre: "Redes", orden: 2, activo: true, tipo: diputado },
+        {
+          id: "a3",
+          nombre: "Archivo",
+          orden: 3,
+          activo: true,
+          tipo: { id: "t2", nombre: "Bloque" },
+        },
+      );
+      renderAdmin("areas");
+      await screen.findByText("Archivo");
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "Buscar en el catálogo" }),
+        "diputado",
+      );
+
+      expect(names()).toEqual(["Sistemas", "Redes"]);
+    });
+  });
+
+  describe("paginación", () => {
+    it("muestra de a 10, con el tramo y el total de páginas", async () => {
+      seed(25);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      expect(names()).toHaveLength(10);
+      expect(screen.getByText("Mostrando 1–10 de 25 · Página 1 de 3")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled();
+    });
+
+    it("«Siguiente» y «Anterior» recorren las páginas", async () => {
+      seed(25);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      expect(names()?.[0]).toBe("Edificio 11");
+      expect(screen.getByText("Mostrando 11–20 de 25 · Página 2 de 3")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      expect(names()).toHaveLength(5);
+      expect(screen.getByText("Mostrando 21–25 de 25 · Página 3 de 3")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+
+      await userEvent.click(screen.getByRole("button", { name: "Anterior" }));
+      expect(names()?.[0]).toBe("Edificio 11");
+    });
+
+    it("buscar o filtrar vuelve a la primera página", async () => {
+      seed(25, [20]);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "Buscar en el catálogo" }),
+        "Edificio",
+      );
+
+      expect(screen.getByText(/Página 1 de 3/)).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      await userEvent.click(screen.getByRole("button", { name: "Desactivados 1" }));
+
+      expect(names()).toEqual(["Edificio 20"]);
+      expect(screen.getByText("Mostrando 1–1 de 1 · Página 1 de 1")).toBeInTheDocument();
+    });
+
+    it("con 10 o menos no hay una segunda página", async () => {
+      seed(10);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      expect(screen.getByText("Mostrando 1–10 de 10 · Página 1 de 1")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+    });
+
+    it("sin registros dice que todavía no hay y no muestra el pie", async () => {
+      fake.state.tables.clear();
+      renderAdmin("edificios");
+
+      expect(await screen.findByText("Todavía no hay registros.")).toBeInTheDocument();
+      expect(screen.queryByRole("navigation", { name: "Paginación" })).not.toBeInTheDocument();
+    });
+
+    it("al eliminar el único ítem de la última página, vuelve a la anterior", async () => {
+      seed(11);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      expect(names()).toEqual(["Edificio 11"]);
+
+      await userEvent.click(within(row("Edificio 11")).getByRole("button", { name: /^Eliminar/ }));
+      await userEvent.click(
+        within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Eliminar" }),
+      );
+
+      await waitFor(() => expect(names()).toHaveLength(10));
+      expect(screen.getByText("Mostrando 1–10 de 10 · Página 1 de 1")).toBeInTheDocument();
+    });
+  });
+
+  describe("orden", () => {
+    it("en la segunda página la primera fila sí puede subir: la lista completa tiene otras antes", async () => {
+      seed(15);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+      expect(within(row("Edificio 11")).getByRole("button", { name: /^Subir/ })).toBeEnabled();
+      expect(within(row("Edificio 15")).getByRole("button", { name: /^Bajar/ })).toBeDisabled();
+    });
+
+    it("mover la última fila de una página la pasa a la siguiente", async () => {
+      seed(15);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(within(row("Edificio 10")).getByRole("button", { name: /^Bajar/ }));
+
+      await waitFor(() =>
+        expect(screen.queryByTestId("catalog-row-Edificio 10")).not.toBeInTheDocument(),
+      );
+      expect(names()?.[9]).toBe("Edificio 11");
+    });
+
+    it("con una búsqueda activa las flechas se deshabilitan en todas las filas", async () => {
+      seed(5);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      expect(within(row("Edificio 03")).getByRole("button", { name: /^Subir/ })).toBeEnabled();
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "Buscar en el catálogo" }),
+        "Edificio 0",
+      );
+
+      for (const nombre of names()) {
+        expect(
+          within(row(nombre as string)).getByRole("button", { name: /^Subir/ }),
+        ).toBeDisabled();
+        expect(
+          within(row(nombre as string)).getByRole("button", { name: /^Bajar/ }),
+        ).toBeDisabled();
+      }
+    });
+
+    it("con un filtro de estado activo también, y al volver a «Todos» se habilitan", async () => {
+      seed(5, [4]);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(screen.getByRole("button", { name: "Activos 4" }));
+      expect(within(row("Edificio 03")).getByRole("button", { name: /^Subir/ })).toBeDisabled();
+
+      await userEvent.click(screen.getByRole("button", { name: "Todos 5" }));
+      expect(within(row("Edificio 03")).getByRole("button", { name: /^Subir/ })).toBeEnabled();
+    });
+  });
+
+  describe("cambiar de catálogo", () => {
+    it("reinicia la búsqueda, el filtro y la página", async () => {
+      seed(25);
+      fake.table("tiposArea").push({ id: "t1", nombre: "Diputado", orden: 1, activo: true });
+      const { show } = renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: "Buscar en el catálogo" }),
+        "Edificio",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      await userEvent.click(screen.getByRole("button", { name: /^Activos/ }));
+
+      show("tiposArea");
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Tipos de área" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("searchbox", { name: "Buscar en el catálogo" })).toHaveValue("");
+      expect(screen.getByRole("button", { name: /^Todos/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+  });
+
+  describe("panel y confirmación", () => {
+    it("«Nuevo …» abre el panel con su título, y Escape lo cierra sin crear", async () => {
+      seed(2);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo edificio" }));
+      expect(await screen.findByRole("dialog", { name: "Nuevo edificio" })).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(fake.state.creates).toEqual([]);
+    });
+
+    it("«Cancelar» cierra el panel sin guardar", async () => {
+      seed(2);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+      await userEvent.click(within(row("Edificio 01")).getByRole("button", { name: /^Editar/ }));
+      expect(await screen.findByRole("dialog", { name: "Editar edificio" })).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(fake.state.updates).toEqual([]);
+    });
+
+    it("la confirmación de eliminar tiene el botón relleno en rojo", async () => {
+      seed(2);
+      renderAdmin("edificios");
+      await screen.findByText("Edificio 01");
+
+      await userEvent.click(within(row("Edificio 01")).getByRole("button", { name: /^Eliminar/ }));
+
+      const confirmar = within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "Eliminar",
+      });
+      expect(confirmar).toHaveClass("bg-destructive", "text-destructive-foreground");
+    });
   });
 });
