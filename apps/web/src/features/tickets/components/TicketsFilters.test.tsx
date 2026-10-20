@@ -4,7 +4,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { TicketsSearch } from "../tickets-search";
 
 const data = vi.hoisted(() => ({
-  catalogs: {} as Record<string, { id: string; nombre: string; activo: boolean }[]>,
+  catalogs: {} as Record<
+    string,
+    { id: string; nombre: string; activo: boolean; tipo?: { id: string; nombre: string } }[]
+  >,
   organizations: [] as { id: string; nombre: string; activo: boolean }[],
 }));
 vi.mock("@/features/catalogs/hooks/useCatalog", () => ({
@@ -34,8 +37,13 @@ beforeEach(() => {
     ],
     // El inactivo está primero en el orden de la administración: la bandeja lo manda al final.
     areas: [
-      { id: "arch", nombre: "Archivo", activo: false },
-      { id: "sis", nombre: "Sistemas", activo: true },
+      { id: "arch", nombre: "Archivo", activo: false, tipo: { id: "dir", nombre: "Dirección" } },
+      { id: "sis", nombre: "Sistemas", activo: true, tipo: { id: "dir", nombre: "Dirección" } },
+      { id: "aco", nombre: "Acosta", activo: true, tipo: { id: "dip", nombre: "Diputado" } },
+    ],
+    tiposArea: [
+      { id: "dip", nombre: "Diputado", activo: true },
+      { id: "dir", nombre: "Dirección", activo: true },
     ],
   };
   data.organizations = [
@@ -122,12 +130,63 @@ describe("TicketsFilters", () => {
     });
 
     it("ofrece los ítems inactivos al final, marcados «(inactivo)»", async () => {
+      // El inactivo está primero en el orden de la administración.
+      data.catalogs.estados.unshift({ id: "viejo", nombre: "Viejo", activo: false });
+      renderFilters();
+
+      await userEvent.click(screen.getByRole("combobox", { name: "Estado" }));
+
+      expect(optionNames()).toEqual(["Todos", "Pendiente", "En progreso", "Viejo (inactivo)"]);
+    });
+
+    it("el filtro de área se agrupa por tipo, con las inactivas al final de su grupo", async () => {
       renderFilters();
       await openMore();
 
       await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
 
-      expect(optionNames()).toEqual(["Todos", "Sistemas", "Archivo (inactivo)"]);
+      expect(optionNames()).toEqual(["Todos", "Acosta", "Sistemas", "Archivo (inactivo)"]);
+      expect(screen.getAllByRole("group").map((g) => g.textContent)).toEqual([
+        "DiputadoAcosta",
+        "DirecciónSistemasArchivo (inactivo)",
+      ]);
+    });
+
+    it("el filtro de área deja al final, sin grupo, las áreas de un tipo desconocido", async () => {
+      data.catalogs.areas.push({ id: "sin", nombre: "Huérfana", activo: true });
+      renderFilters();
+      await openMore();
+
+      await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
+
+      expect(optionNames().at(-1)).toBe("Huérfana");
+      expect(screen.getAllByRole("group")).toHaveLength(2);
+    });
+
+    it("elegir un área filtra por areaId y vuelve a la página 1", async () => {
+      const { onChange } = renderFilters({ page: 2 });
+      await openMore();
+
+      await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
+      await userEvent.click(screen.getByRole("option", { name: "Acosta" }));
+
+      expect(onChange).toHaveBeenCalledWith({ areaId: "aco", page: undefined });
+    });
+
+    it("con un área elegida, el botón la muestra como «Tipo · Nombre»", () => {
+      renderFilters({ areaId: "sis" });
+
+      expect(screen.getByRole("combobox", { name: "Área" })).toHaveTextContent(
+        "Dirección · Sistemas",
+      );
+    });
+
+    it("un área inactiva elegida se muestra marcada", () => {
+      renderFilters({ areaId: "arch" });
+
+      expect(screen.getByRole("combobox", { name: "Área" })).toHaveTextContent(
+        "Dirección · Archivo (inactivo)",
+      );
     });
 
     it("la fila principal tiene Estado y Prioridad; el resto, bajo «Más filtros»", async () => {

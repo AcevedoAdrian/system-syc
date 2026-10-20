@@ -1,6 +1,6 @@
 # SPEC 09 — Sistema visual
 
-> **Status:** Completed (con tarjetas de resumen de la bandeja pendientes, ver 9.4) — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada, 9.6 (administración) implementada
+> **Status:** Completed (con tarjetas de resumen de la bandeja pendientes, ver 9.4) — etapa 9.1 (tema) implementada, 9.2 (login) implementada, 9.3 (layout) implementada, 9.4 (bandeja) implementada, 9.5 (formulario y detalle) implementada, 9.6 (administración) implementada, 9.7 (ajustes) implementada, 9.8 (actuación simple con el año) pendiente
 > **Depends on:** SPEC 02 (login), SPEC 05 y 06 (tickets y bandeja), SPEC 04 y 08 (catálogos)
 > **Date:** 2026-10-16
 > **Objective:** llevar al proyecto el diseño de la maqueta de Claude Design (`docs/Maqueta-Dashboard/`): primero la paleta, la tipografía, los radios y las sombras, definidos en un solo lugar; después, pantalla por pantalla.
@@ -27,8 +27,10 @@ Decisiones del usuario del 2026-10-16:
 | 9.4 | Bandeja de tickets; color de estados y prioridades (las tarjetas de resumen quedan para una etapa aparte) | Hecha |
 | 9.5 | Formulario y detalle de ticket (secciones de color, pestañas, comentarios e historial) | Hecha |
 | 9.6 | Administración: departamentos, usuarios, catálogos y diálogos | Hecha |
+| 9.7 | Ajustes: filtro de área agrupado, aviso de errores del formulario, página no encontrada | Hecha |
+| 9.8 | Actuación simple con el año en curso precargado en el alta | Pendiente |
 
-Las etapas 9.2 a 9.6 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
+Las etapas 9.2 a 9.7 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
 
 ## Etapa 9.1 — Tema
 
@@ -329,6 +331,71 @@ Referencia: `ADMINISTRACIÓN: DEPARTAMENTOS`, `ADMINISTRACIÓN: USUARIOS`, `CAT�
 - [x] **09.37** «Cambiar mi contraseña» y los diálogos de confirmación usan el diseño nuevo y conservan su validación.
 
 A mano (revisado el 2026-10-19 con el admin de desarrollo, con capturas de los tres listados en claro y oscuro, los paneles de departamento, usuario y proveedor, el diálogo de contraseña y los catálogos a 430px): falta recorrerlo con un agente (no entra a estas pantallas) y probar guardar de verdad en cada panel; los tests cubren esos casos.
+
+## Etapa 9.7 — Ajustes
+
+Tres diferencias que quedaron al comparar la maqueta con la app, más una pantalla que la maqueta no tiene. Solo la web: la API, los contratos y la base no cambian.
+
+### Alcance
+
+**Dentro:**
+
+- **Filtro «Área» de la bandeja agrupado por tipo**, como el selector del formulario del ticket (SPEC 08): un título por tipo, en el orden de Tipos de área, y las áreas de cada grupo en el orden del catálogo (las inactivas al final del grupo, marcadas «(inactivo)»). El botón muestra el valor elegido como «Tipo · Nombre». Un área cuyo tipo no está en la lista va al final, sin grupo. La agrupación es un helper compartido con el selector del formulario (`features/catalogs/area-groups.ts`).
+- **Aviso de errores** (`FormErrorSummary`) arriba de los formularios de alta y de edición del ticket: aparece después de un envío con campos inválidos y desaparece cuando ya no hay errores. Alta: «No se pudo crear el ticket.»; edición: «No se pudieron guardar los cambios.»; los dos con «Los campos con error están marcados en rojo.».
+- **Página «Página no encontrada»** (`NotFound`) para cualquier dirección inexistente, con la dirección y un botón «Ir al inicio». Usa el marco del login, así que se ve igual con o sin sesión.
+
+**Fuera:**
+
+- Que elegir un tipo de área acote la lista de áreas del filtro (la maqueta no lo hace).
+- Cambiar los errores del servidor, que siguen en la barra fija.
+- Redirigir sola al inicio: el usuario decide con el botón.
+
+### Decisiones
+
+- **Solo botón, sin cuenta regresiva** (decisión del usuario, 2026-10-20): una redirección automática esconde que la dirección estaba mal.
+- **`/tickets/<id inexistente>` conserva su mensaje propio**: es una ruta válida y la resuelve `TicketDetail`.
+
+### Criterios de aceptación (9.7)
+
+- [x] **09.38** El filtro «Área» agrupa las áreas por tipo, marca las inactivas, deja al final las de tipo desconocido y muestra el valor elegido como «Tipo · Nombre»; elegir una sigue filtrando por `areaId`.
+- [x] **09.39** Enviar el alta o la edición con campos inválidos muestra el aviso arriba del formulario; sin envío previo, o ya corregido, no aparece.
+- [x] **09.40** Una dirección inexistente (también anidada) muestra «Página no encontrada» con la dirección y «Ir al inicio», que lleva a `/`.
+
+## Etapa 9.8 — Actuación simple con el año
+
+Cambia el campo «Actuación simple» del alta (`CreateTicketForm`). La API, los contratos y la base no cambian.
+
+### Por qué
+
+Una actuación simple tiene la forma `número/año` y, por lo general, las que llegan son del año en curso. Hoy el agente escribe el mismo `/2026` en cada carga; con el año precargado solo escribe el número.
+
+### Alcance
+
+**Dentro** (solo el alta, `/tickets/nuevo`):
+
+- **Valor inicial `/{año}`** (por ejemplo `/2026`). El año es el de hoy en Argentina (`hoyArgentina()` de `@syc/contracts`, el mismo que propone la fecha de recepción), no el del reloj UTC, para que el 31 de diciembre a la noche no salga el año siguiente.
+- **Cursor delante de la barra.** Al entrar al campo (con clic o con Tab) mientras conserva el valor sin tocar, el cursor queda al principio, para escribir el número directo (`1023` → `1023/2026`).
+- **Sin tocar = sin actuación.** Si se envía con el valor exacto `/{año}`, se guarda sin actuación (`null`), igual que un campo vacío: una barra con el año solo no identifica ninguna nota.
+- **Sigue siendo texto libre.** El usuario puede borrar o cambiar el año (una actuación del año anterior) y no se valida el formato.
+- **Textos.** La ayuda pasa de «Suele ser corta.» a «Escribí el número antes de la barra.» y se quita el placeholder, que con el valor precargado no se vería.
+
+**Fuera:**
+
+- La edición del ticket (`TicketForm`): muestra lo que el ticket tiene guardado, y uno sin actuación sigue vacío.
+- Validar el formato `número/año`: «por lo general» no es «siempre».
+- Cambios en la API, los contratos o la base.
+
+### Decisiones
+
+- **Valor real, no placeholder.** Un placeholder no se envía: habría que escribir igual la barra y el año.
+- **«Sin tocar» es exactamente `/{año}`, comparado al enviar.** Si el usuario escribe algo y lo borra hasta dejar `/2026`, también cuenta como vacío.
+- **Solo en el alta**, porque en la edición el campo refleja lo guardado.
+
+### Criterios de aceptación (9.8)
+
+- [ ] **09.41** El alta muestra «Actuación simple» con `/{año en curso}`; al entrar sin haberlo tocado, el cursor queda delante de la barra; enviar con el número da `número/año`; enviar sin tocarlo manda la actuación vacía (`null`). La edición no cambia.
+
+Se verifica con los tests de `CreateTicketForm.test.tsx`; al implementar, se agrega el criterio 41 a `scripts/verify/specs/09-sistema-visual.mjs`.
 
 ## Decisiones
 

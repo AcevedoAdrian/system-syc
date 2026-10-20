@@ -511,6 +511,25 @@ describe("TicketForm", () => {
       expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ notificado: true });
     });
 
+    it("un envío inválido muestra el aviso arriba del formulario, que se va al corregir", async () => {
+      renderForm();
+      expect(screen.queryByText("No se pudieron guardar los cambios.")).not.toBeInTheDocument();
+
+      await userEvent.clear(screen.getByLabelText("Título"));
+      await save();
+
+      const aviso = await screen.findByText("No se pudieron guardar los cambios.");
+      expect(aviso.closest('[role="alert"]')).toHaveTextContent(
+        "Los campos con error están marcados en rojo.",
+      );
+
+      await userEvent.type(screen.getByLabelText("Título"), "Otro título");
+
+      await waitFor(() =>
+        expect(screen.queryByText("No se pudieron guardar los cambios.")).not.toBeInTheDocument(),
+      );
+    });
+
     it("pide un título y no envía", async () => {
       renderForm();
 

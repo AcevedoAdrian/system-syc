@@ -30,6 +30,7 @@ import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { controlClass, Field, TodayButton, textareaClass } from "@/components/common/Field";
 import { FormActionBar } from "@/components/common/FormActionBar";
+import { FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { FormSection } from "@/components/common/FormSection";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -103,7 +104,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
     watch,
     setValue,
     reset,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isSubmitting, isDirty, submitCount },
   } = useForm<TicketFormInput, unknown, UpdateTicketInput>({
     resolver: zodResolver(updateTicketInputSchema),
     defaultValues: valuesOf(ticket),
@@ -167,6 +168,9 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
 
   return (
     <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+      {submitCount > 0 && Object.keys(errors).length > 0 && (
+        <FormErrorSummary title="No se pudieron guardar los cambios." />
+      )}
       <FormSection
         id="seccion-datos"
         tone="brand"

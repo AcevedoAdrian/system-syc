@@ -10,7 +10,9 @@ import { routeTree } from "./routeTree.gen";
 // El tema se aplica antes de pintar nada, para que no haya un destello del claro al abrir en oscuro.
 initTheme();
 
-const router = createRouter({ routeTree });
+// Una dirección inexistente, también anidada (`/admin/xyz`), se resuelve en la raíz: la pantalla de
+// «Página no encontrada» no va dentro del marco autenticado.
+const router = createRouter({ routeTree, notFoundMode: "root" });
 
 declare module "@tanstack/react-router" {
   interface Register {

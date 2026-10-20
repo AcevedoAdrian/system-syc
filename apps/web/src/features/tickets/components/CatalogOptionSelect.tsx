@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { groupAreasByTipo } from "@/features/catalogs/area-groups";
 import { useCatalog } from "@/features/catalogs/hooks/useCatalog";
 import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
 
@@ -115,12 +116,7 @@ function AreaOptionSelect({
   const { data: tipos = [] } = useCatalog("tiposArea");
   const options = allOptions.filter((option) => option.id !== excludeId);
 
-  const groups = tipos
-    .map((tipo) => ({
-      tipo,
-      areas: options.filter((option) => option.tipo?.id === tipo.id),
-    }))
-    .filter((group) => group.areas.length > 0);
+  const { groups } = groupAreasByTipo(options, tipos);
 
   const currentIsOutOfOptions =
     !isPending && current && !options.some((option) => option.id === current.id);

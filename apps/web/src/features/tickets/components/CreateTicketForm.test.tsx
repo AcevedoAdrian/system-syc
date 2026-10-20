@@ -367,6 +367,25 @@ describe("CreateTicketForm", () => {
       );
     });
 
+    it("un envío inválido muestra el aviso arriba del formulario, que se va al corregir", async () => {
+      render(<CreateTicketForm />);
+      expect(screen.queryByText("No se pudo crear el ticket.")).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      const aviso = await screen.findByText("No se pudo crear el ticket.");
+      expect(aviso.closest('[role="alert"]')).toHaveTextContent(
+        "Los campos con error están marcados en rojo.",
+      );
+
+      await userEvent.type(screen.getByLabelText("Título"), "Impresora rota");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+
+      await waitFor(() =>
+        expect(screen.queryByText("No se pudo crear el ticket.")).not.toBeInTheDocument(),
+      );
+    });
+
     it("la referencia dice por qué está deshabilitada hasta elegir un proveedor", async () => {
       render(<CreateTicketForm />);
 

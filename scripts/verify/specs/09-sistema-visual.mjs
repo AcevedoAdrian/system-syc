@@ -539,5 +539,44 @@ export default defineSpec({
         );
       },
     ),
+
+    criterion(
+      38,
+      "El filtro «Área» de la bandeja agrupa las áreas por tipo y filtra por areaId",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El filtro de área agrupado",
+          "src/features/tickets/components/TicketsFilters.test.tsx",
+          "src/features/catalogs/area-groups.test.ts",
+          "src/features/tickets/components/CatalogOptionSelect.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      39,
+      "Un envío inválido del alta o de la edición muestra el aviso arriba del formulario",
+      async () => {
+        vitest(
+          "@syc/web",
+          "El aviso de errores",
+          "src/features/tickets/components/CreateTicketForm.test.tsx",
+          "src/features/tickets/components/TicketForm.test.tsx",
+        );
+      },
+    ),
+
+    criterion(
+      40,
+      "Una dirección inexistente (también anidada) muestra «Página no encontrada» con «Ir al inicio»",
+      async () => {
+        vitest(
+          "@syc/web",
+          "La página no encontrada",
+          "src/components/layout/NotFound.router.test.tsx",
+        );
+      },
+    ),
   ],
 });

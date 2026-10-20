@@ -1,17 +1,20 @@
-import type { CatalogRuta } from "@syc/contracts";
+import { areaLabel, type CatalogRuta } from "@syc/contracts";
 import { cn } from "cn";
 import { ListFilter, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { groupAreasByTipo } from "@/features/catalogs/area-groups";
 import { useCatalog } from "@/features/catalogs/hooks/useCatalog";
 import { useOrganizations } from "@/features/organizations/hooks/useOrganizations";
 import {
@@ -55,22 +58,34 @@ function activeFirst(options: FilterOption[]): FilterOption[] {
   return [...options.filter((o) => o.activo), ...options.filter((o) => !o.activo)];
 }
 
+// El ítem de una opción, con los inactivos marcados.
+function OptionItem({ option }: { option: FilterOption }) {
+  return (
+    <SelectItem value={option.id}>
+      {option.activo ? option.nombre : `${option.nombre} (inactivo)`}
+    </SelectItem>
+  );
+}
+
 // `inline`: la etiqueta va a la izquierda del selector (fila principal). Sin `inline`, arriba (panel de
-// «Más filtros»).
+// «Más filtros»). `children` son las opciones que siguen a «Todos». `selectedLabel` es lo que muestra el
+// botón con un valor elegido, cuando no es el texto de la opción (el área, como «Tipo · Nombre»).
 function FilterSelect({
   id,
   label,
-  options,
   value,
   onChange,
   inline,
+  selectedLabel,
+  children,
 }: {
   id: string;
   label: string;
-  options: FilterOption[];
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   inline?: boolean;
+  selectedLabel?: string;
+  children: ReactNode;
 }) {
   return (
     <div className={cn("flex min-w-0 gap-2", inline ? "items-center" : "flex-col gap-1.5")}>
@@ -88,15 +103,11 @@ function FilterSelect({
           id={id}
           className={cn("data-[size=default]:h-10", inline ? "min-w-36" : "w-full")}
         >
-          <SelectValue />
+          <SelectValue>{value === undefined ? undefined : selectedLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ALL}>Todos</SelectItem>
-          {activeFirst(options).map((option) => (
-            <SelectItem key={option.id} value={option.id}>
-              {option.activo ? option.nombre : `${option.nombre} (inactivo)`}
-            </SelectItem>
-          ))}
+          {children}
         </SelectContent>
       </Select>
     </div>
@@ -124,11 +135,50 @@ function CatalogFilter({
     <FilterSelect
       id={`filtro-${filterKey}`}
       label={label}
-      options={items}
       value={filters[filterKey] as string | undefined}
       onChange={(value) => onChange(withFilter(filters, filterKey, value))}
       inline={inline}
-    />
+    >
+      {activeFirst(items).map((option) => (
+        <OptionItem key={option.id} option={option} />
+      ))}
+    </FilterSelect>
+  );
+}
+
+// El filtro de área, agrupado por tipo como el selector del formulario (SPEC 09, 9.7). Ofrece las áreas
+// activas e inactivas: dentro de cada grupo, las inactivas al final. Las de un tipo que no se conoce (o
+// mientras Tipos de área carga) van al final, sin grupo.
+function AreaFilter({ filters, onChange }: { filters: TicketsSearch; onChange: FiltersChange }) {
+  const { data: areas = [] } = useCatalog("areas");
+  const { data: tipos = [] } = useCatalog("tiposArea");
+  const { groups, rest } = groupAreasByTipo(areas, tipos);
+  const selected = areas.find((area) => area.id === filters.areaId);
+  const name = selected?.tipo
+    ? areaLabel({ nombre: selected.nombre, tipo: selected.tipo })
+    : selected?.nombre;
+  const selectedLabel = selected && !selected.activo ? `${name} (inactivo)` : name;
+
+  return (
+    <FilterSelect
+      id="filtro-areaId"
+      label="Área"
+      value={filters.areaId}
+      onChange={(value) => onChange(withFilter(filters, "areaId", value))}
+      selectedLabel={selectedLabel}
+    >
+      {groups.map(({ tipo, areas: grouped }) => (
+        <SelectGroup key={tipo.id}>
+          <SelectLabel>{tipo.nombre}</SelectLabel>
+          {activeFirst(grouped).map((area) => (
+            <OptionItem key={area.id} option={area} />
+          ))}
+        </SelectGroup>
+      ))}
+      {activeFirst(rest).map((area) => (
+        <OptionItem key={area.id} option={area} />
+      ))}
+    </FilterSelect>
   );
 }
 
@@ -146,11 +196,14 @@ function DepartmentFilter({
     <FilterSelect
       id="filtro-departamentoId"
       label="Departamento"
-      options={departments}
       value={filters.departamentoId}
       onChange={(value) => onChange(withFilter(filters, "departamentoId", value))}
       inline
-    />
+    >
+      {activeFirst(departments).map((option) => (
+        <OptionItem key={option.id} option={option} />
+      ))}
+    </FilterSelect>
   );
 }
 
@@ -310,7 +363,7 @@ export function TicketsFilters({
           id={MORE_PANEL_ID}
           className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 px-5 pt-1 pb-5"
         >
-          {catalog("areas", "areaId", "Área")}
+          <AreaFilter filters={filters} onChange={onChange} />
           {catalog("tiposArea", "tipoAreaId", "Tipo de área")}
           {catalog("edificios", "edificioId", "Edificio")}
           {catalog("tipos", "tipoId", "Tipo de ticket")}

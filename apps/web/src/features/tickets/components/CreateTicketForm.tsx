@@ -25,6 +25,7 @@ import {
   textareaClass,
 } from "@/components/common/Field";
 import { FormActionBar } from "@/components/common/FormActionBar";
+import { FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { FormSection } from "@/components/common/FormSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,7 +100,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, submitCount },
   } = useForm<CreateTicketFormInput, unknown, CreateTicketInput>({
     resolver: zodResolver(createTicketFormSchema),
     defaultValues: {
@@ -127,6 +128,9 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
 
   return (
     <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
+      {submitCount > 0 && Object.keys(errors).length > 0 && (
+        <FormErrorSummary title="No se pudo crear el ticket." />
+      )}
       <FormSection
         id="seccion-datos"
         tone="brand"
