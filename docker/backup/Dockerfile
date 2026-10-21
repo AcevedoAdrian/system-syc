@@ -1,7 +1,7 @@
 # Contenedor de backups (SPEC 07): cron + pg_dump/pg_restore sobre la misma imagen que la base,
 # para que el cliente de Postgres sea siempre de la misma versión que el servidor.
 #   docker build docker/backup
-FROM postgres:17-alpine
+FROM postgres:17.11-alpine
 
 # "02:00 hora del servidor" no depende de la zona de la imagen; es la misma que `hoyArgentina()`.
 ENV TZ=America/Argentina/Buenos_Aires \

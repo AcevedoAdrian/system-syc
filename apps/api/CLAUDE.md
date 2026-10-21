@@ -81,7 +81,7 @@ SPEC 06 (`specs/06-comentarios-bandeja.md`). Viven en `modules/tickets` (PRD §8
 
 ## Imágenes de producción
 
-`apps/api/Dockerfile` (SPEC 07; el contexto es la raíz del repo) sale de `node:22-slim` y tiene un stage de build y dos targets finales. `docker/Dockerfile.dev` es solo para desarrollo.
+`apps/api/Dockerfile` (SPEC 07; el contexto es la raíz del repo) sale de `node:22.23-slim` y tiene un stage de build y dos targets finales. `docker/Dockerfile.dev` es solo para desarrollo.
 
 - **`migrate`**: el CLI de Prisma con `schema.prisma`, `prisma.config.ts` y `migrations/`; corre `prisma migrate deploy` y termina. Es el servicio `migrate` del compose de producción, que corre antes que `api`.
 - **`api`**: `dist/` (el bundle de `tsdown`) y solo las dependencias de producción, sin pnpm; corre como el usuario `node` con `node dist/main.mjs`. El seed sale de esta misma imagen: `node dist/seed.mjs`.

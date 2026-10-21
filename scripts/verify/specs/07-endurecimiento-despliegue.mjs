@@ -342,7 +342,7 @@ registerCleanup(() => {
         "sh",
         "-v",
         `${path.join(tmp, "backups")}:/backups`,
-        "postgres:17-alpine",
+        "postgres:17.11-alpine",
         "-c",
         "rm -rf /backups/* /backups/.[!.]*",
       );
