@@ -51,6 +51,8 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: api
+    # Node como PID 1 ignora SIGTERM: sin `init`, cada recreación esperaba los 10 s y mataba con SIGKILL.
+    init: true
     restart: unless-stopped
     environment:
       NODE_ENV: production
