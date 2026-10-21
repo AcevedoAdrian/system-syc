@@ -19,7 +19,7 @@ Viven en `apps/api/test/<característica>/*.test.ts` (`auth`, `permissions`, `au
 
 - **Se empaqueta con `tsdown`** (ESM: `dist/main.mjs` y `dist/seed.mjs`). `@syc/contracts` y `@syc/db` son `devDependencies` que entran en el bundle porque exportan su fuente `.ts`. Prisma, Better Auth y `@orpc/*` van como `dependencies` (externos al bundle). Emite la decorator metadata que Nest necesita.
 - **Biome tiene desactivado `useImportType` en `apps/api/**`**: Nest necesita los imports como valor para la inyección de dependencias. No los conviertas a `import type`.
-- **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual.
+- **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual. Un error inesperado (que no es `ORPCError`) lo convierte oRPC en un 500 «Internal server error» sin pasar por el filtro de Nest, así que `ORPCModule.forRoot` en `app.module.ts` registra `common/log-unexpected-errors.ts`, que lo deja en el log con su stack (el cliente no lo ve).
 - Las variables de entorno se validan con Zod al arrancar (`src/config`). Las del seed (`SEED_ADMIN_*`) las valida el propio `src/seed.ts` y **no** son obligatorias para la API.
 
 ## Auditoría y eliminación lógica
@@ -33,7 +33,7 @@ Convenciones de SPEC 03 (`specs/03-auditoria-soft-delete.md`); el módulo `modul
   - Con `auth.api.*` de Better Auth (usuarios): `AuditService.log` **después** de que Better Auth confirma. Si falla, se loguea y la request responde 500, pero el cambio ya quedó aplicado. Es la única excepción.
 - **Una operación de service = un registro**, aunque toque varias tablas. Acciones: `create`, `update`, `delete`, `reset_password` / `change_password` en usuarios y `comment_create` / `comment_delete` en tickets (ver Comentarios y bandeja). Activar, desactivar y cambiar de departamento son `update` con diff.
 - **`payload`**: `create` → `{ after }`; `update` → `{ before, after }` solo con lo que cambió (`computeDiff`, `null` si no cambió nada: entonces no se escribe ni se audita); `delete` y las acciones de contraseña → `{}`. Los campos salen de una lista explícita por entidad (`pickSnapshot`): `User` en `modules/users/user-audit-snapshot.ts`, `Organization` en el service. **Nunca** contraseñas, hashes ni tokens.
-- **Historial**: cada módulo expone su propio `history` con su guard (`users.history`, `organizations.history`, ambos `MANAGE`). No hay un `audit.history` genérico. Un id sin registros devuelve `[]` y no se chequea que la entidad exista (el de un departamento eliminado se sigue leyendo).
+- **Historial**: cada módulo expone su propio `history` con su guard (`users.history`, `organizations.history`, ambos `MANAGE`). No hay un `audit.history` genérico. Un id sin registros devuelve `[]` y no se chequea que la entidad exista (el de un departamento eliminado se sigue leyendo). **Límite conocido: los historiales y `users.list` / `organizations.list` devuelven todo, sin paginar.** Correcto para el volumen del PRD (decenas de usuarios, historiales de pocos cientos de entradas); si crecen, hay que paginarlos en el contrato igual que `tickets.list`.
 - **`change_password`** lo audita un hook `after` de Better Auth (`createAuth(env, { onPasswordChanged })`, cableado en `AuthModule` con `auth-audit.ts`). Login, logout y las demás tablas de Better Auth no se auditan.
 - **Campos base y eliminación lógica de los modelos de negocio** (SPEC 04 y 05): `createdAt`, `updatedAt`, `createdBy`, `updatedBy` (FK reales a `User`, cargadas desde `@CurrentUser()`, nunca del cliente) y `deletedAt`. Se elimina con `softDeleteData(actorId)` y todo listado y detalle filtra con `notDeleted`, escrito en el `where` de cada repository (`src/common/soft-delete.ts`; no hay extensión de Prisma que filtre sola). Eliminar algo ya eliminado es 404 y un ítem en uso se rechaza con 409. `Organization` no sigue esto: se borra físicamente, solo si no está en uso, y su `activo` es otra cosa.
 
@@ -81,7 +81,7 @@ SPEC 06 (`specs/06-comentarios-bandeja.md`). Viven en `modules/tickets` (PRD §8
 
 ## Imágenes de producción
 
-`apps/api/Dockerfile` (SPEC 07; el contexto es la raíz del repo) sale de `node:22-slim` y tiene un stage de build y dos targets finales. `docker/Dockerfile.dev` es solo para desarrollo.
+`apps/api/Dockerfile` (SPEC 07; el contexto es la raíz del repo) sale de `node:22.23-slim` y tiene un stage de build y dos targets finales. `docker/Dockerfile.dev` es solo para desarrollo.
 
 - **`migrate`**: el CLI de Prisma con `schema.prisma`, `prisma.config.ts` y `migrations/`; corre `prisma migrate deploy` y termina. Es el servicio `migrate` del compose de producción, que corre antes que `api`.
 - **`api`**: `dist/` (el bundle de `tsdown`) y solo las dependencias de producción, sin pnpm; corre como el usuario `node` con `node dist/main.mjs`. El seed sale de esta misma imagen: `node dist/seed.mjs`.

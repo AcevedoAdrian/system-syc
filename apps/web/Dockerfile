@@ -2,7 +2,7 @@
 # `/api` a la API. El contexto es la raíz del repo:
 #   docker build -f apps/web/Dockerfile .
 
-FROM node:22-slim AS build
+FROM node:22.23-slim AS build
 # Misma versión que `packageManager` del package.json raíz.
 ARG PNPM_VERSION=11.25.0
 # La API va por el mismo origen, bajo `/api`: la imagen no depende de la IP del servidor.

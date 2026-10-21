@@ -301,3 +301,11 @@ docker compose -f docker-compose.prod.yml up -d
 ## Fuera de alcance (a propósito)
 
 HTTPS, dominio propio y HSTS (Q37); copias fuera del servidor y alertas de backup fallido (Q36); importar datos existentes (el sistema arranca vacío); monitoreo y más de un servidor. Si el servidor queda expuesto fuera de la red interna, el primer punto a revisar es HTTPS: hoy las credenciales viajan sin cifrar.
+
+### Qué viaja en claro (HTTP por IP)
+
+Con `PUBLIC_URL=http://...` el **usuario, la contraseña y la cookie de sesión viajan sin cifrar** por la red local: quien pueda capturar tráfico en esa red los ve. La cookie es `HttpOnly` y `SameSite=Lax`, pero sin `Secure` a propósito (con `Secure` el navegador no la mandaría por HTTP y nadie podría entrar). El día que haya dominio y certificado: poner `PUBLIC_URL` en `https://...`, activar `advanced.useSecureCookies` en `apps/api/src/modules/auth/auth.config.ts` y agregar la cabecera `Strict-Transport-Security` en `apps/web/nginx.conf`.
+
+### Cabeceras de seguridad que faltan
+
+Nginx manda `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`. No manda `Content-Security-Policy` ni `Permissions-Policy`: es una intranet y una política mal ajustada deja la pantalla en blanco, así que se agrega con una prueba en el navegador (las fuentes son `@fontsource` propias, sin CDN, así que se puede ser estricto con los orígenes, pero hay que comprobar que ningún estilo en línea de la web o de las librerías de UI quede bloqueado). Si se agregan, van como `add_header` a nivel `server`, como las demás.

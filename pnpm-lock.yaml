@@ -144,9 +144,6 @@ importers:
       react-hook-form:
         specifier: 7.89.0
         version: 7.89.0(@types/react@19.3.0)(react@19.3.0)
-      shadcn:
-        specifier: 4.21.0
-        version: 4.21.0(typescript@5.9.3)
       tw-animate-css:
         specifier: 1.4.0
         version: 1.4.0
@@ -184,6 +181,9 @@ importers:
       jsdom:
         specifier: 30.1.1
         version: 30.1.1(@noble/hashes@2.4.0)
+      shadcn:
+        specifier: 4.21.0
+        version: 4.21.0(typescript@5.9.3)
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3

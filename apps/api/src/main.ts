@@ -11,6 +11,8 @@ async function bootstrap() {
   const env = loadEnv(process.env);
   // Sin body parser propio: Better Auth lee el cuerpo del stream, así que se monta antes del JSON.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  // Con SIGTERM/SIGINT Nest cierra el servidor y corre los `onModuleDestroy` antes de salir.
+  app.enableShutdownHooks();
   app.enableCors({ origin: env.WEB_ORIGIN, credentials: true });
   mountAuth(app, app.get<Auth>(AUTH));
   app.useBodyParser("json");

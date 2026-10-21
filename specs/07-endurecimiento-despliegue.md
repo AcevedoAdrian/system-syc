@@ -57,7 +57,7 @@ Además cierra lo que el borrador dejaba abierto o como "propuesta técnica", co
 - Un CI que despliega, o un registro de imágenes: las imágenes se construyen en el servidor (Q37).
 - Copias fuera del servidor, en otro disco o en otro equipo (Q36).
 - Alertas automáticas cuando un backup falla. Queda el log.
-- La caché larga de assets y la compresión gzip (decisión del usuario, 2026-10-07).
+- La compresión gzip (decisión del usuario, 2026-10-07). La caché larga de assets entró después, con la auditoría de pre-producción (2026-10-20): ver Decisiones.
 - Importar datos existentes: el sistema arranca vacío (decisión del usuario, 2026-10-07).
 - Playwright o cualquier e2e automatizado (P3).
 - Monitoreo, métricas, más de un servidor, otro orquestador.
@@ -316,7 +316,7 @@ Los marcados *(verify)* los comprueba `pnpm verify --spec 07`. Los demás se til
 - [X] *(verify)* Solo `web` publica un puerto. `postgres` y `api` no publican ninguno.
 - [X] *(verify)* Todos los servicios tienen `json-file` con `max-size` y `max-file` en el `config` resuelto.
 - [X] *(verify)* Por Nginx, `GET /api/health` responde `status: "ok"`. El admin entra por `/api/auth/sign-in/username`, y con esa cookie `GET /api/tickets` responde 200.
-- [X] *(verify)* `GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404.
+- [X] *(verify)* `GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404. `GET /` trae `Cache-Control: no-cache`, un asset del `index.html` trae `max-age` y un asset inexistente responde 404.
 - [X] *(verify)* Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión.
 - [X] *(verify)* Por Nginx, el sexto login fallido en un minuto responde 429, también mandando otro `X-Real-IP`.
 - [X] *(verify)* Contra la API directa, el sexto login fallido con `X-Real-IP: 10.0.0.1` responde 429, y uno con `X-Real-IP: 10.0.0.2` responde 401.
@@ -358,7 +358,8 @@ Los marcados *(verify)* los comprueba `pnpm verify --spec 07`. Los demás se til
 - **Sí:** `pnpm verify --spec 07` cubre lo automatizable, con un proyecto de compose propio (decisión del usuario, 2026-10-07). Un Dockerfile roto se descubre antes de desplegar.
 - **Sí:** el CI construye las imágenes en cada PR, sin publicarlas (decisión del usuario, 2026-10-07).
 - **Sí:** entran la rotación de logs de Docker y las cabeceras de seguridad en Nginx (decisión del usuario, 2026-10-07). Los logs no llenan el disco que comparten con los backups.
-- **No:** la caché larga de assets ni gzip (decisión del usuario, 2026-10-07). Es uso interno en la red local.
+- **No:** gzip (decisión del usuario, 2026-10-07). Es uso interno en la red local.
+- **Sí, después:** caché larga solo para `/assets/*` y `Cache-Control: no-cache` en `index.html` (auditoría de pre-producción, 2026-10-20). Sin esto, tras un deploy el navegador podía usar un `index.html` viejo que apunta a un asset ya borrado, y Nginx lo respondía con `index.html` en lugar de 404: pantalla en blanco.
 - **Sí:** el sistema arranca vacío: migraciones y seed (decisión del usuario, 2026-10-07). Importar datos existentes sería otro spec.
 - **Sí:** `docs/checklist-permisos.md` es una plantilla con registro de corridas, y la corrida se commitea (decisión del usuario, 2026-10-07). Queda la evidencia.
 - **Sí:** backups locales, 30 copias diarias, sin otro disco ni otro equipo (Q36). Queda como riesgo documentado, no como un pendiente silencioso.
@@ -384,7 +385,7 @@ Los marcados *(verify)* los comprueba `pnpm verify --spec 07`. Los demás se til
 - HTTPS, dominio, certificados y HSTS (Q37).
 - CI/CD que despliega, o un registro de imágenes (Q37).
 - Copias en otro disco o en otro equipo, y alertas de backup fallido (Q36).
-- Caché larga de assets y gzip.
+- Gzip.
 - Importar datos existentes.
 - Playwright o e2e automatizados (P3).
 - Monitoreo, varios servidores, otro orquestador, entrar por más de una URL y actualizar Postgres de versión mayor.
