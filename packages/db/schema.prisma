@@ -379,6 +379,7 @@ model Ticket {
   comentarios TicketComentario[]
 
   @@index([departamentoId])
+  @@index([departamentoId, fechaRecepcion(sort: Desc), numero(sort: Desc)])
   @@map("ticket")
 }
 

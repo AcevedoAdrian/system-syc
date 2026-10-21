@@ -19,7 +19,7 @@ Viven en `apps/api/test/<característica>/*.test.ts` (`auth`, `permissions`, `au
 
 - **Se empaqueta con `tsdown`** (ESM: `dist/main.mjs` y `dist/seed.mjs`). `@syc/contracts` y `@syc/db` son `devDependencies` que entran en el bundle porque exportan su fuente `.ts`. Prisma, Better Auth y `@orpc/*` van como `dependencies` (externos al bundle). Emite la decorator metadata que Nest necesita.
 - **Biome tiene desactivado `useImportType` en `apps/api/**`**: Nest necesita los imports como valor para la inyección de dependencias. No los conviertas a `import type`.
-- **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual.
+- **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual. Un error inesperado (que no es `ORPCError`) lo convierte oRPC en un 500 «Internal server error» sin pasar por el filtro de Nest, así que `ORPCModule.forRoot` en `app.module.ts` registra `common/log-unexpected-errors.ts`, que lo deja en el log con su stack (el cliente no lo ve).
 - Las variables de entorno se validan con Zod al arrancar (`src/config`). Las del seed (`SEED_ADMIN_*`) las valida el propio `src/seed.ts` y **no** son obligatorias para la API.
 
 ## Auditoría y eliminación lógica
