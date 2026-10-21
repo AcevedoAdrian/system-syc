@@ -1,5 +1,6 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
+  "globalDependencies": ["packages/config/tsconfig.base.json", "packages/config/biome.json"],
   "tasks": {
     "generate": {
       "inputs": ["schema.prisma", "prisma.config.ts"],
@@ -14,6 +15,7 @@
     },
     "build": {
       "dependsOn": ["^generate", "generate", "^typecheck"],
+      "env": ["VITE_API_URL"],
       "outputs": ["dist/**"]
     }
   }
