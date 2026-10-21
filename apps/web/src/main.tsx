@@ -3,6 +3,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import { RouteError } from "./components/layout/RouteError";
 import { queryClient, setUnauthorizedHandler } from "./lib/query-client";
 import { initTheme } from "./lib/theme";
 import { routeTree } from "./routeTree.gen";
@@ -11,8 +12,13 @@ import { routeTree } from "./routeTree.gen";
 initTheme();
 
 // Una dirección inexistente, también anidada (`/admin/xyz`), se resuelve en la raíz: la pantalla de
-// «Página no encontrada» no va dentro del marco autenticado.
-const router = createRouter({ routeTree, notFoundMode: "root" });
+// «Página no encontrada» no va dentro del marco autenticado. Un error que ninguna ruta captura (la API
+// caída al entrar, por ejemplo) muestra `RouteError` en lugar de la pantalla en inglés del router.
+const router = createRouter({
+  routeTree,
+  notFoundMode: "root",
+  defaultErrorComponent: RouteError,
+});
 
 declare module "@tanstack/react-router" {
   interface Register {
