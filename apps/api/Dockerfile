@@ -3,7 +3,7 @@
 #   docker build -f apps/api/Dockerfile --target api .
 # `docker/Dockerfile.dev` es solo para desarrollo.
 
-FROM node:22.23-slim AS base
+FROM node:22.23.4-slim AS base
 # Misma versión que `packageManager` del package.json raíz.
 ARG PNPM_VERSION=11.25.0
 RUN apt-get update \
@@ -43,7 +43,7 @@ USER node
 CMD ["node_modules/.bin/prisma", "migrate", "deploy"]
 
 # La API: solo Node y el bundle, sin pnpm. El seed corre desde esta imagen: `node dist/seed.mjs`.
-FROM node:22.23-slim AS api
+FROM node:22.23.4-slim AS api
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /out/api/node_modules /app/node_modules

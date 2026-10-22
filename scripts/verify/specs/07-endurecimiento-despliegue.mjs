@@ -406,7 +406,7 @@ export default defineSpec({
         }
         writeFileSync(
           path.join(ctx, "Dockerfile"),
-          "FROM nginx:1.28-alpine\nCOPY . /ctx\nRUN find /ctx -name '.env*' | sort > /found.txt\n",
+          "FROM nginx:1.30.6-alpine\nCOPY . /ctx\nRUN find /ctx -name '.env*' | sort > /found.txt\n",
         );
         const ctxTag = `${PROJECT}-check-contexto`;
         builtTags.add(ctxTag);
