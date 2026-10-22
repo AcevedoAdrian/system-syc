@@ -42,6 +42,15 @@ const agenteTecnico: AuthenticatedUser = {
   scope: { departmentId: "tec" },
 };
 
+const agenteRedes: AuthenticatedUser = {
+  id: "beto",
+  username: "beto",
+  name: "Beto",
+  email: "beto@example.com",
+  role: "agente",
+  scope: { departmentId: "red" },
+};
+
 const input = (extra: Partial<CreateTicketInput> = {}): CreateTicketInput => ({
   departamentoId: "tec",
   titulo: "Impresora rota",
@@ -184,6 +193,8 @@ function buildService(world: World = {}) {
           r.id !== exceptId,
       ) ?? null,
     findDetail: async (id: string) => tickets.find((t) => t.id === id) ?? null,
+    findDepartmentId: async (id: string) =>
+      tickets.find((t) => t.id === id)?.departamento.id ?? null,
     findPage: async (departmentId: string | null, filters: ListTicketsInput) => {
       pageCalls.push({ departmentId, filters });
       return { items: tickets as unknown as TicketSummaryRow[], total: tickets.length };
@@ -411,6 +422,16 @@ describe("TicketsService.create", () => {
     expect(ticket.departamento).toEqual({ id: "red", nombre: "Redes" });
   });
 
+  it("un agente no crea en otro departamento aunque el guard no lo haya frenado: 403", async () => {
+    const { service, created, audits } = buildService();
+
+    await expect(
+      service.create(input({ departamentoId: "red" }), agenteTecnico),
+    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+    expect(created).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
   describe("departamento", () => {
     it("inexistente: 400", async () => {
       const { service, created } = buildService();
@@ -583,6 +604,16 @@ describe("TicketsService.update", () => {
       code: "NOT_FOUND",
       status: 404,
     });
+  });
+
+  it("un agente de otro departamento recibe 404 y no se escribe ni audita nada", async () => {
+    const { service, updates, audits } = buildService({ tickets: [ticket] });
+
+    await expect(
+      service.update(edit(ticket, { titulo: "Pisado" }), agenteRedes),
+    ).rejects.toMatchObject({ code: "NOT_FOUND", status: 404 });
+    expect(updates).toHaveLength(0);
+    expect(audits).toHaveLength(0);
   });
 
   it("guarda el cambio con todos los campos editables y audita solo el diff, con el actor", async () => {
@@ -1349,6 +1380,22 @@ describe("TicketsService.changeStatus", () => {
       expect(statusChanges[0]?.expectedUpdatedAt).toBe(ticket.updatedAt);
     });
 
+    it("un agente de otro departamento recibe 404 y el estado no cambia", async () => {
+      const { service, statusChanges, audits } = buildService({
+        tickets: [ticket],
+        estados: ESTADOS,
+      });
+
+      await expect(service.changeStatus(cambio(ticket, "prog"), agenteRedes)).rejects.toMatchObject(
+        {
+          code: "NOT_FOUND",
+          status: 404,
+        },
+      );
+      expect(statusChanges).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
     it("un ticket inexistente o eliminado: 404", async () => {
       const { service } = buildService({ estados: ESTADOS });
 
@@ -1501,7 +1548,7 @@ describe("TicketsService.history", () => {
   it("lee el AuditLog de la entidad Ticket, sin tabla de historial propia", async () => {
     const { service, history } = buildService();
 
-    await expect(service.history("t-1")).resolves.toEqual([]);
+    await expect(service.history("t-1", admin)).resolves.toEqual([]);
 
     expect(history).toHaveBeenCalledWith("Ticket", "t-1");
   });
@@ -1509,9 +1556,26 @@ describe("TicketsService.history", () => {
   it("no chequea que el ticket exista: el historial de uno eliminado se sigue leyendo", async () => {
     const { service, history } = buildService({ tickets: [] });
 
-    await service.history("t-eliminado");
+    await service.history("t-eliminado", admin);
 
     expect(history).toHaveBeenCalledWith("Ticket", "t-eliminado");
+  });
+
+  it("un agente lee el historial de un ticket de su departamento", async () => {
+    const { service, history } = buildService({ tickets: [unTicket()] });
+
+    await service.history("t-1", agenteTecnico);
+
+    expect(history).toHaveBeenCalledWith("Ticket", "t-1");
+  });
+
+  it("a un agente le responde 404 si el ticket es de otro departamento, eliminado o inexistente", async () => {
+    const { service, history } = buildService({ tickets: [unTicket()] });
+
+    for (const id of ["t-1", "t-eliminado"]) {
+      await expect(service.history(id, agenteRedes)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    }
+    expect(history).not.toHaveBeenCalled();
   });
 });
 
@@ -1521,13 +1585,24 @@ describe("TicketsService.get", () => {
     const creado = await service.create(input(), admin);
     const { service: conTicket } = buildService({ tickets: [creado] });
 
-    await expect(conTicket.get(creado.id)).resolves.toEqual(creado);
+    await expect(conTicket.get(creado.id, admin)).resolves.toEqual(creado);
+    await expect(conTicket.get(creado.id, agenteTecnico)).resolves.toEqual(creado);
+  });
+
+  it("a un agente de otro departamento le responde 404, igual que por un id inexistente", async () => {
+    const { service } = buildService({ tickets: [unTicket()] });
+
+    await expect(service.get("t-1", agenteRedes)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+      status: 404,
+      message: "El ticket no existe",
+    });
   });
 
   it("un id inexistente o eliminado responde 404", async () => {
     const { service } = buildService();
 
-    await expect(service.get("nada")).rejects.toMatchObject({
+    await expect(service.get("nada", admin)).rejects.toMatchObject({
       code: "NOT_FOUND",
       status: 404,
       message: "El ticket no existe",

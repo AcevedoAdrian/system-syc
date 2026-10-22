@@ -30,7 +30,7 @@ const ENTITY_TYPE = "Ticket";
 
 // El guard deja `user.scope` en todo endpoint con `@RequirePermission`. Sin él, un endpoint olvidó
 // declararlo: se falla en vez de listar sin filtro.
-function scopeOf(actor: AuthenticatedUser): UserScope {
+export function scopeOf(actor: AuthenticatedUser): UserScope {
   if (!actor.scope) {
     throw new Error("Falta el scope del usuario: el endpoint debe declarar @RequirePermission");
   }
@@ -77,16 +77,24 @@ export class TicketsService {
     return { items, total, page: filters.page, pageSize: TICKETS_PAGE_SIZE };
   }
 
-  // El guard ya acota a un agente a su departamento (404 si es ajeno); acá solo falta el caso del
-  // admin, para quien un id inexistente o eliminado también es 404.
-  async get(ticketId: string): Promise<Ticket> {
+  // La barrera que manda: el guard ya acota a un agente a su departamento, pero el service lo vuelve a
+  // exigir con el id que de verdad va a usar. Un ticket inexistente, eliminado o de otro departamento
+  // es el mismo 404 (para el admin, que no tiene departamento, solo los dos primeros).
+  async get(ticketId: string, actor: AuthenticatedUser): Promise<Ticket> {
+    const { departmentId } = scopeOf(actor);
     const ticket = await this.repository.findDetail(ticketId);
-    if (!ticket) throw new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
+    if (!ticket || (departmentId !== null && ticket.departamento.id !== departmentId)) {
+      throw new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
+    }
     return ticket;
   }
 
   async create(input: CreateTicketInput, actor: AuthenticatedUser): Promise<Ticket> {
     const scope = scopeOf(actor);
+    // Defensa extra: el guard ya lo exige leyendo el cuerpo, pero el service no depende de eso.
+    if (scope.departmentId !== null && input.departamentoId !== scope.departmentId) {
+      throw new ORPCError("FORBIDDEN", { message: "No podés crear tickets en otro departamento" });
+    }
 
     const departamento = await this.repository.findDepartment(input.departamentoId);
     if (!departamento) {
@@ -142,7 +150,7 @@ export class TicketsService {
   // procedimiento. Sin cambios efectivos responde 200 y no escribe ni audita.
   async update(input: UpdateTicketInput, actor: AuthenticatedUser): Promise<Ticket> {
     const scope = scopeOf(actor);
-    const current = await this.get(input.ticketId);
+    const current = await this.get(input.ticketId, actor);
     // Antes de todo: con la versión vieja no se guarda nada, ni siquiera "sin cambios".
     if (!sameInstant(input.updatedAt, current.updatedAt)) {
       throw new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE });
@@ -247,7 +255,7 @@ export class TicketsService {
   // `fechaCierre`, `REABIERTO` pide `fechaReabierto`, y cualquier otro no admite ninguna. Lo que la
   // request no manda no se toca (al reabrir se conservan `fechaCierre` y la solución).
   async changeStatus(input: ChangeTicketStatusInput, actor: AuthenticatedUser): Promise<Ticket> {
-    const current = await this.get(input.ticketId);
+    const current = await this.get(input.ticketId, actor);
     if (!sameInstant(input.updatedAt, current.updatedAt)) {
       throw new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE });
     }
@@ -320,7 +328,7 @@ export class TicketsService {
     input: ChangeTicketDepartmentInput,
     actor: AuthenticatedUser,
   ): Promise<Ticket> {
-    const current = await this.get(input.ticketId);
+    const current = await this.get(input.ticketId, actor);
     if (!sameInstant(input.updatedAt, current.updatedAt)) {
       throw new ORPCError("CONFLICT", { message: STALE_TICKET_MESSAGE });
     }
@@ -351,7 +359,7 @@ export class TicketsService {
   // Solo el admin (el guard lo exige), también sobre un ticket de su propio departamento. Eliminar
   // algo ya eliminado o inexistente es 404.
   async remove(ticketId: string, actor: AuthenticatedUser): Promise<void> {
-    await this.get(ticketId);
+    await this.get(ticketId, actor);
     await this.repository.softDelete(ticketId, actor.id, {
       entityType: ENTITY_TYPE,
       entityId: ticketId,
@@ -361,10 +369,18 @@ export class TicketsService {
     });
   }
 
-  // Del más reciente al más antiguo. Sin chequear que el ticket exista: el de uno eliminado se sigue
-  // leyendo (solo el admin llega acá, porque para un agente el guard ya responde 404), y un id sin
-  // registros devuelve `[]`. No hay una tabla de historial propia: es `AuditLog`.
-  async history(ticketId: string): Promise<AuditHistory> {
+  // Del más reciente al más antiguo. Al admin no se le chequea que el ticket exista: el de uno
+  // eliminado se sigue leyendo, y un id sin registros devuelve `[]`. Un agente solo lee el de un
+  // ticket vivo de su departamento (404 en cualquier otro caso). No hay una tabla de historial
+  // propia: es `AuditLog`.
+  async history(ticketId: string, actor: AuthenticatedUser): Promise<AuditHistory> {
+    const { departmentId } = scopeOf(actor);
+    if (
+      departmentId !== null &&
+      (await this.repository.findDepartmentId(ticketId)) !== departmentId
+    ) {
+      throw new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
+    }
     return this.audit.history(ENTITY_TYPE, ticketId);
   }
 

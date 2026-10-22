@@ -18,8 +18,8 @@ export class CommentsController {
 
   @RequirePermission(PERMISSIONS.TICKET_VIEW, ownTicket)
   @Implement(c.list)
-  list() {
-    return implement(c.list).handler(({ input }) => this.service.list(input.ticketId));
+  list(@CurrentUser() actor: AuthenticatedUser) {
+    return implement(c.list).handler(({ input }) => this.service.list(input.ticketId, actor));
   }
 
   // Comentar es editar el ticket para el PRD §4.2, aunque no lo modifique: también con el ticket en
@@ -28,7 +28,7 @@ export class CommentsController {
   @Implement(c.create)
   create(@CurrentUser() actor: AuthenticatedUser) {
     return implement(c.create).handler(({ input }) =>
-      this.service.create(input.ticketId, input.texto, actor.id),
+      this.service.create(input.ticketId, input.texto, actor),
     );
   }
 

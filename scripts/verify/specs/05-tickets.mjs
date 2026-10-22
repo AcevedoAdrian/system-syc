@@ -906,6 +906,65 @@ export default defineSpec({
       // Los criterios 19 y 20 de SPEC 02 usan tickets reales y se verifican con `pnpm verify --spec 02`.
     }),
 
+    criterion(
+      25,
+      "Un agente no alcanza un ticket de otro departamento mandando su `ticketId` en la query o en el cuerpo de un endpoint de un ticket propio: 404 y el ticket ajeno no cambia",
+      async () => {
+        const [tecnico, redes] = [await departmentNamed("Técnico"), await departmentNamed("Redes")];
+        const a = await admin();
+        const atacante = await loggedIn(await newUser({ organizationId: tecnico.id }));
+        const propio = await newTicket(atacante, tecnico.id);
+        const ajeno = await newTicket(a, redes.id);
+        const estado = await estadoLibre(ajeno.estado.id);
+
+        const intentos = [
+          [
+            "GET con ticketId en la query",
+            () => atacante.get(`/tickets/${propio.id}?ticketId=${ajeno.id}`),
+          ],
+          [
+            "PUT con ticketId en el cuerpo",
+            () => update(atacante, propio, { ticketId: ajeno.id, titulo: "Pisado" }),
+          ],
+          [
+            "status con ticketId en el cuerpo",
+            () => changeStatus(atacante, propio, { ticketId: ajeno.id, estadoId: estado.id }),
+          ],
+          [
+            "history con ticketId en la query",
+            () => atacante.get(`/tickets/${propio.id}/history?ticketId=${ajeno.id}`),
+          ],
+          [
+            "comments (GET) con ticketId en la query",
+            () => atacante.get(`/tickets/${propio.id}/comments?ticketId=${ajeno.id}`),
+          ],
+          [
+            "comments (POST) con ticketId en el cuerpo",
+            () =>
+              atacante.post(`/tickets/${propio.id}/comments`, {
+                ticketId: ajeno.id,
+                texto: "Comentario colado",
+              }),
+          ],
+        ];
+        for (const [label, call] of intentos) assertStatus(await call(), 404, label);
+
+        const despues = await get(a, ajeno.id);
+        same(
+          [despues.titulo, despues.estado.id, despues.updatedAt],
+          [ajeno.titulo, ajeno.estado.id, ajeno.updatedAt],
+          "el ticket ajeno no cambió",
+        );
+        same(auditActions(ajeno.id), ["create"], "sin auditoría nueva en el ajeno");
+        const comentarios = await a.get(`/tickets/${ajeno.id}/comments`);
+        assertStatus(comentarios, 200, "comentarios del ajeno");
+        same(comentarios.body.length, 0, "sin comentarios en el ajeno");
+
+        // Los propios siguen funcionando con la URL sola.
+        assertStatus(await atacante.get(`/tickets/${propio.id}`), 200, "GET propio");
+      },
+    ),
+
     turboCriterion(24),
   ],
 });
