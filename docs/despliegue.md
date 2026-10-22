@@ -307,6 +307,10 @@ HTTPS, dominio propio y HSTS (Q37); copias fuera del servidor y alertas de backu
 
 Con `PUBLIC_URL=http://...` el **usuario, la contraseña y la cookie de sesión viajan sin cifrar** por la red local: quien pueda capturar tráfico en esa red los ve. La cookie es `HttpOnly` y `SameSite=Lax`, pero sin `Secure` a propósito (con `Secure` el navegador no la mandaría por HTTP y nadie podría entrar). El día que haya dominio y certificado: poner `PUBLIC_URL` en `https://...`, activar `advanced.useSecureCookies` en `apps/api/src/modules/auth/auth.config.ts` y agregar la cabecera `Strict-Transport-Security` en `apps/web/nginx.conf`.
 
+### Contenedores endurecidos
+
+`api` y `migrate` corren con `no-new-privileges` y sin ninguna capacidad de Linux (`cap_drop: ALL`), y `api` además con el sistema de archivos de solo lectura (`read_only`, con `/tmp` en memoria). El seed (`run --rm api node dist/seed.mjs`) hereda lo mismo y funciona igual: solo lee `/seed-data`, que va montado `:ro`. Si un cambio futuro de la API necesita escribir en disco, va a fallar con `EROFS`: la solución es un volumen o `tmpfs` para esa ruta, no sacar `read_only`. Los defaults están en el bloque `x-hardened` de `docker-compose.prod.yml`.
+
 ### Cabeceras de seguridad
 
 Nginx manda `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy` (a nivel `server` en `apps/web/nginx.conf`), y limita el cuerpo de una request a 256 KB (413 si lo pasa). La API además no manda `X-Powered-By` y lee cuerpos JSON de hasta 100 KB.

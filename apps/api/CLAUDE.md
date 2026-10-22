@@ -13,14 +13,14 @@ Un módulo por dominio de negocio, autocontenido: controla sus propias entidades
 
 ## Tests
 
-Viven en `apps/api/test/<característica>/*.test.ts` (`auth`, `permissions`, `audit`, `catalogs`, `tickets`, `comments`, `users`, `organizations`, `health`, `seed`, `common`), nunca en `src`: el `include` de Vitest solo mira `test/`. Importan el código con el alias `@/` (→ `src`, definido en `vitest.config.ts` y `tsconfig.json`); es solo para los tests, el código de producción sigue con rutas relativas y el bundle de `tsdown` no lo conoce. Un test nuevo va en la carpeta de su característica.
+Viven en `apps/api/test/<característica>/*.test.ts` (`auth`, `permissions`, `audit`, `config`, `catalogs`, `tickets`, `comments`, `users`, `organizations`, `health`, `seed`, `common`), nunca en `src`: el `include` de Vitest solo mira `test/`. Importan el código con el alias `@/` (→ `src`, definido en `vitest.config.ts` y `tsconfig.json`); es solo para los tests, el código de producción sigue con rutas relativas y el bundle de `tsdown` no lo conoce. Un test nuevo va en la carpeta de su característica.
 
 ## Particularidades
 
 - **Se empaqueta con `tsdown`** (ESM: `dist/main.mjs` y `dist/seed.mjs`). `@syc/contracts` y `@syc/db` son `devDependencies` que entran en el bundle porque exportan su fuente `.ts`. Prisma, Better Auth y `@orpc/*` van como `dependencies` (externos al bundle). Emite la decorator metadata que Nest necesita.
 - **Biome tiene desactivado `useImportType` en `apps/api/**`**: Nest necesita los imports como valor para la inyección de dependencias. No los conviertas a `import type`.
 - **`@orpc/nest` expone el contrato como OpenAPI/REST** (`GET /health`, `GET /users/me`, ...), no como RPC en `/rpc`. Los errores de negocio se lanzan con `ORPCError` (`CONFLICT` → 409, `BAD_REQUEST` → 400, `NOT_FOUND` → 404), con el mensaje en español que la web muestra tal cual. Un error inesperado (que no es `ORPCError`) lo convierte oRPC en un 500 «Internal server error» sin pasar por el filtro de Nest, así que `ORPCModule.forRoot` en `app.module.ts` registra `common/log-unexpected-errors.ts`, que lo deja en el log con su stack (el cliente no lo ve).
-- Las variables de entorno se validan con Zod al arrancar (`src/config`). Las del seed (`SEED_ADMIN_*`) las valida el propio `src/seed.ts` y **no** son obligatorias para la API.
+- Las variables de entorno se validan con Zod al arrancar (`src/config`). En producción rechaza un `BETTER_AUTH_SECRET` que empiece con `dev-only-` (los secretos de ejemplo de `.env.example` y `docker-compose.yml`), para que copiar el `.env` de desarrollo no deje las sesiones firmadas con una clave pública. Las del seed (`SEED_ADMIN_*`) las valida el propio `src/seed.ts` y **no** son obligatorias para la API.
 
 ## Auditoría y eliminación lógica
 

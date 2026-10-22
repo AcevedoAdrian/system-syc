@@ -696,6 +696,25 @@ export default defineSpec({
       },
     ),
 
+    criterion(
+      25,
+      "En producción, la API no arranca con el `BETTER_AUTH_SECRET` de ejemplo del repo y el error nombra la variable",
+      async () => {
+        const res = run(process.execPath, ["apps/api/dist/main.mjs"], {
+          env: cleanEnv({
+            NODE_ENV: "production",
+            API_PORT: "3919",
+            BETTER_AUTH_SECRET: "dev-only-secret-change-me-0123456789abcdef",
+          }),
+        });
+        assert(res.status !== 0, "la API arrancó con el secreto de ejemplo en producción");
+        assert(
+          res.output.includes("BETTER_AUTH_SECRET"),
+          `el error no nombra la variable:\n${tail(res.output)}`,
+        );
+      },
+    ),
+
     turboCriterion(23),
   ],
 });

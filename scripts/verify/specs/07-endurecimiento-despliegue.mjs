@@ -809,6 +809,47 @@ export default defineSpec({
       },
     ),
 
+    criterion(
+      20,
+      "`api` y `migrate` corren sin capacidades de Linux ni privilegios nuevos, y `api` con el sistema de archivos de solo lectura: no puede escribir en `/app` y sí en `/tmp`",
+      async () => {
+        await ensureStack();
+        for (const name of ["api", "migrate"]) {
+          const inspected = docker(
+            "inspect",
+            "-f",
+            "{{json .HostConfig.CapDrop}} {{json .HostConfig.SecurityOpt}} {{.HostConfig.ReadonlyRootfs}}",
+            containerOf(name),
+          );
+          mustRun(inspected, `inspect de ${name}`);
+          const [capDrop, securityOpt, readonly] = inspected.stdout.trim().split(" ");
+          assert(capDrop === '["ALL"]', `${name}: CapDrop = ${capDrop}`);
+          assert(
+            securityOpt === '["no-new-privileges:true"]',
+            `${name}: SecurityOpt = ${securityOpt}`,
+          );
+          assert(
+            readonly === String(name === "api"),
+            `${name}: ReadonlyRootfs = ${readonly} (solo api debe ser true)`,
+          );
+        }
+        const write = (target) =>
+          compose([
+            "exec",
+            "-T",
+            "api",
+            "node",
+            "-e",
+            `require("node:fs").writeFileSync(${JSON.stringify(target)}, "x")`,
+          ]);
+        assert(write("/app/escritura-prohibida").status !== 0, "api pudo escribir en /app");
+        mustRun(write("/tmp/escritura-permitida"), "escribir en /tmp de api");
+        // Con todo lo anterior, la API sigue sana y sirve la web.
+        const health = await fetch(`${PUBLIC_URL}/api/health`);
+        assert(health.status === 200, `GET /api/health respondió ${health.status}`);
+      },
+    ),
+
     turboCriterion(19),
   ],
 });
