@@ -52,7 +52,7 @@ docker-compose.prod.yml   # producción (servidor on-premise)
 
 ## Cómo levantarlo
 
-Requisitos: Node 22, pnpm 11 y Docker.
+Requisitos: Node 24, pnpm 11 y Docker.
 
 ```bash
 pnpm install

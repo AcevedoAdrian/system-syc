@@ -13,12 +13,11 @@ overrides:
 # detectaron en horas o días). Sin excepciones: si una versión nueva hace falta antes, se espera.
 minimumReleaseAge: 4320
 # Rechaza una versión sin la procedencia (publicador confiable o attestation) que sí tenían versiones
-# publicadas antes: puede ser una toma de control del paquete. Las tres excepciones se revisaron a mano
+# publicadas antes: puede ser una toma de control del paquete. Las dos excepciones se revisaron a mano
 # (octubre de 2026) y en ninguna cambió quién publica: `prisma@7.10.1` la publicó `prismabot`, igual que
-# la 7.10.0; `undici-types@6.21.0`, el mismo mantenedor que el resto de sus versiones; `semver@6.3.1` es
-# un parche de la rama 6 publicado después de la 7.5.4. Una excepción nueva se revisa igual, no se copia.
+# la 7.10.0, y `semver@6.3.1` es un parche de la rama 6 publicado después de la 7.5.4. Una excepción
+# nueva se revisa igual, no se copia.
 trustPolicy: no-downgrade
 trustPolicyExclude:
   - prisma@7.10.1
   - semver@6.3.1
-  - undici-types@6.21.0

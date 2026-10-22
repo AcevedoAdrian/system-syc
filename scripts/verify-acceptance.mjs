@@ -12,7 +12,7 @@ import { teardownInfra } from "./verify/lib/infra.mjs";
 //
 // Los criterios que necesitan la API se prueban contra una API real (build de producción,
 // NODE_ENV=production) y una base de datos TEMPORAL creada en el Postgres de `docker compose`; la base
-// de desarrollo no se toca. Requiere Node 22, pnpm y Docker. Sale con código 1 si algún criterio falla.
+// de desarrollo no se toca. Requiere Node 24, pnpm y Docker. Sale con código 1 si algún criterio falla.
 //
 // Estructura:
 //   scripts/verify/lib/     piezas reutilizables (entorno, infraestructura, cliente HTTP, fixtures, runner)

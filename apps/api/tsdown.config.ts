@@ -4,7 +4,7 @@ export default defineConfig({
   entry: ["src/main.ts", "src/seed.ts"],
   format: "esm",
   platform: "node",
-  target: "node22",
+  target: "node24",
   sourcemap: true,
   clean: true,
 });

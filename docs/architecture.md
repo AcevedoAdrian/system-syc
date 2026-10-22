@@ -23,7 +23,7 @@ Tres reglas sostienen esa decisión:
 | ------------------------------------- | ---------------------------------------------------------------- |
 | Gestor de paquetes                    | `pnpm` workspaces                                                |
 | Orquestador de monorepo               | Turborepo                                                        |
-| Lenguaje                              | TypeScript en modo `strict`, Node LTS (22/24)                    |
+| Lenguaje                              | TypeScript en modo `strict`, Node LTS (24)                       |
 | Backend                               | NestJS                                                           |
 | Contratos de API                      | oRPC + Zod (paquete `packages/contracts`)                        |
 | Base de datos                         | PostgreSQL                                                       |
@@ -179,7 +179,7 @@ Las relaciones importantes entre entidades **no van como IDs dentro de JSONB**: 
   - `api`: el bundle de `tsdown` con solo las dependencias de producción, sin puertos publicados.
   - `web`: Nginx, **única entrada HTTP**. Sirve la SPA y reenvía `/api` a la API, así que la API va por el mismo origen: un solo puerto abierto y sin CORS.
   - `backup`: cron + `pg_dump -Fc` sobre `postgres:17.11-alpine`; una copia diaria a las 02:00 (hora de Argentina) en una carpeta del servidor (`BACKUP_DIR`), con rotación de 30. Un backup fallido no borra copias.
-- Las imágenes de producción (`apps/api/Dockerfile`, con los targets `migrate` y `api`, y `apps/web/Dockerfile`) se construyen en el servidor, sin registro de imágenes. Llevan versiones de base fijadas (`node:22.23.4-slim`, `nginx:1.30.6-alpine`, `postgres:17.11-alpine`), nunca `latest`. Se fija la minor (no solo la mayor): dos builds del mismo tag no deben dar imágenes distintas. Subirla es un cambio a propósito, en los Dockerfiles, los dos compose y el `verify` del SPEC 07, probado con `pnpm verify --spec 07`.
+- Las imágenes de producción (`apps/api/Dockerfile`, con los targets `migrate` y `api`, y `apps/web/Dockerfile`) se construyen en el servidor, sin registro de imágenes. Llevan versiones de base fijadas (`node:24.22.1-slim`, `nginx:1.30.6-alpine`, `postgres:17.11-alpine`), nunca `latest`. Se fija la minor (no solo la mayor): dos builds del mismo tag no deben dar imágenes distintas. Subirla es un cambio a propósito, en los Dockerfiles, los dos compose y el `verify` del SPEC 07, probado con `pnpm verify --spec 07`.
 - Se despliega un tag `vAAAA.MM.DD` sobre `main`; el CI construye las imágenes para detectar un Dockerfile roto, pero no despliega ni publica.
 - Una sola URL de entrada (`PUBLIC_URL`) sobre HTTP, sin dominio ni HTTPS (decisión explícita). Nginx manda la IP real del cliente (`X-Real-IP`) para que el rate limit del login cuente por persona, y agrega cabeceras de seguridad.
 - Los logs de todos los servicios rotan (`json-file`, 10 MB × 5). Los backups viven en el mismo servidor que la base: es un riesgo aceptado y documentado, no un pendiente silencioso.

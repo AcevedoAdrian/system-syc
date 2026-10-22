@@ -23,7 +23,7 @@ No se carga sola: abrila cuando la tarea lo requiera.
 
 ## Comandos
 
-Requisitos: Node 22 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
+Requisitos: Node 24 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
 
 ```bash
 pnpm install                              # instala todo el workspace
