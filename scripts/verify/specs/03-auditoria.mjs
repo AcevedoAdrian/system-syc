@@ -273,11 +273,16 @@ export default defineSpec({
       "Correr el seed sobre una base vacía deja 5 `create` con `actorId: null` (admin y 4 departamentos); correrlo otra vez no agrega registros",
       async () => {
         // Solo las entidades de este SPEC: desde SPEC 04 el seed también carga estados y
-        // prioridades, y esos 11 `create` los verifica el criterio 04.12.
+        // prioridades, y esos 11 `create` los verifica el criterio 04.12. De los usuarios, solo el admin
+        // raíz: el seed también crea a los agentes de `seed-data/agentes.json` (si existe; no está en git)
+        // y el criterio 02.24 crea otros dos en esta misma base, todos con `actorId: null`.
         const system = () =>
           sql(
             `SELECT "entityType", action FROM audit_log
-             WHERE "actorId" IS NULL AND "entityType" IN ('User', 'Organization')
+             WHERE "actorId" IS NULL
+               AND ("entityType" = 'Organization'
+                    OR ("entityType" = 'User'
+                        AND "entityId" IN (SELECT id FROM "user" WHERE username = '${ADMIN.username}')))
              ORDER BY "entityType"`,
           );
         same(
