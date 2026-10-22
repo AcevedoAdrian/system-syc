@@ -27,7 +27,7 @@ Requisitos: Node 22 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
 
 ```bash
 pnpm install                              # instala todo el workspace
-docker compose up                         # postgres + api + web con hot reload (web :5173, api :3000, postgres :5432)
+docker compose up                         # postgres + api + web con hot reload (web :5173, api :3000, postgres :5432; solo en 127.0.0.1)
 docker compose down                       # detiene el stack (conserva volúmenes)
 
 pnpm lint                                 # biome check sobre todo el repo
