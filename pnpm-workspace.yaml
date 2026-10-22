@@ -4,6 +4,11 @@ packages:
 allowBuilds:
   '@prisma/engines': true
   prisma: true
+overrides:
+  '@modelcontextprotocol/sdk': 1.32.0
+  hono: 4.13.11
+  mysql2: 3.23.1
+  source-map-js: 1.2.2
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.11.3'
   - '@turbo/darwin-arm64@2.11.3'

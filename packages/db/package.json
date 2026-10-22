@@ -12,11 +12,11 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.10.0",
-    "@prisma/client": "7.10.0"
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1"
   },
   "devDependencies": {
     "@syc/config": "workspace:*",
-    "prisma": "7.10.0"
+    "prisma": "7.10.1"
   }
 }

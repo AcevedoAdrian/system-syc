@@ -13,14 +13,14 @@
     "lint": "biome check ."
   },
   "dependencies": {
-    "@nestjs/common": "12.1.0",
-    "@nestjs/core": "12.1.0",
-    "@nestjs/platform-express": "12.1.0",
+    "@nestjs/common": "12.2.0",
+    "@nestjs/core": "12.2.0",
+    "@nestjs/platform-express": "12.2.0",
     "@orpc/contract": "1.15.4",
     "@orpc/nest": "1.15.4",
     "@orpc/server": "1.15.4",
-    "@prisma/adapter-pg": "7.10.0",
-    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "better-auth": "1.7.7",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
@@ -32,6 +32,6 @@
     "@syc/db": "workspace:*",
     "auth": "1.7.7",
     "tsdown": "0.23.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.4"
   }
 }
