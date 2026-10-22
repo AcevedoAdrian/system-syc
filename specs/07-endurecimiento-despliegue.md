@@ -317,7 +317,7 @@ Los marcados *(verify)* los comprueba `pnpm verify --spec 07`. Los demás se til
 - [X] *(verify)* Todos los servicios tienen `json-file` con `max-size` y `max-file` en el `config` resuelto.
 - [X] *(verify)* Por Nginx, `GET /api/health` responde `status: "ok"`. El admin entra por `/api/auth/sign-in/username`, y con esa cookie `GET /api/tickets` responde 200.
 - [X] *(verify)* `GET /tickets/cualquier-cosa` responde 200 con `index.html`, y `POST /api/auth/sign-up/email` responde 404. `GET /` trae `Cache-Control: no-cache`, un asset del `index.html` trae `max-age` y un asset inexistente responde 404.
-- [X] *(verify)* Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión.
+- [X] *(verify)* Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy`, el header `Server` no muestra la versión, la API no manda `X-Powered-By` y un cuerpo de más de 256 KB responde 413. *(Auditoría de seguridad de octubre de 2026.)*
 - [X] *(verify)* Por Nginx, el sexto login fallido en un minuto responde 429, también mandando otro `X-Real-IP`.
 - [X] *(verify)* Contra la API directa, el sexto login fallido con `X-Real-IP: 10.0.0.1` responde 429, y uno con `X-Real-IP: 10.0.0.2` responde 401.
 - [X] *(verify)* Después de recrear solo `api` (`up -d --force-recreate api`), `GET /api/health` por Nginx sigue respondiendo `ok` sin reiniciar `web`.

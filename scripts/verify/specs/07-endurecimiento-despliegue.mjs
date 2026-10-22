@@ -50,6 +50,9 @@ const SECURITY_HEADERS = {
   "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
+  "content-security-policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
 
 // --- Archivos temporales -------------------------------------------------------------------------
@@ -556,7 +559,7 @@ export default defineSpec({
 
     criterion(
       9,
-      "Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión",
+      "Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy`, el header `Server` no muestra la versión, la API no manda `X-Powered-By` y un cuerpo de más de 256 KB responde 413",
       async () => {
         await ensureStack();
         for (const url of ["/", "/tickets/x", "/api/health", "/api/tickets"]) {
@@ -573,6 +576,20 @@ export default defineSpec({
             `${url}: Server = "${server}" (no debe llevar la versión)`,
           );
         }
+        const health = await fetch(`${PUBLIC_URL}/api/health`);
+        assert(
+          !health.headers.has("x-powered-by"),
+          `/api/health: X-Powered-By = ${health.headers.get("x-powered-by")} (no debe estar)`,
+        );
+        const grande = await fetch(`${PUBLIC_URL}/api/auth/sign-in/username`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "x".repeat(300 * 1024), password: "x" }),
+        });
+        assert(
+          grande.status === 413,
+          `un cuerpo de 300 KB respondió ${grande.status} (se esperaba 413)`,
+        );
       },
     ),
 

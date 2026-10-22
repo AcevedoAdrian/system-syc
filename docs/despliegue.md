@@ -306,6 +306,8 @@ HTTPS, dominio propio y HSTS (Q37); copias fuera del servidor y alertas de backu
 
 Con `PUBLIC_URL=http://...` el **usuario, la contraseña y la cookie de sesión viajan sin cifrar** por la red local: quien pueda capturar tráfico en esa red los ve. La cookie es `HttpOnly` y `SameSite=Lax`, pero sin `Secure` a propósito (con `Secure` el navegador no la mandaría por HTTP y nadie podría entrar). El día que haya dominio y certificado: poner `PUBLIC_URL` en `https://...`, activar `advanced.useSecureCookies` en `apps/api/src/modules/auth/auth.config.ts` y agregar la cabecera `Strict-Transport-Security` en `apps/web/nginx.conf`.
 
-### Cabeceras de seguridad que faltan
+### Cabeceras de seguridad
 
-Nginx manda `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`. No manda `Content-Security-Policy` ni `Permissions-Policy`: es una intranet y una política mal ajustada deja la pantalla en blanco, así que se agrega con una prueba en el navegador (las fuentes son `@fontsource` propias, sin CDN, así que se puede ser estricto con los orígenes, pero hay que comprobar que ningún estilo en línea de la web o de las librerías de UI quede bloqueado). Si se agregan, van como `add_header` a nivel `server`, como las demás.
+Nginx manda `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy` (a nivel `server` en `apps/web/nginx.conf`), y limita el cuerpo de una request a 256 KB (413 si lo pasa). La API además no manda `X-Powered-By` y lee cuerpos JSON de hasta 100 KB.
+
+La CSP solo admite recursos del mismo origen: la API va por `/api` y las fuentes son `@fontsource` propias, sin CDN. Dos excepciones, ambas necesarias: `style-src 'unsafe-inline'` (Radix escribe atributos `style`) y `font-src data:` (Vite inlinea como `data:` las fuentes más chicas). **Si se agrega un recurso externo (una fuente de Google, un script, una imagen de otro sitio, un iframe), hay que sumarlo a la CSP o el navegador lo bloquea sin avisar en pantalla**: abrir la consola del navegador y buscar «Content Security Policy». `pnpm verify --spec 07` comprueba que las cabeceras estén, no que la web cargue con ellas.
