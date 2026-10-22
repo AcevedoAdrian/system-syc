@@ -23,6 +23,7 @@ que el seed lee al correr; no forman parte del código.
   `agentes.example.json` muestran el formato: copialos como `areas.json` y `agentes.json` y
   completalos. En el servidor de producción esos dos se copian a mano a `seed-data/`.
 - Los agentes se crean con el usuario `<primera letra del nombre><apellido>` (sin acentos) y la
-  contraseña de `SEED_AGENTS_PASSWORD`; el `departamento` tiene que ser uno de `departamentos.json`.
+  una contraseña aleatoria propia (distinta para cada uno) que el seed imprime una sola vez al terminar;
+  el `departamento` tiene que ser uno de `departamentos.json`.
 - El seed busca la carpeta subiendo desde el directorio actual, o usa `SEED_DATA_DIR` si está definida
   (en producción es `/seed-data`, montada desde esta carpeta).

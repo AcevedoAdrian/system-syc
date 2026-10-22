@@ -54,7 +54,7 @@ docker compose exec api pnpm --filter @syc/db exec prisma migrate deploy
 docker compose exec api pnpm --filter @syc/api seed
 ```
 
-El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` (y, opcional, `SEED_AGENTS_PASSWORD` para cargar los agentes de `seed-data/agentes.json`) del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
+El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
 
 **Volver a la base vacía** (para probar de nuevo; borra todos los datos de desarrollo), con el stack levantado:
 
