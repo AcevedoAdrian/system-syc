@@ -1,0 +1,25 @@
+# Avisa de versiones nuevas de las acciones del CI (fijadas por SHA) y de las imágenes base de los
+# Dockerfiles. Cada propuesta es un PR que pasa por el CI; nada se aplica solo.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+      - /docker
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "build"
+    # Node y Nginx cambian de versión mayor a propósito (pasar a Node 24 es una decisión aparte, y las
+    # imágenes se fijan hasta la minor en `docs/architecture.md`): acá solo se avisan los parches y minors.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
