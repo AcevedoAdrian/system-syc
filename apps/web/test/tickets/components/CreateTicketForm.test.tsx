@@ -137,6 +137,7 @@ describe("CreateTicketForm", () => {
       "Descripción",
       "Actuación simple",
       "Referencia externa",
+      "N.º de factura",
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
@@ -178,6 +179,7 @@ describe("CreateTicketForm", () => {
       }
       const proveedor = within(screen.getByRole("region", { name: "Proveedor" }));
       expect(proveedor.getByLabelText("Referencia externa")).toBeInTheDocument();
+      expect(proveedor.getByLabelText("N.º de factura")).toBeInTheDocument();
       expect(proveedor.getByRole("combobox", { name: "Proveedor" })).toBeInTheDocument();
     });
 
@@ -309,6 +311,7 @@ describe("CreateTicketForm", () => {
         actuacionSimple: null,
         proveedorId: null,
         referenciaExterna: null,
+        numeroFactura: null,
       });
       await waitFor(() =>
         expect(mocks.navigate).toHaveBeenCalledWith({
@@ -590,6 +593,74 @@ describe("CreateTicketForm", () => {
       await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
 
       expect(await screen.findByText(/Usá el formato número\/año/)).toBeInTheDocument();
+      expect(mocks.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("número de factura (SPEC 10)", () => {
+    const elegirProveedor = () =>
+      userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "acme");
+
+    it("está deshabilitado sin proveedor, dice por qué y se habilita al elegir uno", async () => {
+      render(<CreateTicketForm />);
+
+      const factura = screen.getByLabelText("N.º de factura");
+      expect(factura).toBeDisabled();
+      expect(factura).toHaveAccessibleDescription("Elegí un proveedor para cargar la factura.");
+
+      await elegirProveedor();
+      expect(factura).toBeEnabled();
+      expect(factura).not.toHaveAccessibleDescription();
+    });
+
+    it("manda la factura recortada y sin referencia externa", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Falla del proveedor");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await elegirProveedor();
+      await userEvent.type(screen.getByLabelText("N.º de factura"), "  0003-00004567  ");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({
+        proveedorId: "acme",
+        referenciaExterna: null,
+        numeroFactura: "0003-00004567",
+      });
+    });
+
+    it("quitar el proveedor vacía y deshabilita la factura, y no se envía", async () => {
+      render(<CreateTicketForm />);
+      await elegirProveedor();
+      await userEvent.type(screen.getByLabelText("N.º de factura"), "A-12");
+
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "");
+
+      expect(screen.getByLabelText("N.º de factura")).toBeDisabled();
+      expect(screen.getByLabelText("N.º de factura")).toHaveValue("");
+
+      await userEvent.type(screen.getByLabelText("Título"), "Falla");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({ numeroFactura: null });
+    });
+
+    it("rechaza una factura de más de 50 caracteres y lo dice bajo el campo", async () => {
+      render(<CreateTicketForm />);
+      await userEvent.type(screen.getByLabelText("Título"), "Falla");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await elegirProveedor();
+      fireEvent.change(screen.getByLabelText("N.º de factura"), {
+        target: { value: "a".repeat(51) },
+      });
+
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByText("Hasta 50 caracteres.")).toBeInTheDocument();
+      expect(screen.getByLabelText("N.º de factura")).toBeInvalid();
       expect(mocks.create).not.toHaveBeenCalled();
     });
   });

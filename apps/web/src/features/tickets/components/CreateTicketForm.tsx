@@ -8,6 +8,7 @@ import {
   Flag,
   Hash,
   Lock,
+  Receipt,
   TextAlignStart,
   Ticket,
   Truck,
@@ -93,6 +94,8 @@ const DATE_ERROR = "Ingresá una fecha válida, de hoy o anterior.";
 const REFERENCIA_ERROR =
   "Usá el formato número/año, por ejemplo 19092/2026 (el año va de 2000 a 2100).";
 const REFERENCIA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la referencia.";
+const FACTURA_ERROR = "Hasta 50 caracteres.";
+const FACTURA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la factura.";
 
 interface FormProps {
   isAdmin: boolean;
@@ -124,6 +127,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       actuacionSimple: actuacionPrefijo,
       proveedorId: "",
       referenciaExterna: "",
+      numeroFactura: "",
     },
   });
   const hasProveedor = Boolean(watch("proveedorId"));
@@ -331,8 +335,11 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
                     value={field.value ?? ""}
                     onChange={(value) => {
                       field.onChange(value);
-                      // La referencia es del proveedor: sin proveedor no existe.
-                      if (!value) setValue("referenciaExterna", "");
+                      // La referencia y la factura son del proveedor: sin proveedor no existen.
+                      if (!value) {
+                        setValue("referenciaExterna", "");
+                        setValue("numeroFactura", "");
+                      }
                     }}
                     placeholder="Sin proveedor"
                     emptyLabel="Sin proveedor"
@@ -361,6 +368,27 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
               />
             )}
           </Field>
+          <div className="sm:col-start-2">
+            <Field
+              id="numeroFactura"
+              label="N.º de factura"
+              icon={Receipt}
+              hint={hasProveedor ? undefined : FACTURA_SIN_PROVEEDOR}
+              error={errors.numeroFactura && FACTURA_ERROR}
+            >
+              {(aria) => (
+                <Input
+                  id="numeroFactura"
+                  placeholder="0003-00004567"
+                  autoComplete="off"
+                  disabled={!hasProveedor}
+                  className={`${controlClass} font-mono text-[15px] md:text-[15px]`}
+                  {...aria}
+                  {...register("numeroFactura")}
+                />
+              )}
+            </Field>
+          </div>
         </div>
       </FormSection>
 

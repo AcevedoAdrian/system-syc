@@ -18,6 +18,7 @@ export function makeTicket(extra: Partial<Ticket> = {}): Ticket {
     descripcion: null,
     actuacionSimple: null,
     referenciaExterna: null,
+    numeroFactura: null,
     solucionDescripcion: null,
     notificado: false,
     fechaRecepcion: "2026-10-01",
