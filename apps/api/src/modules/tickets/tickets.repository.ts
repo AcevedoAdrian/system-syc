@@ -57,6 +57,7 @@ export interface TicketCreateData {
   descripcion: string | null;
   actuacionSimple: string | null;
   referenciaExterna: string | null;
+  numeroFactura: string | null;
   fechaRecepcion: string;
 }
 
@@ -73,6 +74,7 @@ export interface TicketUpdateData {
   moduloId: string | null;
   proveedorId: string | null;
   referenciaExterna: string | null;
+  numeroFactura: string | null;
   fechaRecepcion: string;
   fechaCierre: string | null;
   fechaReabierto: string | null;
@@ -111,6 +113,7 @@ const detailSelect = {
   descripcion: true,
   actuacionSimple: true,
   referenciaExterna: true,
+  numeroFactura: true,
   solucionDescripcion: true,
   notificado: true,
   fechaRecepcion: true,
@@ -167,6 +170,7 @@ interface DbTicket extends DbTicketSummary {
   descripcion: string | null;
   actuacionSimple: string | null;
   referenciaExterna: string | null;
+  numeroFactura: string | null;
   solucionDescripcion: string | null;
   notificado: boolean;
   fechaCierre: Date | null;
@@ -208,6 +212,7 @@ function toRow(row: DbTicket): TicketRow {
     descripcion: row.descripcion,
     actuacionSimple: row.actuacionSimple,
     referenciaExterna: row.referenciaExterna,
+    numeroFactura: row.numeroFactura,
     solucionDescripcion: row.solucionDescripcion,
     notificado: row.notificado,
     fechaCierre: row.fechaCierre && toDay(row.fechaCierre),

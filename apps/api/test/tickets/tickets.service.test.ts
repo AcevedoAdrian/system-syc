@@ -5,7 +5,7 @@ import type {
   ListTicketsInput,
   UpdateTicketInput,
 } from "@syc/contracts";
-import { listTicketsInputSchema } from "@syc/contracts";
+import { listTicketsInputSchema, updateTicketInputSchema } from "@syc/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@/common/authenticated-request";
 import type { AuditEntry } from "@/modules/audit/audit.repository";
@@ -60,6 +60,7 @@ const input = (extra: Partial<CreateTicketInput> = {}): CreateTicketInput => ({
   actuacionSimple: null,
   proveedorId: null,
   referenciaExterna: null,
+  numeroFactura: null,
   ...extra,
 });
 
@@ -94,6 +95,7 @@ const unTicket = (extra: Partial<TicketRow> = {}): TicketRow => ({
   descripcion: null,
   actuacionSimple: null,
   referenciaExterna: null,
+  numeroFactura: null,
   solucionDescripcion: null,
   notificado: false,
   fechaRecepcion: "2026-10-01",
@@ -120,6 +122,7 @@ const edit = (t: TicketRow, extra: Partial<UpdateTicketInput> = {}): UpdateTicke
   moduloId: t.modulo?.id ?? null,
   proveedorId: t.proveedor?.id ?? null,
   referenciaExterna: t.referenciaExterna,
+  numeroFactura: t.numeroFactura,
   fechaRecepcion: t.fechaRecepcion,
   fechaCierre: t.fechaCierre,
   fechaReabierto: t.fechaReabierto,
@@ -235,6 +238,7 @@ function buildService(world: World = {}) {
         descripcion: data.descripcion,
         actuacionSimple: data.actuacionSimple,
         referenciaExterna: data.referenciaExterna,
+        numeroFactura: data.numeroFactura,
         solucionDescripcion: null,
         notificado: false,
         fechaRecepcion: data.fechaRecepcion,
@@ -397,6 +401,7 @@ describe("TicketsService.create", () => {
         descripcion: null,
         actuacionSimple: null,
         referenciaExterna: null,
+        numeroFactura: null,
         solucionDescripcion: null,
         notificado: false,
         fechaRecepcion: "2026-10-01",
@@ -499,6 +504,37 @@ describe("TicketsService.create", () => {
 
       expect(ticket.proveedor).toEqual({ id: "acme", nombre: "Acme" });
       expect(ticket.referenciaExterna).toBe("19092/2026");
+    });
+  });
+
+  describe("número de factura (SPEC 10)", () => {
+    it("guarda la factura de un proveedor aunque no tenga referencia externa", async () => {
+      const { service, created, audits } = buildService();
+
+      const ticket = await service.create(
+        input({ proveedorId: "acme", numeroFactura: "0003-00004567" }),
+        agenteTecnico,
+      );
+
+      expect(created[0]?.data).toMatchObject({
+        referenciaExterna: null,
+        numeroFactura: "0003-00004567",
+      });
+      expect(ticket.numeroFactura).toBe("0003-00004567");
+      expect(audits[0]?.payload).toMatchObject({
+        after: { numeroFactura: "0003-00004567" },
+      });
+    });
+
+    it("acepta la misma factura en dos tickets del mismo proveedor", async () => {
+      const { service, created } = buildService();
+      const conFactura = input({ proveedorId: "acme", numeroFactura: "0003-00004567" });
+
+      const primero = await service.create(conFactura, admin);
+      const segundo = await service.create(conFactura, admin);
+
+      expect(created).toHaveLength(2);
+      expect(primero.numeroFactura).toBe(segundo.numeroFactura);
     });
   });
 
@@ -1002,6 +1038,93 @@ describe("TicketsService.update", () => {
       );
 
       expect(updates[0]?.data).toMatchObject({ proveedorId: "otro", referenciaExterna: null });
+    });
+  });
+
+  describe("número de factura (SPEC 10)", () => {
+    const conFactura = unTicket({
+      proveedor: { id: "acme", nombre: "Acme" },
+      numeroFactura: "0003-00004567",
+    });
+
+    it("la cambia y deja el diff con el valor anterior y el nuevo", async () => {
+      const { service, updates, audits } = buildService({ tickets: [conFactura] });
+
+      const updated = await service.update(
+        edit(conFactura, { numeroFactura: "0003-00004568" }),
+        agenteTecnico,
+      );
+
+      expect(updates[0]?.data.numeroFactura).toBe("0003-00004568");
+      expect(updated.numeroFactura).toBe("0003-00004568");
+      expect(audits[0]).toMatchObject({ action: "update", entityId: "t-1" });
+      expect(audits[0]?.payload).toEqual({
+        before: { numeroFactura: "0003-00004567" },
+        after: { numeroFactura: "0003-00004568" },
+      });
+    });
+
+    it("la agrega a un ticket con proveedor y sin factura", async () => {
+      const sinFactura = unTicket({ proveedor: { id: "acme", nombre: "Acme" } });
+      const { service, audits } = buildService({ tickets: [sinFactura] });
+
+      await service.update(edit(sinFactura, { numeroFactura: "A-12" }), agenteTecnico);
+
+      expect(audits[0]?.payload).toEqual({
+        before: { numeroFactura: null },
+        after: { numeroFactura: "A-12" },
+      });
+    });
+
+    it("al vaciarla (cambiando de proveedor), el historial conserva la anterior", async () => {
+      const { service, updates, audits } = buildService({
+        tickets: [conFactura],
+        catalogos: { proveedor: [ref("acme", "Acme"), ref("otro", "Otro")] },
+      });
+
+      await service.update(edit(conFactura, { proveedorId: "otro", numeroFactura: null }), admin);
+
+      expect(updates[0]?.data).toMatchObject({ proveedorId: "otro", numeroFactura: null });
+      expect(audits[0]?.payload).toEqual({
+        before: { proveedor: { id: "acme", nombre: "Acme" }, numeroFactura: "0003-00004567" },
+        after: { proveedor: { id: "otro", nombre: "Otro" }, numeroFactura: null },
+      });
+    });
+
+    it("una edición sin cambios no escribe ni audita", async () => {
+      const { service, updates, audits } = buildService({ tickets: [conFactura] });
+
+      const result = await service.update(edit(conFactura), agenteTecnico);
+
+      expect(result).toEqual(conFactura);
+      expect(updates).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("una edición que solo cambia los espacios de los extremos no cambia nada", async () => {
+      const { service, updates, audits } = buildService({ tickets: [conFactura] });
+      // El contrato recorta antes de llegar al service: se parsea igual que lo hace oRPC.
+      const entrada = updateTicketInputSchema.parse({
+        ...edit(conFactura),
+        numeroFactura: "  0003-00004567  ",
+      });
+
+      await service.update(entrada, agenteTecnico);
+
+      expect(updates).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    });
+
+    it("se edita con el ticket cerrado como cualquier otro campo", async () => {
+      const cerrada = unTicket({
+        proveedor: { id: "acme", nombre: "Acme" },
+        fechaCierre: "2026-10-05",
+      });
+      const { service, updates } = buildService({ tickets: [cerrada] });
+
+      await service.update(edit(cerrada, { numeroFactura: "A-12" }), agenteTecnico);
+
+      expect(updates[0]?.data.numeroFactura).toBe("A-12");
     });
   });
 });
