@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@orpc/contract": "1.15.4",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@syc/config": "workspace:*",
-    "vitest": "5.0.1"
+    "vitest": "5.0.4"
   }
 }

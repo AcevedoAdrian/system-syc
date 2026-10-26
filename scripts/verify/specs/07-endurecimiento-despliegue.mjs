@@ -50,6 +50,9 @@ const SECURITY_HEADERS = {
   "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
+  "content-security-policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
 
 // --- Archivos temporales -------------------------------------------------------------------------
@@ -406,7 +409,7 @@ export default defineSpec({
         }
         writeFileSync(
           path.join(ctx, "Dockerfile"),
-          "FROM nginx:1.28-alpine\nCOPY . /ctx\nRUN find /ctx -name '.env*' | sort > /found.txt\n",
+          "FROM nginx:1.30.6-alpine\nCOPY . /ctx\nRUN find /ctx -name '.env*' | sort > /found.txt\n",
         );
         const ctxTag = `${PROJECT}-check-contexto`;
         builtTags.add(ctxTag);
@@ -556,7 +559,7 @@ export default defineSpec({
 
     criterion(
       9,
-      "Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`, y el header `Server` no muestra la versión",
+      "Las respuestas de Nginx traen `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy`, el header `Server` no muestra la versión, la API no manda `X-Powered-By` y un cuerpo de más de 256 KB responde 413",
       async () => {
         await ensureStack();
         for (const url of ["/", "/tickets/x", "/api/health", "/api/tickets"]) {
@@ -573,6 +576,20 @@ export default defineSpec({
             `${url}: Server = "${server}" (no debe llevar la versión)`,
           );
         }
+        const health = await fetch(`${PUBLIC_URL}/api/health`);
+        assert(
+          !health.headers.has("x-powered-by"),
+          `/api/health: X-Powered-By = ${health.headers.get("x-powered-by")} (no debe estar)`,
+        );
+        const grande = await fetch(`${PUBLIC_URL}/api/auth/sign-in/username`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "x".repeat(300 * 1024), password: "x" }),
+        });
+        assert(
+          grande.status === 413,
+          `un cuerpo de 300 KB respondió ${grande.status} (se esperaba 413)`,
+        );
       },
     ),
 
@@ -789,6 +806,47 @@ export default defineSpec({
           (await ticketIds(admin)).includes(t3.id),
           "restore.sh con api corriendo tocó la base",
         );
+      },
+    ),
+
+    criterion(
+      20,
+      "`api` y `migrate` corren sin capacidades de Linux ni privilegios nuevos, y `api` con el sistema de archivos de solo lectura: no puede escribir en `/app` y sí en `/tmp`",
+      async () => {
+        await ensureStack();
+        for (const name of ["api", "migrate"]) {
+          const inspected = docker(
+            "inspect",
+            "-f",
+            "{{json .HostConfig.CapDrop}} {{json .HostConfig.SecurityOpt}} {{.HostConfig.ReadonlyRootfs}}",
+            containerOf(name),
+          );
+          mustRun(inspected, `inspect de ${name}`);
+          const [capDrop, securityOpt, readonly] = inspected.stdout.trim().split(" ");
+          assert(capDrop === '["ALL"]', `${name}: CapDrop = ${capDrop}`);
+          assert(
+            securityOpt === '["no-new-privileges:true"]',
+            `${name}: SecurityOpt = ${securityOpt}`,
+          );
+          assert(
+            readonly === String(name === "api"),
+            `${name}: ReadonlyRootfs = ${readonly} (solo api debe ser true)`,
+          );
+        }
+        const write = (target) =>
+          compose([
+            "exec",
+            "-T",
+            "api",
+            "node",
+            "-e",
+            `require("node:fs").writeFileSync(${JSON.stringify(target)}, "x")`,
+          ]);
+        assert(write("/app/escritura-prohibida").status !== 0, "api pudo escribir en /app");
+        mustRun(write("/tmp/escritura-permitida"), "escribir en /tmp de api");
+        // Con todo lo anterior, la API sigue sana y sirve la web.
+        const health = await fetch(`${PUBLIC_URL}/api/health`);
+        assert(health.status === 200, `GET /api/health respondió ${health.status}`);
       },
     ),
 

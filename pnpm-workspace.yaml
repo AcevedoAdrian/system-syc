@@ -4,39 +4,26 @@ packages:
 allowBuilds:
   '@prisma/engines': true
   prisma: true
-minimumReleaseAgeExclude:
-  - '@turbo/darwin-64@2.11.3'
-  - '@turbo/darwin-arm64@2.11.3'
-  - '@turbo/linux-64@2.11.3'
-  - '@turbo/linux-arm64@2.11.3'
-  - '@turbo/windows-64@2.11.3'
-  - '@turbo/windows-arm64@2.11.3'
-  - turbo@2.11.3
-  - '@orpc/client@1.15.4'
-  - '@orpc/contract@1.15.4'
-  - '@orpc/shared@1.15.4'
-  - '@orpc/standard-server-fetch@1.15.4'
-  - '@orpc/standard-server-peer@1.15.4'
-  - '@orpc/standard-server@1.15.4'
-  - '@nestjs/common@12.1.0'
-  - '@nestjs/core@12.1.0'
-  - '@nestjs/platform-express@12.1.0'
-  - '@orpc/interop@1.15.4'
-  - '@orpc/nest@1.15.4'
-  - '@orpc/openapi-client@1.15.4'
-  - '@orpc/openapi@1.15.4'
-  - '@orpc/server@1.15.4'
-  - '@orpc/standard-server-aws-lambda@1.15.4'
-  - '@orpc/standard-server-fastify@1.15.4'
-  - '@orpc/standard-server-node@1.15.4'
-  - '@tanstack/react-router@1.170.39'
-  - '@orpc/tanstack-query@1.15.4'
-  - '@better-auth/core@1.7.7'
-  - '@better-auth/drizzle-adapter@1.7.7'
-  - '@better-auth/kysely-adapter@1.7.7'
-  - '@better-auth/memory-adapter@1.7.7'
-  - '@better-auth/mongo-adapter@1.7.7'
-  - '@better-auth/prisma-adapter@1.7.7'
-  - '@better-auth/telemetry@1.7.7'
-  - better-auth@1.7.7
-  - auth@1.7.7
+overrides:
+  '@modelcontextprotocol/sdk': 1.32.0
+  hono: 4.13.11
+  mysql2: 3.23.1
+  # Avisos altos del 22 de octubre de 2026 en dependencias de dependencias: `multer` entra fijo desde
+  # `@nestjs/platform-express` 12.2.0, `body-parser` desde `express` 5.3.0 y `undici` desde `jsdom`.
+  # Se sacan cuando esos paquetes suban sus propias versiones (`pnpm why <paquete>`).
+  body-parser: 2.4.0
+  multer: 2.5.0
+  'undici@^8.0.0': 8.12.2
+  source-map-js: 1.2.2
+# Una versión publicada hace menos de 3 días no se instala (los ataques de 2026 a TanStack y axios se
+# detectaron en horas o días). Sin excepciones: si una versión nueva hace falta antes, se espera.
+minimumReleaseAge: 4320
+# Rechaza una versión sin la procedencia (publicador confiable o attestation) que sí tenían versiones
+# publicadas antes: puede ser una toma de control del paquete. Las dos excepciones se revisaron a mano
+# (octubre de 2026) y en ninguna cambió quién publica: `prisma@7.10.1` la publicó `prismabot`, igual que
+# la 7.10.0, y `semver@6.3.1` es un parche de la rama 6 publicado después de la 7.5.4. Una excepción
+# nueva se revisa igual, no se copia.
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - prisma@7.10.1
+  - semver@6.3.1

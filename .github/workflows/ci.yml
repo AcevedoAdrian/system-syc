@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# Mínimo privilegio: el CI solo lee el repo. Un job que necesite más lo declara en su propio bloque.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -13,32 +17,41 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
+      # Dependencias de producción con avisos de seguridad altos o críticos. Las de desarrollo (por
+      # ejemplo el CLI de shadcn) quedan fuera: no llegan a las imágenes.
+      - name: Audit de dependencias de producción
+        run: pnpm audit --prod --audit-level high
+
       # Solo lo afectado respecto de main. En push a main compara contra el commit anterior.
       - name: Lint (repo completo)
         run: pnpm lint
 
+      # `base_ref` es el nombre de la rama de destino del PR: va por `env` y no dentro del `run`, para que
+      # un nombre de rama armado a propósito no se interprete como comandos de shell.
       - name: Typecheck, test y build de lo afectado
-        run: pnpm turbo typecheck test build --filter="...[${{ github.event_name == 'pull_request' && 'origin/' || '' }}${{ github.event_name == 'pull_request' && github.base_ref || 'HEAD^1' }}]"
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD^1' }}
+        run: pnpm turbo typecheck test build --filter="...[$BASE]"
 
   # Construye las imágenes de producción (SPEC 07) sin publicarlas ni desplegarlas: un Dockerfile roto
   # se descubre en el PR, no el día del deploy. Sin filtro de turbo: corre siempre.
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: API, target migrate
         run: docker build -f apps/api/Dockerfile --target migrate -t syc-migrate:ci .

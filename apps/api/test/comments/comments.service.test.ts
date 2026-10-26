@@ -1,9 +1,24 @@
 import { ORPCError } from "@orpc/server";
 import type { Comment } from "@syc/contracts";
 import { describe, expect, it, vi } from "vitest";
+import type { AuthenticatedUser } from "@/common/authenticated-request";
 import type { CommentsRepository } from "@/modules/tickets/comments.repository";
 import { CommentsService } from "@/modules/tickets/comments.service";
 import type { TicketsRepository } from "@/modules/tickets/tickets.repository";
+
+const userOf = (id: string, role: "admin" | "agente", departmentId: string | null) =>
+  ({
+    id,
+    username: id,
+    name: id,
+    email: `${id}@example.com`,
+    role,
+    scope: { departmentId },
+  }) satisfies AuthenticatedUser;
+
+const admin = userOf("admin-1", "admin", null);
+const ana = userOf("ana", "agente", "tec");
+const beto = userOf("beto", "agente", "red");
 
 interface StoredComment {
   id: string;
@@ -77,26 +92,52 @@ describe("CommentsService", () => {
     it("comenta y devuelve el comentario en la lista", async () => {
       const { service } = buildService();
 
-      const created = await service.create("t-1", "Llamé al proveedor", "ana");
+      const created = await service.create("t-1", "Llamé al proveedor", ana);
 
       expect(created.texto).toBe("Llamé al proveedor");
-      expect(await service.list("t-1")).toEqual([created]);
+      expect(await service.list("t-1", ana)).toEqual([created]);
     });
 
     it("responde 404 si el ticket no existe o está eliminado", async () => {
       const { service, commentsRepository } = buildService({ tickets: [] });
 
-      await expect(service.list("t-1")).rejects.toEqual(notFound("El ticket no existe"));
-      await expect(service.create("t-1", "hola", "ana")).rejects.toEqual(
+      await expect(service.list("t-1", ana)).rejects.toEqual(notFound("El ticket no existe"));
+      await expect(service.create("t-1", "hola", ana)).rejects.toEqual(
         notFound("El ticket no existe"),
       );
       expect(commentsRepository.create).not.toHaveBeenCalled();
     });
 
+    it("un agente de otro departamento recibe 404 al listar y al comentar, como si no existiera", async () => {
+      const { service, commentsRepository } = buildService();
+
+      await expect(service.list("t-1", beto)).rejects.toEqual(notFound("El ticket no existe"));
+      await expect(service.create("t-1", "hola", beto)).rejects.toEqual(
+        notFound("El ticket no existe"),
+      );
+      expect(commentsRepository.findByTicket).not.toHaveBeenCalled();
+      expect(commentsRepository.create).not.toHaveBeenCalled();
+    });
+
+    it("el admin lee y comenta en cualquier departamento", async () => {
+      const { service } = buildService();
+
+      await service.create("t-1", "hola", admin);
+
+      expect(await service.list("t-1", admin)).toHaveLength(1);
+    });
+
+    it("sin scope falla en vez de listar sin filtro", async () => {
+      const { service } = buildService();
+      const { scope: _scope, ...sinScope } = ana;
+
+      await expect(service.list("t-1", sinScope)).rejects.toThrow("Falta el scope");
+    });
+
     it("no llama a ninguna escritura de Ticket al comentar", async () => {
       const { service, ticketWrites } = buildService();
 
-      await service.create("t-1", "hola", "ana");
+      await service.create("t-1", "hola", ana);
 
       for (const write of Object.values(ticketWrites)) expect(write).not.toHaveBeenCalled();
     });
@@ -105,16 +146,16 @@ describe("CommentsService", () => {
   describe("remove", () => {
     it("elimina el comentario y deja de salir en la lista", async () => {
       const { service } = buildService();
-      const { id } = await service.create("t-1", "hola", "ana");
+      const { id } = await service.create("t-1", "hola", ana);
 
       await service.remove("t-1", id, "admin-1");
 
-      expect(await service.list("t-1")).toEqual([]);
+      expect(await service.list("t-1", ana)).toEqual([]);
     });
 
     it("responde 404 al eliminar dos veces", async () => {
       const { service } = buildService();
-      const { id } = await service.create("t-1", "hola", "ana");
+      const { id } = await service.create("t-1", "hola", ana);
       await service.remove("t-1", id, "admin-1");
 
       await expect(service.remove("t-1", id, "admin-1")).rejects.toEqual(
@@ -124,12 +165,12 @@ describe("CommentsService", () => {
 
     it("responde 404 si el comentario es de otro ticket", async () => {
       const { service } = buildService({ tickets: ["t-1", "t-2"] });
-      const { id } = await service.create("t-1", "hola", "ana");
+      const { id } = await service.create("t-1", "hola", ana);
 
       await expect(service.remove("t-2", id, "admin-1")).rejects.toEqual(
         notFound("El comentario no existe"),
       );
-      expect(await service.list("t-1")).toHaveLength(1);
+      expect(await service.list("t-1", ana)).toHaveLength(1);
     });
 
     it("responde 404 con un comentario inexistente", async () => {

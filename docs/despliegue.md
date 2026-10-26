@@ -68,7 +68,6 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
 
    - `PUBLIC_URL`: la URL exacta con la que se entra, por ejemplo `http://10.0.0.5`. Si `HTTP_PORT` no es 80, va con el puerto: `http://10.0.0.5:8080`.
    - `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME`: el administrador raíz. Se usan una sola vez, en el paso 4.
-   - `SEED_AGENTS_PASSWORD`: la contraseña temporal de los agentes de `seed-data/agentes.json` (mínimo 8 caracteres; sin ella el seed no los carga). Todos entran con ella y la cambian desde la interfaz.
    - `BACKUP_DIR`, solo si no es `/srv/syc/backups`.
 
    Si falta `PUBLIC_URL`, `POSTGRES_PASSWORD` o `BETTER_AUTH_SECRET`, `docker compose` no arranca y nombra la que falta.
@@ -87,13 +86,15 @@ Se despliega siempre un **tag** (ver "Tags"), nunca una rama. En los ejemplos, `
 
    Tiene que verse `migrate` en `Exited (0)` y `postgres`, `api`, `web` y `backup` en `running`, con `api` en `healthy`. Si `up` termina con error, mirá "Si algo falla".
 
-4. **Correr el seed y borrar las variables.** Antes, copiá `areas.json` y `agentes.json` a la carpeta `seed-data/` del clon (con `scp`): no están en git porque tienen nombres de personas y de áreas, y sin ellos el seed los saltea y lo avisa (`seed-data/README.md` explica el formato). El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades, las áreas y los edificios iniciales y los agentes. Es idempotente. En una base que ya tiene áreas (por ejemplo, la que migra a la versión con tipos de área) el seed no carga tipos ni áreas: ver «Deploy regular» para ese caso.
+4. **Correr el seed y borrar las variables.** Antes, copiá `areas.json` y `agentes.json` a la carpeta `seed-data/` del clon (con `scp`): no están en git porque tienen nombres de personas y de áreas, y sin ellos el seed los saltea y lo avisa (`seed-data/README.md` explica el formato). El seed crea el admin raíz, los 4 departamentos, los 7 estados y las 4 prioridades, las áreas y los edificios iniciales y los agentes, cada uno con su propia contraseña aleatoria. Es idempotente. En una base que ya tiene áreas (por ejemplo, la que migra a la versión con tipos de área) el seed no carga tipos ni áreas: ver «Deploy regular» para ese caso.
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm api node dist/seed.mjs
    ```
 
-   Después, borrá la contraseña del `.env` y recreá `api` para que tampoco quede en su entorno:
+   Al final, el seed imprime una tabla con el usuario y la contraseña inicial de cada agente creado. **Se muestra una sola vez** (en la base queda solo el hash): copiala a un lugar seguro y entregá a cada agente la suya por un canal que no sea el chat de grupo ni el correo; cada uno la cambia al entrar. Corré el seed con `run --rm`, como arriba, para que la salida no quede además en los logs de un contenedor. Si se pierde una, el admin la resetea desde `/admin/usuarios`. Un agente que ya existía no se toca.
+
+   Después, borrá las variables del seed del `.env` y recreá `api` para que tampoco queden en su entorno:
 
    ```bash
    sed -i '/^SEED_/d' .env
@@ -306,6 +307,12 @@ HTTPS, dominio propio y HSTS (Q37); copias fuera del servidor y alertas de backu
 
 Con `PUBLIC_URL=http://...` el **usuario, la contraseña y la cookie de sesión viajan sin cifrar** por la red local: quien pueda capturar tráfico en esa red los ve. La cookie es `HttpOnly` y `SameSite=Lax`, pero sin `Secure` a propósito (con `Secure` el navegador no la mandaría por HTTP y nadie podría entrar). El día que haya dominio y certificado: poner `PUBLIC_URL` en `https://...`, activar `advanced.useSecureCookies` en `apps/api/src/modules/auth/auth.config.ts` y agregar la cabecera `Strict-Transport-Security` en `apps/web/nginx.conf`.
 
-### Cabeceras de seguridad que faltan
+### Contenedores endurecidos
 
-Nginx manda `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`. No manda `Content-Security-Policy` ni `Permissions-Policy`: es una intranet y una política mal ajustada deja la pantalla en blanco, así que se agrega con una prueba en el navegador (las fuentes son `@fontsource` propias, sin CDN, así que se puede ser estricto con los orígenes, pero hay que comprobar que ningún estilo en línea de la web o de las librerías de UI quede bloqueado). Si se agregan, van como `add_header` a nivel `server`, como las demás.
+`api` y `migrate` corren con `no-new-privileges` y sin ninguna capacidad de Linux (`cap_drop: ALL`), y `api` además con el sistema de archivos de solo lectura (`read_only`, con `/tmp` en memoria). El seed (`run --rm api node dist/seed.mjs`) hereda lo mismo y funciona igual: solo lee `/seed-data`, que va montado `:ro`. Si un cambio futuro de la API necesita escribir en disco, va a fallar con `EROFS`: la solución es un volumen o `tmpfs` para esa ruta, no sacar `read_only`. Los defaults están en el bloque `x-hardened` de `docker-compose.prod.yml`.
+
+### Cabeceras de seguridad
+
+Nginx manda `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` y `Permissions-Policy` (a nivel `server` en `apps/web/nginx.conf`), y limita el cuerpo de una request a 256 KB (413 si lo pasa). La API además no manda `X-Powered-By` y lee cuerpos JSON de hasta 100 KB.
+
+La CSP solo admite recursos del mismo origen: la API va por `/api` y las fuentes son `@fontsource` propias, sin CDN. Dos excepciones, ambas necesarias: `style-src 'unsafe-inline'` (Radix escribe atributos `style`) y `font-src data:` (Vite inlinea como `data:` las fuentes más chicas). **Si se agrega un recurso externo (una fuente de Google, un script, una imagen de otro sitio, un iframe), hay que sumarlo a la CSP o el navegador lo bloquea sin avisar en pantalla**: abrir la consola del navegador y buscar «Content Security Policy». `pnpm verify --spec 07` comprueba que las cabeceras estén, no que la web cargue con ellas.

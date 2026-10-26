@@ -163,7 +163,7 @@ Cambiar el estado o el departamento se hace desde diálogos aparte; el formulari
 | ------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Gestor de paquetes       | `pnpm` workspaces                     |                                                                                                         |
 | Monorepo                 | Turborepo                             |                                                                                                         |
-| Lenguaje                 | TypeScript `strict`, Node 22          |                                                                                                         |
+| Lenguaje                 | TypeScript `strict`, Node 24          |                                                                                                         |
 | Backend                  | NestJS                                | Módulos, DI, guards.                                                                                    |
 | Contratos de API         | **oRPC + Zod** (`packages/contracts`) | Ya cableado en el esqueleto; se expone como OpenAPI/REST. Reemplaza al "REST clásico" del PRD original. |
 | Base de datos            | PostgreSQL 16+                        |                                                                                                         |

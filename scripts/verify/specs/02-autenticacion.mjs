@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
+import { auditRows, same } from "../lib/audit.mjs";
 import { Client } from "../lib/client.mjs";
-import { ADMIN, AGENT_PASSWORD } from "../lib/env.mjs";
+import { ADMIN, AGENT_PASSWORD, cleanEnv, DATABASE_URL } from "../lib/env.mjs";
 import {
   admin,
   departmentNamed,
@@ -606,6 +608,109 @@ export default defineSpec({
           await client.get("/users/me"),
           200,
           "la cookie sin Secure sirve en la request siguiente",
+        );
+      },
+    ),
+
+    criterion(
+      24,
+      "El seed crea a cada agente de `agentes.json` con su propia contraseña aleatoria, la imprime una sola vez y no la guarda en la auditoría; otra corrida no la repite ni la cambia",
+      async () => {
+        const dir = mkdtempSync(path.join(tmpdir(), "seed-02-"));
+        for (const file of ["departamentos.json", "estados.json", "prioridades.json"]) {
+          copyFileSync(path.join(ROOT, "seed-data", file), path.join(dir, file));
+        }
+        const apellido = `Agente${Date.now()}`;
+        writeFileSync(
+          path.join(dir, "agentes.json"),
+          JSON.stringify([
+            { nombre: "Verify", apellido: `${apellido}A`, departamento: "Técnico" },
+            { nombre: "Verify", apellido: `${apellido}B`, departamento: "Redes" },
+          ]),
+        );
+        const seed = () =>
+          run(process.execPath, ["apps/api/dist/seed.mjs"], {
+            env: cleanEnv({
+              DATABASE_URL,
+              SEED_DATA_DIR: dir,
+              SEED_ADMIN_USERNAME: ADMIN.username,
+              SEED_ADMIN_PASSWORD: ADMIN.password,
+              SEED_ADMIN_NAME: ADMIN.name,
+            }),
+          });
+        const usernames = ["a", "b"].map((x) => `v${apellido}${x}`.toLowerCase());
+
+        const first = seed();
+        assert(first.status === 0, `el seed falló:\n${tail(first.output)}`);
+        const printed = Object.fromEntries(
+          usernames.map((u) => {
+            const found = first.output.match(new RegExp(`^\\s+${u}\\s+(\\S+)$`, "m"));
+            assert(found, `el seed no imprimió la contraseña de ${u}:\n${tail(first.output)}`);
+            return [u, found[1]];
+          }),
+        );
+        const [passA, passB] = usernames.map((u) => printed[u]);
+        assert(passA !== passB, "los dos agentes recibieron la misma contraseña");
+        for (const pass of [passA, passB]) {
+          assert(/^[A-Za-z0-9]{16}$/.test(pass), `contraseña con formato inesperado: ${pass}`);
+        }
+
+        resetRateLimit();
+        for (const [u, pass] of Object.entries(printed)) {
+          assertStatus(await new Client().login(u, pass), 200, `login de ${u} con la suya`);
+        }
+        const [userA, userB] = usernames;
+        assertStatus(
+          await new Client().login(userA, printed[userB]),
+          401,
+          "login con la contraseña de otro agente",
+        );
+        resetRateLimit();
+
+        const ids = usernames.map((u) => scalar(`SELECT id FROM "user" WHERE username = '${u}'`));
+        for (const [i, id] of ids.entries()) {
+          const rows = auditRows("User", id);
+          same(
+            rows.map((r) => r.action),
+            ["create"],
+            `auditoría de ${usernames[i]}`,
+          );
+          assert(
+            !JSON.stringify(rows).includes(printed[usernames[i]]),
+            "la auditoría contiene la contraseña",
+          );
+        }
+
+        const second = seed();
+        assert(second.status === 0, `la segunda corrida falló:\n${tail(second.output)}`);
+        assert(
+          !second.output.includes(passA) && !second.output.includes(passB),
+          "la segunda corrida volvió a imprimir una contraseña",
+        );
+        assertStatus(
+          await new Client().login(userA, passA),
+          200,
+          "la contraseña original sigue sirviendo después de otra corrida",
+        );
+        resetRateLimit();
+      },
+    ),
+
+    criterion(
+      25,
+      "En producción, la API no arranca con el `BETTER_AUTH_SECRET` de ejemplo del repo y el error nombra la variable",
+      async () => {
+        const res = run(process.execPath, ["apps/api/dist/main.mjs"], {
+          env: cleanEnv({
+            NODE_ENV: "production",
+            API_PORT: "3919",
+            BETTER_AUTH_SECRET: "dev-only-secret-change-me-0123456789abcdef",
+          }),
+        });
+        assert(res.status !== 0, "la API arrancó con el secreto de ejemplo en producción");
+        assert(
+          res.output.includes("BETTER_AUTH_SECRET"),
+          `el error no nombra la variable:\n${tail(res.output)}`,
         );
       },
     ),

@@ -13,9 +13,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
   // Con SIGTERM/SIGINT Nest cierra el servidor y corre los `onModuleDestroy` antes de salir.
   app.enableShutdownHooks();
+  app.disable("x-powered-by");
   app.enableCors({ origin: env.WEB_ORIGIN, credentials: true });
   mountAuth(app, app.get<Auth>(AUTH));
-  app.useBodyParser("json");
+  app.useBodyParser("json", { limit: "100kb" });
   await app.listen(env.API_PORT);
 }
 

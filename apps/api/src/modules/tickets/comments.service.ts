@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { Comment } from "@syc/contracts";
+import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { CommentsRepository } from "./comments.repository";
 import { TicketsRepository } from "./tickets.repository";
+import { scopeOf } from "./tickets.service";
 
 @Injectable()
 export class CommentsService {
@@ -11,16 +13,16 @@ export class CommentsService {
     private readonly tickets: TicketsRepository,
   ) {}
 
-  // El guard ya acota a un agente a su departamento (404 si es ajeno); acá solo falta el caso del
-  // admin, para quien un ticket inexistente o eliminado también es 404.
-  async list(ticketId: string): Promise<Comment[]> {
-    await this.assertTicketExists(ticketId);
+  // La barrera que manda: el guard ya acota a un agente a su departamento, pero el service lo vuelve a
+  // exigir con el id que de verdad va a usar.
+  async list(ticketId: string, actor: AuthenticatedUser): Promise<Comment[]> {
+    await this.assertTicketInScope(ticketId, actor);
     return this.repository.findByTicket(ticketId);
   }
 
-  async create(ticketId: string, texto: string, actorId: string): Promise<Comment> {
-    await this.assertTicketExists(ticketId);
-    return this.repository.create(ticketId, texto, actorId);
+  async create(ticketId: string, texto: string, actor: AuthenticatedUser): Promise<Comment> {
+    await this.assertTicketInScope(ticketId, actor);
+    return this.repository.create(ticketId, texto, actor.id);
   }
 
   // Que el comentario sea de ese ticket, y que ninguno de los dos esté eliminado, lo exige el
@@ -29,8 +31,14 @@ export class CommentsService {
     await this.repository.softDelete(ticketId, comentarioId, actorId);
   }
 
-  private async assertTicketExists(ticketId: string): Promise<void> {
-    if ((await this.tickets.findDepartmentId(ticketId)) === null) {
+  // Inexistente, eliminado o de otro departamento (si quien pide es un agente): el mismo 404.
+  private async assertTicketInScope(ticketId: string, actor: AuthenticatedUser): Promise<void> {
+    const { departmentId } = scopeOf(actor);
+    const ticketDepartmentId = await this.tickets.findDepartmentId(ticketId);
+    if (
+      ticketDepartmentId === null ||
+      (departmentId !== null && ticketDepartmentId !== departmentId)
+    ) {
       throw new ORPCError("NOT_FOUND", { message: "El ticket no existe" });
     }
   }

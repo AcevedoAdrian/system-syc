@@ -9,6 +9,15 @@
 # que se llama `system-syc`, si algún día corren en la misma máquina.
 name: syc-prod
 
+# Endurecimiento de los contenedores que ejecutan código de la aplicación: ninguno necesita ganar
+# privilegios ni capacidades especiales de Linux (corren como el usuario `node` y escuchan en un puerto
+# alto). Si un servicio nuevo necesita alguna, se agrega a mano con `cap_add` y el motivo.
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 x-logging: &logging
   driver: json-file
   options:
@@ -34,6 +43,7 @@ services:
 
   # Aplica las migraciones y termina. Si falla, `up -d` termina con error y `api` no se crea ni se recrea.
   migrate:
+    <<: *hardened
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -47,10 +57,16 @@ services:
     logging: *logging
 
   api:
+    <<: *hardened
     build:
       context: .
       dockerfile: apps/api/Dockerfile
       target: api
+    # Sistema de archivos de solo lectura: quien lograra ejecutar código en la API no podría escribir
+    # nada (salvo `/tmp`, en memoria). La API no escribe en disco; los datos del seed van montados `:ro`.
+    read_only: true
+    tmpfs:
+      - /tmp
     # Node como PID 1 ignora SIGTERM: sin `init`, cada recreación esperaba los 10 s y mataba con SIGKILL.
     init: true
     restart: unless-stopped
@@ -65,7 +81,6 @@ services:
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-}
-      SEED_AGENTS_PASSWORD: ${SEED_AGENTS_PASSWORD:-}
       SEED_DATA_DIR: /seed-data
     # Los datos del seed se leen en el momento (no van dentro de la imagen: áreas y agentes no están en git).
     volumes:

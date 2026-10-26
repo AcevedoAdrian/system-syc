@@ -3,11 +3,11 @@
   "private": true,
   "packageManager": "pnpm@11.25.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
-    "@types/node": "22.20.4",
+    "@types/node": "24.19.2",
     "turbo": "2.11.3",
     "typescript": "5.9.3"
   },

@@ -52,11 +52,11 @@ docker-compose.prod.yml   # producción (servidor on-premise)
 
 ## Cómo levantarlo
 
-Requisitos: Node 22, pnpm 11 y Docker.
+Requisitos: Node 24, pnpm 11 y Docker.
 
 ```bash
 pnpm install
-docker compose up         # web :5173, api :3000, postgres :5432
+docker compose up         # web :5173, api :3000, postgres :5432 (solo en 127.0.0.1)
 ```
 
 El `.env` es opcional con Docker; `.env.example` lista las variables.

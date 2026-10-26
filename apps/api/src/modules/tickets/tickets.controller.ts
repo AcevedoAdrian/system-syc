@@ -26,8 +26,8 @@ export class TicketsController {
 
   @RequirePermission(PERMISSIONS.TICKET_VIEW, ownTicket)
   @Implement(c.get)
-  get() {
-    return implement(c.get).handler(({ input }) => this.service.get(input.ticketId));
+  get(@CurrentUser() actor: AuthenticatedUser) {
+    return implement(c.get).handler(({ input }) => this.service.get(input.ticketId, actor));
   }
 
   // Un agente solo crea en su departamento: el resolver lee `departamentoId` del cuerpo y, si es
@@ -70,8 +70,8 @@ export class TicketsController {
 
   @RequirePermission(PERMISSIONS.TICKET_VIEW, ownTicket)
   @Implement(c.history)
-  history() {
-    return implement(c.history).handler(({ input }) => this.service.history(input.ticketId));
+  history(@CurrentUser() actor: AuthenticatedUser) {
+    return implement(c.history).handler(({ input }) => this.service.history(input.ticketId, actor));
   }
 }
 

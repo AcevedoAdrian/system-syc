@@ -2,7 +2,7 @@
 # `/api` a la API. El contexto es la raíz del repo:
 #   docker build -f apps/web/Dockerfile .
 
-FROM node:22.23-slim AS build
+FROM node:24.22.1-slim AS build
 # Misma versión que `packageManager` del package.json raíz.
 ARG PNPM_VERSION=11.25.0
 # La API va por el mismo origen, bajo `/api`: la imagen no depende de la IP del servidor.
@@ -23,6 +23,6 @@ COPY packages/contracts packages/contracts
 # `VITE_API_URL` llega como variable de entorno del build, que Vite prefiere a cualquier `.env`.
 RUN pnpm --filter @syc/web build
 
-FROM nginx:1.28-alpine
+FROM nginx:1.30.6-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html

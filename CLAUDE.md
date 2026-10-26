@@ -23,11 +23,11 @@ No se carga sola: abrila cuando la tarea lo requiera.
 
 ## Comandos
 
-Requisitos: Node 22 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
+Requisitos: Node 24 (`.nvmrc`), pnpm 11 (`packageManager`), Docker.
 
 ```bash
 pnpm install                              # instala todo el workspace
-docker compose up                         # postgres + api + web con hot reload (web :5173, api :3000, postgres :5432)
+docker compose up                         # postgres + api + web con hot reload (web :5173, api :3000, postgres :5432; solo en 127.0.0.1)
 docker compose down                       # detiene el stack (conserva volúmenes)
 
 pnpm lint                                 # biome check sobre todo el repo
@@ -54,7 +54,7 @@ docker compose exec api pnpm --filter @syc/db exec prisma migrate deploy
 docker compose exec api pnpm --filter @syc/api seed
 ```
 
-El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` (y, opcional, `SEED_AGENTS_PASSWORD` para cargar los agentes de `seed-data/agentes.json`) del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
+El seed lee `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME` del `.env` de la raíz (el repo está montado en el contenedor); también se pueden pasar con `docker compose exec -e VAR=valor api ...`. Sin ellas aborta nombrándolas. La API **no** las necesita para arrancar. Cambiar el esquema: ver `packages/db/CLAUDE.md`.
 
 **Volver a la base vacía** (para probar de nuevo; borra todos los datos de desarrollo), con el stack levantado:
 
@@ -84,7 +84,7 @@ El `.env` es opcional con Docker en desarrollo (las variables de la API y la web
 
 - **Tests**: viven en `test/` de cada paquete (`apps/api`, `apps/web`, `packages/contracts`), no en `src`, agrupados por característica (`test/tickets/`, `test/auth/`…) y con el sufijo `.test.ts(x)`. El `include` de Vitest solo mira `test/`, así que uno dentro de `src` no corre. `scripts/verify` nombra tests por ruta: mover uno exige actualizar el verify.
 - **`turbo.json`**: `typecheck`, `test` y `build` dependen de `^typecheck`; sin eso Turbo da cache hit al cambiar un contrato y no detecta el error en los consumidores. `globalDependencies` lista `tsconfig.base.json` y `biome.json` de `packages/config` (que no tiene tasks): sin eso, editarlos deja cache hits viejos de `typecheck` y `lint`. `build` declara `VITE_API_URL` en `env` (Turbo ya infiere las `VITE_*` por el framework; es explícito, no una corrección).
-- **pnpm 11 bloquea scripts de build** por defecto: `allowBuilds` en `pnpm-workspace.yaml` autoriza solo `prisma` y `@prisma/engines`. pnpm también agrega entradas a `minimumReleaseAgeExclude` por su cuenta; es esperable.
+- **pnpm 11 bloquea scripts de build** por defecto: `allowBuilds` en `pnpm-workspace.yaml` autoriza solo `prisma` y `@prisma/engines`. `minimumReleaseAge` es de 3 días y no hay excepciones (`minimumReleaseAgeExclude` no existe: si pnpm la vuelve a agregar por su cuenta, revisala), y `trustPolicy: no-downgrade` rechaza una versión sin la procedencia que tenían las anteriores; las 3 excepciones (`trustPolicyExclude`) están justificadas en el propio archivo.
 - **Versiones exactas** (sin `^`) en todos los `package.json`.
 - El `biome.json` de la raíz solo extiende `packages/config/biome.json` (Biome exige una config en la raíz).
 - Los paquetes del workspace exportan su fuente `.ts`, sin build propio (detalle del bundle en `apps/api/CLAUDE.md`).

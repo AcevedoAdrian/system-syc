@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomPassword } from "./common/random-password";
 import { normalizeName, uniqueSlug } from "./common/text";
 import { loadEnv } from "./config/env.schema";
 import { AuditRepository } from "./modules/audit/audit.repository";
@@ -59,14 +60,7 @@ function loadSeedData(dir: string): SeedData {
 }
 
 // Variables propias del seed: no son obligatorias para arrancar la API (por eso no están en `env.schema.ts`).
-// `SEED_AGENTS_PASSWORD` es la contraseña inicial de los agentes; sin ella el seed no los carga.
 const seedEnvSchema = z.object({
-  SEED_AGENTS_PASSWORD: z
-    .string()
-    .min(8)
-    .max(128)
-    .optional()
-    .or(z.literal("").transform(() => undefined)), // docker-compose pasa la ausente como ""
   SEED_ADMIN_USERNAME: z
     .string()
     .min(3)
@@ -239,14 +233,15 @@ async function seedCatalogs(
 }
 
 // Los agentes se crean como `seedAdmin` crea al admin (sin sesión, por el contexto interno de Better
-// Auth) y con su `Member` en el departamento. Uno cuyo usuario ya existe se saltea: no se le cambia la
-// contraseña ni el departamento. Un departamento inexistente aborta antes de crear a nadie.
+// Auth) y con su `Member` en el departamento. Cada uno recibe su propia contraseña aleatoria, que se
+// devuelve para mostrarla una sola vez (no se guarda en ningún lado: en la base queda solo el hash).
+// Uno cuyo usuario ya existe se saltea: no se le cambia la contraseña ni el departamento. Un
+// departamento inexistente aborta antes de crear a nadie.
 async function seedAgents(
   auth: Auth,
   audit: AuditService,
   agentes: readonly SeedAgent[],
-  password: string,
-): Promise<{ creados: string[]; existentes: number }> {
+): Promise<{ creados: { username: string; password: string }[]; existentes: number }> {
   const ctx = await auth.$context;
   const departments = await ctx.adapter.findMany<OrganizationRow & { id: string }>({
     model: "organization",
@@ -263,9 +258,8 @@ async function seedAgents(
     return { agent, department, username: seedUsername(agent) };
   });
 
-  const creados: string[] = [];
+  const creados: { username: string; password: string }[] = [];
   let existentes = 0;
-  const hash = await ctx.password.hash(password);
   for (const { agent, department, username } of pendientes) {
     const found = await ctx.adapter.findOne({
       model: "user",
@@ -276,6 +270,7 @@ async function seedAgents(
       continue;
     }
     const name = `${agent.nombre.trim()} ${agent.apellido.trim()}`;
+    const password = randomPassword();
     const user = await ctx.internalAdapter.createUser(
       {
         name,
@@ -290,7 +285,7 @@ async function seedAgents(
       userId: user.id,
       providerId: "credential",
       accountId: user.id,
-      password: hash,
+      password: await ctx.password.hash(password),
     });
     await ctx.adapter.create({
       model: "member",
@@ -318,7 +313,7 @@ async function seedAgents(
         }),
       },
     });
-    creados.push(username);
+    creados.push({ username, password });
   }
   return { creados, existentes };
 }
@@ -338,10 +333,7 @@ async function main() {
     data,
     await findAdminId(auth, seedEnv.SEED_ADMIN_USERNAME),
   );
-  const agents =
-    data.agentes && seedEnv.SEED_AGENTS_PASSWORD
-      ? await seedAgents(auth, audit, data.agentes, seedEnv.SEED_AGENTS_PASSWORD)
-      : null;
+  const agents = data.agentes ? await seedAgents(auth, audit, data.agentes) : null;
 
   const report = (label: string, verb: string, created: number | null, file: string) => {
     if (created === null) console.log(`${label}: no hay seed-data/${file}, no se cargaron.`);
@@ -361,14 +353,17 @@ async function main() {
   report("Tipos de área", "creados", catalogs.tiposArea, "tipos-area.json");
   report("Áreas", "creadas", catalogs.areas, "areas.json");
   report("Edificios", "creados", catalogs.edificios, "edificios.json");
-  if (!data.agentes) console.log("Agentes: no hay seed-data/agentes.json, no se cargaron.");
-  else if (!agents) console.log("Agentes: no se cargaron (falta SEED_AGENTS_PASSWORD).");
+  if (!agents) console.log("Agentes: no hay seed-data/agentes.json, no se cargaron.");
+  else if (agents.creados.length === 0) console.log("Agentes: ya existían todos.");
   else {
+    // La única vez que se ven: en la base queda solo el hash. Si se pierde una, la resetea el admin.
     console.log(
-      agents.creados.length > 0
-        ? `Agentes creados: ${agents.creados.join(", ")}.`
-        : "Agentes: ya existían todos.",
+      `Agentes creados: ${agents.creados.length}. Contraseñas iniciales (se muestran UNA SOLA VEZ, entregá cada una a su agente):`,
     );
+    const width = Math.max(...agents.creados.map((agent) => agent.username.length));
+    for (const { username, password } of agents.creados) {
+      console.log(`  ${username.padEnd(width)}  ${password}`);
+    }
   }
   process.exit(0);
 }
