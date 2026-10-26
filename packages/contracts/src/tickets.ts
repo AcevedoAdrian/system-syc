@@ -40,6 +40,8 @@ const actuacionSimpleSchema = blankToNull(z.string().max(500));
 const textoLargoSchema = blankToNull(z.string().max(5000));
 const idOpcionalSchema = blankToNull(z.string());
 const referenciaSchema = blankToNull(referenciaExternaSchema);
+// Texto libre del proveedor, sin formato fijo (SPEC 10): solo se recortan los espacios.
+const numeroFacturaSchema = blankToNull(z.string().trim().max(50));
 
 // La referencia externa no puede existir sin proveedor (Q29, Feature 5.5). Al quitar el proveedor, la
 // referencia se borra en la misma operación: mandar una sin la otra es un error del formulario.
@@ -49,6 +51,17 @@ const referenciaRequiereProveedor = {
   options: {
     path: ["referenciaExterna"],
     message: "La referencia externa requiere un proveedor",
+  },
+};
+
+// Igual que la referencia, la factura es del proveedor: no puede existir sin él (SPEC 10). Pero no exige
+// referencia externa, porque hay proveedores que facturan sin dar número de ticket.
+const facturaRequiereProveedor = {
+  check: (v: { proveedorId: string | null; numeroFactura: string | null }) =>
+    !(v.numeroFactura && !v.proveedorId),
+  options: {
+    path: ["numeroFactura"],
+    message: "El número de factura requiere un proveedor",
   },
 };
 
@@ -62,8 +75,10 @@ export const createTicketInputSchema = z
     actuacionSimple: actuacionSimpleSchema,
     proveedorId: idOpcionalSchema,
     referenciaExterna: referenciaSchema,
+    numeroFactura: numeroFacturaSchema,
   })
-  .refine(referenciaRequiereProveedor.check, referenciaRequiereProveedor.options);
+  .refine(referenciaRequiereProveedor.check, referenciaRequiereProveedor.options)
+  .refine(facturaRequiereProveedor.check, facturaRequiereProveedor.options);
 
 // Reemplaza todos los campos editables (como `update` de catálogos): un campo que no viene o viene en
 // blanco se guarda como null. `fechaCierre` y `fechaReabierto` solo se corrigen si el ticket ya
@@ -82,13 +97,15 @@ export const updateTicketInputSchema = z
     moduloId: idOpcionalSchema,
     proveedorId: idOpcionalSchema,
     referenciaExterna: referenciaSchema,
+    numeroFactura: numeroFacturaSchema,
     fechaRecepcion: fechaNoFuturaSchema,
     fechaCierre: fechaNoFuturaSchema.nullable(),
     fechaReabierto: fechaNoFuturaSchema.nullable(),
     solucionDescripcion: textoLargoSchema,
     notificado: z.boolean(),
   })
-  .refine(referenciaRequiereProveedor.check, referenciaRequiereProveedor.options);
+  .refine(referenciaRequiereProveedor.check, referenciaRequiereProveedor.options)
+  .refine(facturaRequiereProveedor.check, facturaRequiereProveedor.options);
 
 // `fechaCierre`, `fechaReabierto` y `solucionDescripcion` no vienen por defecto: ausentes significan
 // "no tocar", y el service rechaza las que el estado destino no admite (Feature 5.4). Por eso la
@@ -172,6 +189,7 @@ export const ticketSchema = z.object({
   descripcion: z.string().nullable(),
   actuacionSimple: z.string().nullable(),
   referenciaExterna: z.string().nullable(),
+  numeroFactura: z.string().nullable(),
   solucionDescripcion: z.string().nullable(),
   notificado: z.boolean(),
   fechaRecepcion: z.iso.date(),
