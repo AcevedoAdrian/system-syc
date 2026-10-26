@@ -8,6 +8,12 @@ overrides:
   '@modelcontextprotocol/sdk': 1.32.0
   hono: 4.13.11
   mysql2: 3.23.1
+  # Avisos altos del 22 de octubre de 2026 en dependencias de dependencias: `multer` entra fijo desde
+  # `@nestjs/platform-express` 12.2.0, `body-parser` desde `express` 5.3.0 y `undici` desde `jsdom`.
+  # Se sacan cuando esos paquetes suban sus propias versiones (`pnpm why <paquete>`).
+  body-parser: 2.4.0
+  multer: 2.5.0
+  'undici@^8.0.0': 8.12.2
   source-map-js: 1.2.2
 # Una versión publicada hace menos de 3 días no se instala (los ataques de 2026 a TanStack y axios se
 # detectaron en horas o días). Sin excepciones: si una versión nueva hace falta antes, se espera.
