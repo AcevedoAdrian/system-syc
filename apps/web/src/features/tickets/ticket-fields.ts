@@ -9,6 +9,7 @@ export const FIELD_LABELS: Record<string, string> = {
   descripcion: "Descripción",
   actuacionSimple: "Actuación simple",
   referenciaExterna: "Referencia externa",
+  numeroFactura: "N.º de factura",
   solucionDescripcion: "Solución",
   notificado: "Notificado",
   fechaRecepcion: "Fecha de recepción",

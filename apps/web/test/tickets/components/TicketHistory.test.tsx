@@ -149,6 +149,19 @@ describe("TicketHistory", () => {
     expect(screen.getByRole("listitem")).toHaveTextContent("Área: Mantenimiento (vieja) → —");
   });
 
+  it("un cambio de factura se muestra con la etiqueta «N.º de factura»", () => {
+    show([
+      entry("a2", "update", {
+        before: { numeroFactura: "0003-00004567" },
+        after: { numeroFactura: "0003-00004568" },
+      }),
+    ]);
+
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      "N.º de factura: 0003-00004567 → 0003-00004568",
+    );
+  });
+
   it("un comentario agregado o eliminado se anota con fecha y usuario, sin su texto", () => {
     show([
       entry("a3", "comment_delete", { comentarioId: "c-secreto" }, { id: "u0", name: "Admin" }),

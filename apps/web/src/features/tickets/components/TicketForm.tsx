@@ -17,6 +17,7 @@ import {
   Hash,
   Layers,
   Lock,
+  Receipt,
   Tag,
   TextAlignStart,
   Ticket as TicketIcon,
@@ -61,6 +62,7 @@ function valuesOf(ticket: Ticket): TicketFormInput {
     moduloId: ticket.modulo?.id ?? "",
     proveedorId: ticket.proveedor?.id ?? "",
     referenciaExterna: ticket.referenciaExterna ?? "",
+    numeroFactura: ticket.numeroFactura ?? "",
     fechaRecepcion: ticket.fechaRecepcion,
     fechaCierre: ticket.fechaCierre,
     fechaReabierto: ticket.fechaReabierto,
@@ -73,6 +75,8 @@ const DATE_ERROR = "Ingresá una fecha válida, de hoy o anterior.";
 const REFERENCIA_ERROR =
   "Usá el formato número/año, por ejemplo 19092/2026 (el año va de 2000 a 2100).";
 const REFERENCIA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la referencia.";
+const FACTURA_ERROR = "Hasta 50 caracteres.";
+const FACTURA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la factura.";
 
 const monoClass = `${controlClass} font-mono text-[15px] md:text-[15px]`;
 
@@ -441,9 +445,10 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                     value={field.value ?? ""}
                     onChange={(value) => {
                       field.onChange(value);
-                      // La referencia es del proveedor: al cambiar de proveedor (o quitarlo) no se
-                      // conserva; se carga la del nuevo o queda vacía (Q30).
+                      // La referencia y la factura son del proveedor: al cambiar de proveedor (o
+                      // quitarlo) no se conservan; se cargan las del nuevo o quedan vacías (Q30).
                       setValue("referenciaExterna", "", { shouldDirty: true });
+                      setValue("numeroFactura", "", { shouldDirty: true });
                     }}
                     placeholder="Sin proveedor"
                     emptyLabel="Sin proveedor"
@@ -470,6 +475,25 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                 className={monoClass}
                 {...aria}
                 {...register("referenciaExterna")}
+              />
+            )}
+          </Field>
+          <Field
+            id="numeroFactura"
+            label="N.º de factura"
+            icon={Receipt}
+            hint={hasProveedor ? undefined : FACTURA_SIN_PROVEEDOR}
+            error={errors.numeroFactura && FACTURA_ERROR}
+          >
+            {(aria) => (
+              <Input
+                id="numeroFactura"
+                placeholder="0003-00004567"
+                autoComplete="off"
+                disabled={!hasProveedor}
+                className={monoClass}
+                {...aria}
+                {...register("numeroFactura")}
               />
             )}
           </Field>
