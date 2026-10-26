@@ -1,6 +1,6 @@
 # SPEC 10 — Número de factura del ticket
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo)
 > **Date:** 2026-10-26
 > **Objective:** sumar al ticket un campo opcional `numeroFactura`, ligado al proveedor, que se carga en el alta y la edición junto a la referencia externa.
