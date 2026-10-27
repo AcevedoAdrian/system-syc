@@ -11,5 +11,17 @@ import spec06 from "./06-comentarios-bandeja.mjs";
 import spec07 from "./07-endurecimiento-despliegue.mjs";
 import spec08 from "./08-tipos-area.mjs";
 import spec09 from "./09-sistema-visual.mjs";
+import spec10 from "./10-numero-factura.mjs";
 
-export const SPECS = [spec01, spec02, spec03, spec04, spec05, spec06, spec07, spec08, spec09];
+export const SPECS = [
+  spec01,
+  spec02,
+  spec03,
+  spec04,
+  spec05,
+  spec06,
+  spec07,
+  spec08,
+  spec09,
+  spec10,
+];

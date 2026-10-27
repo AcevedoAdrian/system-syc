@@ -80,6 +80,26 @@ describe("describeChanges", () => {
     ]);
   });
 
+  it("un cambio de factura se lee con la etiqueta «N.º de factura»", () => {
+    const changes = describeChanges(
+      { numeroFactura: "0003-00004567" },
+      { numeroFactura: "0003-00004568" },
+    );
+
+    expect(changes).toEqual([
+      {
+        field: "numeroFactura",
+        label: "N.º de factura",
+        before: "0003-00004567",
+        after: "0003-00004568",
+      },
+    ]);
+    expect(describeChanges({ numeroFactura: "A-12" }, { numeroFactura: null })[0]).toMatchObject({
+      before: "A-12",
+      after: "—",
+    });
+  });
+
   it("ignora los campos que no conoce y tolera un payload sin `before`", () => {
     expect(describeChanges(undefined, { campoNuevo: 1 })).toEqual([]);
     expect(describeChanges(undefined, { titulo: "Impresora" })).toEqual([

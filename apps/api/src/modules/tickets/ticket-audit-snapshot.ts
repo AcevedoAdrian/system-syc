@@ -24,6 +24,7 @@ export function snapshotOf(ticket: Ticket): AuditSnapshot {
     descripcion: ticket.descripcion,
     actuacionSimple: ticket.actuacionSimple,
     referenciaExterna: ticket.referenciaExterna,
+    numeroFactura: ticket.numeroFactura,
     solucionDescripcion: ticket.solucionDescripcion,
     notificado: ticket.notificado,
     fechaRecepcion: ticket.fechaRecepcion,

@@ -361,6 +361,7 @@ model Ticket {
   descripcion         String?
   actuacionSimple     String?
   referenciaExterna   String? // "número/año" ya normalizado; único por proveedor (índice parcial)
+  numeroFactura       String? // texto libre del proveedor; exige proveedor; puede repetirse
   solucionDescripcion String?
   notificado          Boolean @default(false)
 

@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/client";
 import { hoyArgentina, STALE_TICKET_MESSAGE } from "@syc/contracts";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTicket } from "../../fixtures/ticket-fixtures";
@@ -99,6 +99,7 @@ describe("TicketForm", () => {
       area: { id: "sist", nombre: "Sistemas", tipo: { id: "dip", nombre: "Diputado" } },
       proveedor: { id: "acme", nombre: "Acme" },
       referenciaExterna: "19092/2026",
+      numeroFactura: "0003-00004567",
       solucionDescripcion: "Se reinició",
       notificado: true,
     });
@@ -110,6 +111,7 @@ describe("TicketForm", () => {
     expect(screen.getByLabelText("Edificio")).toHaveValue("");
     expect(screen.getByRole("combobox", { name: "Proveedor" })).toHaveValue("acme");
     expect(screen.getByLabelText("Referencia externa")).toHaveValue("19092/2026");
+    expect(screen.getByLabelText("N.º de factura")).toHaveValue("0003-00004567");
     expect(screen.getByLabelText("Descripción de la solución")).toHaveValue("Se reinició");
     expect(screen.getByLabelText("Fecha de recepción")).toHaveValue("2026-10-01");
     expect(screen.getByRole("checkbox", { name: "Notificado" })).toBeChecked();
@@ -395,7 +397,7 @@ describe("TicketForm", () => {
     it("los campos de texto libre no ofrecen autocompletar del navegador", () => {
       renderForm();
 
-      for (const label of ["Título", "Actuación simple", "Referencia externa"]) {
+      for (const label of ["Título", "Actuación simple", "Referencia externa", "N.º de factura"]) {
         expect(screen.getByLabelText(label)).toHaveAttribute("autocomplete", "off");
       }
     });
@@ -460,6 +462,7 @@ describe("TicketForm", () => {
         moduloId: null,
         proveedorId: null,
         referenciaExterna: null,
+        numeroFactura: null,
         fechaRecepcion: "2026-10-01",
         fechaCierre: null,
         fechaReabierto: null,
@@ -615,6 +618,98 @@ describe("TicketForm", () => {
       await save();
 
       expect(await screen.findByText(/Usá el formato número\/año/)).toBeInTheDocument();
+      expect(mocks.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("número de factura (SPEC 10)", () => {
+    const acme = { id: "acme", nombre: "Acme" };
+
+    it("sin proveedor está deshabilitado y dice por qué", () => {
+      renderForm({ proveedor: null });
+
+      const factura = screen.getByLabelText("N.º de factura");
+      expect(factura).toBeDisabled();
+      expect(factura).toHaveAccessibleDescription("Elegí un proveedor para cargar la factura.");
+    });
+
+    it("con proveedor se habilita, y la pista desaparece", () => {
+      renderForm({ proveedor: acme, numeroFactura: "A-12" });
+
+      expect(screen.getByLabelText("N.º de factura")).toBeEnabled();
+      expect(
+        screen.queryByText("Elegí un proveedor para cargar la factura."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("se edita y se manda recortada, con la referencia externa en null", async () => {
+      renderForm({ proveedor: acme, numeroFactura: "A-12" });
+
+      await userEvent.clear(screen.getByLabelText("N.º de factura"));
+      await userEvent.type(screen.getByLabelText("N.º de factura"), "  0003-00004567  ");
+      await save();
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({
+        proveedorId: "acme",
+        referenciaExterna: null,
+        numeroFactura: "0003-00004567",
+      });
+    });
+
+    it("al cambiar de proveedor se vacía, y se manda la que se cargue para el nuevo", async () => {
+      renderForm({ proveedor: acme, numeroFactura: "A-12" });
+
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "otro");
+      expect(screen.getByLabelText("N.º de factura")).toHaveValue("");
+      await userEvent.type(screen.getByLabelText("N.º de factura"), "B-7");
+      await save();
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({
+        proveedorId: "otro",
+        numeroFactura: "B-7",
+      });
+    });
+
+    it("al cambiar de proveedor sin cargar otra, queda vacía", async () => {
+      renderForm({ proveedor: acme, numeroFactura: "A-12" });
+
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "otro");
+      await save();
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({
+        proveedorId: "otro",
+        numeroFactura: null,
+      });
+    });
+
+    it("quitar el proveedor la borra y la deshabilita", async () => {
+      renderForm({ proveedor: acme, numeroFactura: "A-12" });
+
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "");
+
+      expect(screen.getByLabelText("N.º de factura")).toBeDisabled();
+      expect(screen.getByLabelText("N.º de factura")).toHaveValue("");
+      await save();
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({
+        proveedorId: null,
+        numeroFactura: null,
+      });
+    });
+
+    it("rechaza una factura de más de 50 caracteres y lo dice bajo el campo", async () => {
+      renderForm({ proveedor: acme });
+
+      fireEvent.change(screen.getByLabelText("N.º de factura"), {
+        target: { value: "a".repeat(51) },
+      });
+      await save();
+
+      expect(await screen.findByText("Hasta 50 caracteres.")).toBeInTheDocument();
+      expect(screen.getByLabelText("N.º de factura")).toBeInvalid();
       expect(mocks.update).not.toHaveBeenCalled();
     });
   });

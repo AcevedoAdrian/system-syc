@@ -89,6 +89,7 @@ describe("createTicketInputSchema", () => {
       actuacionSimple: null,
       proveedorId: null,
       referenciaExterna: null,
+      numeroFactura: null,
     });
   });
 
@@ -120,6 +121,47 @@ describe("createTicketInputSchema", () => {
     expect(createTicketInputSchema.parse({ ...base, referenciaExterna: "  " })).toMatchObject({
       referenciaExterna: null,
     });
+  });
+
+  it("trata una factura en blanco como null y recorta los espacios de las de texto", () => {
+    expect(
+      createTicketInputSchema.parse({ ...base, numeroFactura: "   " }).numeroFactura,
+    ).toBeNull();
+    expect(
+      createTicketInputSchema.parse({
+        ...base,
+        proveedorId: "prov1",
+        numeroFactura: "  0003-00004567  ",
+      }).numeroFactura,
+    ).toBe("0003-00004567");
+  });
+
+  it("rechaza una factura de más de 50 caracteres y acepta una de 50", () => {
+    const conProveedor = { ...base, proveedorId: "prov1" };
+
+    expect(
+      createTicketInputSchema.safeParse({ ...conProveedor, numeroFactura: "a".repeat(51) }).success,
+    ).toBe(false);
+    expect(
+      createTicketInputSchema.safeParse({ ...conProveedor, numeroFactura: "a".repeat(50) }).success,
+    ).toBe(true);
+  });
+
+  it("rechaza una factura sin proveedor, con el error en `numeroFactura`", () => {
+    const result = createTicketInputSchema.safeParse({ ...base, numeroFactura: "A-12" });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["numeroFactura"]);
+  });
+
+  it("acepta una factura con proveedor y sin referencia externa", () => {
+    const result = createTicketInputSchema.parse({
+      ...base,
+      proveedorId: "prov1",
+      numeroFactura: "0003-00004567",
+    });
+
+    expect(result).toMatchObject({ referenciaExterna: null, numeroFactura: "0003-00004567" });
   });
 
   it("rechaza una fecha de recepción futura y no acepta campos que decide el servidor", () => {
@@ -162,6 +204,7 @@ describe("updateTicketInputSchema", () => {
       descripcion: null,
       actuacionSimple: null,
       referenciaExterna: null,
+      numeroFactura: null,
       solucionDescripcion: null,
     });
   });
@@ -170,6 +213,33 @@ describe("updateTicketInputSchema", () => {
     const result = updateTicketInputSchema.safeParse({ ...base, referenciaExterna: "1/2026" });
 
     expect(result.success).toBe(false);
+  });
+
+  it("rechaza una factura sin proveedor, con el error en `numeroFactura`", () => {
+    const result = updateTicketInputSchema.safeParse({ ...base, numeroFactura: "A-12" });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["numeroFactura"]);
+  });
+
+  it("rechaza una factura de más de 50 caracteres", () => {
+    const result = updateTicketInputSchema.safeParse({
+      ...base,
+      proveedorId: "prov1",
+      numeroFactura: "a".repeat(51),
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("recorta la factura y la acepta con proveedor y sin referencia", () => {
+    const result = updateTicketInputSchema.parse({
+      ...base,
+      proveedorId: "prov1",
+      numeroFactura: "  A-12  ",
+    });
+
+    expect(result).toMatchObject({ numeroFactura: "A-12", referenciaExterna: null });
   });
 
   it("exige `updatedAt` para el bloqueo optimista", () => {
