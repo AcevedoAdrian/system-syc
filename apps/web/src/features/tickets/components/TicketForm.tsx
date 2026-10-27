@@ -5,6 +5,7 @@ import {
   type UpdateTicketInput,
   updateTicketInputSchema,
 } from "@syc/contracts";
+import { Link } from "@tanstack/react-router";
 import {
   Bell,
   Box,
@@ -560,6 +561,9 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
       </FormSection>
 
       <FormActionBar message={message}>
+        <Button variant="outline" className="h-10 px-5" asChild>
+          <Link to="/tickets">Volver a los tickets</Link>
+        </Button>
         <Button
           type="button"
           variant="outline"
