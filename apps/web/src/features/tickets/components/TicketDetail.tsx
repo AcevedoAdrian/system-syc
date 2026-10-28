@@ -93,7 +93,6 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button
-              variant="outline"
               className="h-10 px-5"
               onClick={() => setStatusOpen(true)}
               disabled={dirty}

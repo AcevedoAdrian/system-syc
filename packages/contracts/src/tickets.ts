@@ -204,6 +204,7 @@ export const ticketSchema = z.object({
 export const ticketSummarySchema = ticketSchema.pick({
   id: true,
   numero: true,
+  referenciaExterna: true,
   titulo: true,
   departamento: true,
   estado: true,

@@ -146,16 +146,38 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
   };
 
   const catalogs = [
-    { id: "areaId", label: "Área", icon: Users, ruta: "areas", current: ticket.area },
+    {
+      id: "areaId",
+      label: "Área",
+      icon: Users,
+      ruta: "areas",
+      current: ticket.area,
+      hint: "Agrupada por tipo.",
+    },
     {
       id: "edificioId",
       label: "Edificio",
       icon: Building2,
       ruta: "edificios",
       current: ticket.edificio,
+      hint: undefined,
     },
-    { id: "tipoId", label: "Tipo de ticket", icon: Layers, ruta: "tipos", current: ticket.tipo },
-    { id: "moduloId", label: "Módulo", icon: Box, ruta: "modulos", current: ticket.modulo },
+    {
+      id: "tipoId",
+      label: "Tipo de ticket",
+      icon: Layers,
+      ruta: "tipos",
+      current: ticket.tipo,
+      hint: "Qué clase de pedido es: una falla, una consulta, una solicitud nueva…",
+    },
+    {
+      id: "moduloId",
+      label: "Módulo",
+      icon: Box,
+      ruta: "modulos",
+      current: ticket.modulo,
+      hint: "Parte del sistema a la que se refiere el pedido.",
+    },
   ] as const;
 
   const message = serverError ? (
@@ -401,7 +423,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                 id={catalog.id}
                 label={catalog.label}
                 icon={catalog.icon}
-                hint={catalog.id === "areaId" ? "Agrupada por tipo." : undefined}
+                hint={catalog.hint}
               >
                 {(aria) => (
                   <Controller

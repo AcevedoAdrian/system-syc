@@ -197,6 +197,9 @@ function StatusForm({
         </div>
       )}
       <DialogFooter>
+        <Button type="button" variant="outline" onClick={onDone} disabled={isSubmitting}>
+          Cancelar
+        </Button>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Cambiando…" : "Cambiar estado"}
         </Button>

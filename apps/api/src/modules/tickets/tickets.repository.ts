@@ -128,6 +128,7 @@ const detailSelect = {
 const summarySelect = {
   id: true,
   numero: true,
+  referenciaExterna: true,
   titulo: true,
   departamento: { select: { id: true, name: true } },
   estado: { select: { id: true, nombre: true, clave: true } },
@@ -154,6 +155,7 @@ interface DbEstado extends DbRef {
 interface DbTicketSummary {
   id: string;
   numero: number;
+  referenciaExterna: string | null;
   titulo: string;
   departamento: DbUser;
   estado: DbEstado;
@@ -169,7 +171,6 @@ interface DbTicket extends DbTicketSummary {
   proveedor: DbRef | null;
   descripcion: string | null;
   actuacionSimple: string | null;
-  referenciaExterna: string | null;
   numeroFactura: string | null;
   solucionDescripcion: string | null;
   notificado: boolean;
@@ -193,6 +194,7 @@ function toSummary(row: DbTicketSummary): TicketSummaryRow {
   return {
     id: row.id,
     numero: row.numero,
+    referenciaExterna: row.referenciaExterna,
     titulo: row.titulo,
     departamento: fromUser(row.departamento),
     estado: fromEstado(row.estado),
