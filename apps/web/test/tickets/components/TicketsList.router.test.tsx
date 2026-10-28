@@ -39,6 +39,7 @@ import { TicketsList } from "@/features/tickets/components/TicketsList";
 const ticket = (numero: number): TicketSummary => ({
   id: `t-${numero}`,
   numero,
+  referenciaExterna: `${numero}/2026`,
   titulo: `Ticket ${numero}`,
   departamento: { id: "tec", nombre: "Técnico" },
   estado: { id: "pend", nombre: "Pendiente", clave: null },

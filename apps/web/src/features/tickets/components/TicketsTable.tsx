@@ -16,20 +16,30 @@ import { EstadoPill, PrioridadLabel } from "./TicketBadges";
 const features = tableFeatures({});
 const column = createColumnHelper<typeof features, TicketSummary>();
 
-// El número abre el ticket (es el único enlace de la fila); el título es texto, que se parte en líneas
+// El número de la bandeja es el que asignó el proveedor (`referenciaExterna`), no el del sistema. Abre el
+// ticket (es el único enlace de la fila); un ticket sin proveedor o sin referencia muestra «Sin número»,
+// y el nombre accesible del enlace lleva siempre el número del sistema para identificarlo. El título es texto, que se parte en líneas
 // hasta un ancho razonable para que uno largo no ensanche la tabla. El orden es el que manda la API
 // (fecha de recepción y número descendentes): la tabla solo renderiza la página recibida, no ordena ni
 // filtra.
 const columns = column.columns([
-  column.accessor("numero", {
-    header: "Número",
+  column.accessor("referenciaExterna", {
+    header: "N.º del proveedor",
     cell: ({ row }) => (
       <Link
         to="/tickets/$ticketId"
         params={{ ticketId: row.original.id }}
-        className="inline-flex min-h-10 items-center font-mono text-[13px] font-medium whitespace-nowrap text-link tabular-nums underline-offset-4 hover:underline focus-visible:underline"
+        aria-label={
+          row.original.referenciaExterna
+            ? undefined
+            : `Sin número del proveedor, abrir ${formatTicketNumber(row.original.numero)}`
+        }
+        className={cn(
+          "inline-flex min-h-10 items-center font-mono text-[13px] font-medium whitespace-nowrap text-link tabular-nums underline-offset-4 hover:underline focus-visible:underline",
+          !row.original.referenciaExterna && "font-sans font-normal text-muted-foreground",
+        )}
       >
-        {formatTicketNumber(row.original.numero)}
+        {row.original.referenciaExterna ?? "Sin número"}
       </Link>
     ),
   }),

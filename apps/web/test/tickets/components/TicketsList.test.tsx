@@ -57,11 +57,13 @@ vi.mock("@tanstack/react-router", () => ({
     search,
     className,
     children,
+    "aria-label": ariaLabel,
   }: {
     to: string;
     params?: { ticketId: string };
     search?: Record<string, unknown>;
     className?: string;
+    "aria-label"?: string;
     children: React.ReactNode;
   }) => {
     // El `search` queda en el href como en la URL real; el router de verdad se prueba aparte.
@@ -72,7 +74,7 @@ vi.mock("@tanstack/react-router", () => ({
     ).toString();
     const path = params ? to.replace("$ticketId", params.ticketId) : to;
     return (
-      <a href={query ? `${path}?${query}` : path} className={className}>
+      <a href={query ? `${path}?${query}` : path} className={className} aria-label={ariaLabel}>
         {children}
       </a>
     );
@@ -84,6 +86,7 @@ import { TicketsList } from "@/features/tickets/components/TicketsList";
 const ticket = (numero: number, extra: Partial<TicketSummary> = {}): TicketSummary => ({
   id: `t-${numero}`,
   numero,
+  referenciaExterna: `${numero}/2026`,
   titulo: `Ticket ${numero}`,
   departamento: { id: "tec", nombre: "Técnico" },
   estado: { id: "pend", nombre: "Pendiente", clave: null },
@@ -301,18 +304,18 @@ describe("TicketsList", () => {
   });
 
   describe("tabla", () => {
-    it("muestra una fila por ticket, en el orden recibido, con el número formateado", () => {
+    it("muestra una fila por ticket, en el orden recibido, con el número del proveedor", () => {
       ready(page([ticket(13), ticket(1000000, { id: "t-grande" }), ticket(2)]));
       renderList();
 
       const rows = screen.getAllByRole("row").slice(1); // sin el encabezado
       expect(rows.map((row) => within(row).getAllByRole("cell")[0]?.textContent)).toEqual([
-        "TE-000013",
-        "TE-1000000",
-        "TE-000002",
+        "13/2026",
+        "1000000/2026",
+        "2/2026",
       ]);
       expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
-        "Número",
+        "N.º del proveedor",
         "Título",
         "Departamento",
         "Estado",
@@ -352,7 +355,7 @@ describe("TicketsList", () => {
       expect(fecha.tagName).toBe("TIME");
       expect(fecha).toHaveAttribute("datetime", "2026-10-01");
       expect(fecha).toHaveClass("tabular-nums");
-      expect(within(row).getByText("TE-000013")).toHaveClass("tabular-nums");
+      expect(within(row).getByText("13/2026")).toHaveClass("tabular-nums");
     });
 
     it("un título largo se parte en líneas dentro de su celda y no ensancha la tabla", () => {
@@ -370,8 +373,18 @@ describe("TicketsList", () => {
 
       const enlaces = within(screen.getByTestId("ticket-row-13")).getAllByRole("link");
       expect(enlaces).toHaveLength(1);
-      expect(enlaces[0]).toHaveAccessibleName("TE-000013");
+      expect(enlaces[0]).toHaveAccessibleName("13/2026");
       expect(enlaces[0]).toHaveAttribute("href", "/tickets/t-13");
+    });
+
+    it("un ticket sin número del proveedor muestra «Sin número» y el enlace nombra el del sistema", () => {
+      ready(page([ticket(13, { referenciaExterna: null })]));
+      renderList();
+
+      const enlace = within(screen.getByTestId("ticket-row-13")).getByRole("link");
+      expect(enlace).toHaveTextContent("Sin número");
+      expect(enlace).toHaveAccessibleName("Sin número del proveedor, abrir TE-000013");
+      expect(enlace).toHaveAttribute("href", "/tickets/t-13");
     });
 
     it("el título es texto, no un segundo enlace al mismo destino", () => {
@@ -388,7 +401,7 @@ describe("TicketsList", () => {
       ready(page([ticket(13)]));
       renderList();
 
-      expect(screen.getByRole("link", { name: "TE-000013" })).toHaveClass(
+      expect(screen.getByRole("link", { name: "13/2026" })).toHaveClass(
         "font-mono",
         "text-link",
         "hover:underline",
