@@ -71,6 +71,7 @@ export const createTicketInputSchema = z
     titulo: tituloSchema,
     descripcion: textoLargoSchema,
     prioridadId: z.string(),
+    tipoId: idOpcionalSchema, // el service valida que exista y esté activo (SPEC 12)
     moduloId: idOpcionalSchema, // el service valida que sea del departamento del ticket (SPEC 11)
     fechaRecepcion: fechaNoFuturaSchema,
     actuacionSimple: actuacionSimpleSchema,
