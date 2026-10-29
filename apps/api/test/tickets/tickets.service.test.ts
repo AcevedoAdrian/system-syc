@@ -58,6 +58,7 @@ const input = (extra: Partial<CreateTicketInput> = {}): CreateTicketInput => ({
   titulo: "Impresora rota",
   descripcion: null,
   prioridadId: "alta",
+  tipoId: null,
   moduloId: null,
   fechaRecepcion: "2026-10-01",
   actuacionSimple: null,
@@ -237,7 +238,7 @@ function buildService(world: World = {}) {
         },
         area: null,
         edificio: null,
-        tipo: null,
+        tipo: nombreDe(catalogos.tipoTicket, data.tipoId),
         modulo: nombreDe(modulos, data.moduloId),
         prioridad: nombreDe(catalogos.prioridad, data.prioridadId) as {
           id: string;
@@ -602,6 +603,48 @@ describe("TicketsService.create", () => {
 
       expect(ticket.proveedor?.id).toBe("otro");
     });
+  });
+});
+
+describe("TicketsService.create: tipo (SPEC 12)", () => {
+  const catalogos = {
+    tipoTicket: [ref("inc", "Incidente"), ref("viejo", "Viejo", false)],
+  };
+
+  it("con un tipo activo: lo guarda, lo devuelve y lo audita", async () => {
+    const { service, created, audits } = buildService({ catalogos });
+
+    const ticket = await service.create(input({ tipoId: "inc" }), agenteTecnico);
+
+    expect(created[0]?.data.tipoId).toBe("inc");
+    expect(ticket.tipo).toEqual({ id: "inc", nombre: "Incidente" });
+    expect(audits[0]?.payload).toMatchObject({
+      after: { tipo: { id: "inc", nombre: "Incidente" } },
+    });
+  });
+
+  it("sin tipo sigue funcionando: queda en null y la auditoría lo muestra vacío", async () => {
+    const { service, created, audits } = buildService({ catalogos });
+
+    const ticket = await service.create(input(), agenteTecnico);
+
+    expect(created[0]?.data.tipoId).toBeNull();
+    expect(ticket.tipo).toBeNull();
+    expect(audits[0]?.payload).toMatchObject({ after: { tipo: null } });
+  });
+
+  it("un tipo inexistente (o eliminado, que el repository no devuelve) o desactivado: 400 y no crea nada", async () => {
+    const { service, created, audits } = buildService({ catalogos });
+
+    for (const tipoId of ["nada", "viejo"]) {
+      await expect(service.create(input({ tipoId }), agenteTecnico)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        status: 400,
+        message: "El tipo de ticket no existe o está desactivado",
+      });
+    }
+    expect(created).toHaveLength(0);
+    expect(audits).toHaveLength(0);
   });
 });
 

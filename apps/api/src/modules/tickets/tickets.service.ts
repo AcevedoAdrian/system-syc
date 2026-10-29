@@ -107,6 +107,7 @@ export class TicketsService {
     }
 
     await this.resolveReference("prioridad", input.prioridadId, null, MESSAGES.prioridad);
+    await this.resolveOptional("tipoTicket", input.tipoId, null, MESSAGES.tipo);
     await this.resolveModulo(input.moduloId, input.departamentoId, null);
     await this.resolveOptional("proveedor", input.proveedorId, null, MESSAGES.proveedor);
     if (input.proveedorId && input.referenciaExterna) {
@@ -130,6 +131,7 @@ export class TicketsService {
         departamentoId: input.departamentoId,
         prioridadId: input.prioridadId,
         estadoId: initial.id,
+        tipoId: input.tipoId,
         moduloId: input.moduloId,
         proveedorId: input.proveedorId,
         titulo: input.titulo,
