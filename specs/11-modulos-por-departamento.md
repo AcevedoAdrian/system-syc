@@ -308,25 +308,25 @@ Convenciones:
 
 ## Criterios de aceptación
 
-- [ ] Después de `prisma migrate deploy`, existe la tabla `modulo_departamento` con clave `(moduloId, organizationId)`, `ticket` tiene el índice `(departamentoId, moduloId)`, y un segundo `migrate dev` no genera nada.
-- [ ] `catalogs.modulos.create` con `departamentoIds` de Desarrollo y Redes devuelve 200, con `departamentos` con los dos.
-- [ ] `catalogs.modulos.create` sin `departamentoIds`, con `[]` o con un departamento desactivado devuelve 400.
-- [ ] Editar un módulo conservando un departamento que se desactivó después devuelve 200.
-- [ ] Quitarle un departamento a un módulo deja un `AuditLog` `update` cuyo diff tiene `departamentos` antes y después. Reenviar los mismos departamentos en otro orden responde 200 y no deja `AuditLog`.
-- [ ] Un agente de Redes recibe en `catalogs.modulos.list` solo los módulos que tienen Redes, activos e inactivos, cada uno con todos sus departamentos. El admin recibe todos. Un agente sin departamento recibe `[]`.
-- [ ] Eliminar un módulo borra sus filas de `modulo_departamento`; un módulo con un ticket no eliminado sigue dando 409.
-- [ ] Eliminar un departamento asignado a un módulo devuelve 409. Después de eliminar ese módulo, eliminar el departamento devuelve 200.
-- [ ] `tickets.create` con un `moduloId` que no tiene el departamento del ticket devuelve 400 "El módulo no es del departamento del ticket". Con uno que lo tiene, 200, y `tickets.get` lo trae. Con un módulo desactivado o inexistente, 400 «El módulo no existe o está desactivado».
-- [ ] `tickets.update` eligiendo un módulo nuevo de otro departamento devuelve 400. Guardar un ticket cuyo módulo actual ya no tiene su departamento, sin cambiarlo, devuelve 200.
-- [ ] `tickets.changeDepartment` de Técnico a Redes, con un módulo que solo tiene Técnico, deja `modulo: null` y un `AuditLog` `update` con `departamento` y `modulo` en el diff. Con un módulo de Técnico y Redes, el módulo se conserva.
-- [ ] En la web, la pestaña Módulos muestra la columna «Departamentos», y el panel no envía un módulo sin ninguna casilla tildada.
-- [ ] En la web, el selector de módulo de la edición ofrece solo los módulos del departamento del ticket, y el actual que no está entre ellos se ve «(no disponible)».
-- [ ] En la web, el alta tiene el campo «Módulo», deshabilitado sin departamento, y cambiar el departamento lo vacía.
-- [ ] En la web, el diálogo «Cambiar departamento» de un ticket con módulo muestra el aviso con el nombre del módulo, y el de un ticket sin módulo no muestra ningún aviso.
-- [ ] En la web, el filtro «Módulo» de la bandeja de un agente de Redes ofrece solo los módulos que tienen Redes; el del admin ofrece todos.
-- [ ] El seed sobre una base vacía crea los módulos de `seed-data/modulos.json` con sus departamentos. Con un departamento inexistente, aborta nombrándolo y no crea módulos. Sin `modulos.json`, lo saltea con un aviso y termina bien.
-- [ ] `docs/prd.md` (§4.2, §5, §6, §8 y P22), `docs/checklist-permisos.md`, `docs/despliegue.md` y `bruno/` reflejan el cambio.
-- [ ] `pnpm verify --spec 04,05,06,08,10,11` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] Después de `prisma migrate deploy`, existe la tabla `modulo_departamento` con clave `(moduloId, organizationId)`, `ticket` tiene el índice `(departamentoId, moduloId)`, y un segundo `migrate dev` no genera nada.
+- [X] `catalogs.modulos.create` con `departamentoIds` de Desarrollo y Redes devuelve 200, con `departamentos` con los dos.
+- [X] `catalogs.modulos.create` sin `departamentoIds`, con `[]` o con un departamento desactivado devuelve 400.
+- [X] Editar un módulo conservando un departamento que se desactivó después devuelve 200.
+- [X] Quitarle un departamento a un módulo deja un `AuditLog` `update` cuyo diff tiene `departamentos` antes y después. Reenviar los mismos departamentos en otro orden responde 200 y no deja `AuditLog`.
+- [X] Un agente de Redes recibe en `catalogs.modulos.list` solo los módulos que tienen Redes, activos e inactivos, cada uno con todos sus departamentos. El admin recibe todos. Un agente sin departamento recibe `[]`.
+- [X] Eliminar un módulo borra sus filas de `modulo_departamento`; un módulo con un ticket no eliminado sigue dando 409.
+- [X] Eliminar un departamento asignado a un módulo devuelve 409. Después de eliminar ese módulo, eliminar el departamento devuelve 200.
+- [X] `tickets.create` con un `moduloId` que no tiene el departamento del ticket devuelve 400 "El módulo no es del departamento del ticket". Con uno que lo tiene, 200, y `tickets.get` lo trae. Con un módulo desactivado o inexistente, 400 «El módulo no existe o está desactivado».
+- [X] `tickets.update` eligiendo un módulo nuevo de otro departamento devuelve 400. Guardar un ticket cuyo módulo actual ya no tiene su departamento, sin cambiarlo, devuelve 200.
+- [X] `tickets.changeDepartment` de Técnico a Redes, con un módulo que solo tiene Técnico, deja `modulo: null` y un `AuditLog` `update` con `departamento` y `modulo` en el diff. Con un módulo de Técnico y Redes, el módulo se conserva.
+- [X] En la web, la pestaña Módulos muestra la columna «Departamentos», y el panel no envía un módulo sin ninguna casilla tildada.
+- [X] En la web, el selector de módulo de la edición ofrece solo los módulos del departamento del ticket, y el actual que no está entre ellos se ve «(no disponible)».
+- [X] En la web, el alta tiene el campo «Módulo», deshabilitado sin departamento, y cambiar el departamento lo vacía.
+- [X] En la web, el diálogo «Cambiar departamento» de un ticket con módulo muestra el aviso con el nombre del módulo, y el de un ticket sin módulo no muestra ningún aviso.
+- [X] En la web, el filtro «Módulo» de la bandeja de un agente de Redes ofrece solo los módulos que tienen Redes; el del admin ofrece todos.
+- [X] El seed sobre una base vacía crea los módulos de `seed-data/modulos.json` con sus departamentos. Con un departamento inexistente, aborta nombrándolo y no crea módulos. Sin `modulos.json`, lo saltea con un aviso y termina bien.
+- [X] `docs/prd.md` (§4.2, §5, §6, §8 y P22), `docs/checklist-permisos.md`, `docs/despliegue.md` y `bruno/` reflejan el cambio.
+- [X] `pnpm verify --spec 04,05,06,08,10,11` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
 
