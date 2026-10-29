@@ -15,6 +15,11 @@ overrides:
   multer: 2.5.0
   'undici@^8.0.0': 8.12.2
   source-map-js: 1.2.2
+  # Avisos altos del 29 de octubre de 2026 en `seroval` (deserialización de `@tanstack/router-core`, que lo
+  # fija en 1.6.7). 1.6.12 es de la misma rama y corrige también los moderados. Se saca cuando
+  # `@tanstack/router-core` suba su propia versión (`pnpm why seroval`).
+  seroval: 1.6.12
+  seroval-plugins: 1.6.12
 # Una versión publicada hace menos de 3 días no se instala (los ataques de 2026 a TanStack y axios se
 # detectaron en horas o días). Sin excepciones: si una versión nueva hace falta antes, se espera.
 minimumReleaseAge: 4320
