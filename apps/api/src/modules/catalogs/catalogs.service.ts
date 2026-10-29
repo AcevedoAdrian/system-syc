@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import type { AuditHistory, CatalogItem, EstadoTicket, Modulo, Proveedor } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
+import { DEPARTMENT_READER, type DepartmentReader } from "../../common/department-reader";
 import { normalizeName } from "../../common/text";
 import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
@@ -43,9 +44,27 @@ export class CatalogsService {
     private readonly repository: CatalogsRepository,
     private readonly audit: AuditService,
     @Inject(TICKET_USAGE_READER) private readonly tickets: TicketUsageReader,
+    @Inject(DEPARTMENT_READER) private readonly departments: DepartmentReader,
   ) {}
 
-  async list(def: CatalogDefinition): Promise<CatalogItemView[]> {
+  // Cualquier usuario con sesión lo lee. Un catálogo con `links.scopeAgentList` (Módulos) le devuelve
+  // a un agente solo los ítems de su departamento, con todos sus departamentos; el admin recibe todos.
+  // Un agente sin departamento recibe `[]`. El recorte es de la API, no de la pantalla (SPEC 11).
+  async list(def: CatalogDefinition, actor: AuthenticatedUser): Promise<CatalogItemView[]> {
+    const rows = await this.repository.findAll(def);
+    if (!def.links?.scopeAgentList || actor.role === "admin") {
+      return rows.map((row) => toItem(def, row));
+    }
+    const departmentId = await this.departments.findDepartmentIdOf(actor.id);
+    if (!departmentId) return [];
+    return rows
+      .filter((row) => this.relatedOf(def, row).some((item) => item.id === departmentId))
+      .map((row) => toItem(def, row));
+  }
+
+  // Todos los ítems, sin recorte por usuario: para código del sistema sin sesión (el seed). Nunca
+  // desde un endpoint.
+  async listAll(def: CatalogDefinition): Promise<CatalogItemView[]> {
     return (await this.repository.findAll(def)).map((row) => toItem(def, row));
   }
 

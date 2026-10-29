@@ -5,6 +5,7 @@ import { loadEnv } from "./config/env.schema";
 import { AuditRepository } from "./modules/audit/audit.repository";
 import { AuditService } from "./modules/audit/audit.service";
 import { type Auth, createAuth } from "./modules/auth/auth.config";
+import { AuthRepository } from "./modules/auth/auth.repository";
 import {
   CATALOG_DEFINITIONS,
   type CatalogDefinition,
@@ -195,7 +196,7 @@ async function seedAreas(
 ): Promise<number | null> {
   if (!areas) return null;
   if (!(await catalogs.isEmpty(CATALOG_DEFINITIONS.areas))) return 0;
-  const tipos = await catalogs.list(CATALOG_DEFINITIONS.tiposArea);
+  const tipos = await catalogs.listAll(CATALOG_DEFINITIONS.tiposArea);
   const items = resolveSeedAreas(areas, tipos);
   return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.areas, items, adminId);
 }
@@ -329,7 +330,12 @@ async function main() {
   const admin = await seedAdmin(auth, audit, seedEnv);
   const departments = await seedDepartments(auth, audit, data.departamentos);
   const catalogs = await seedCatalogs(
-    new CatalogsService(new CatalogsRepository(env), audit, new TicketsRepository(env)),
+    new CatalogsService(
+      new CatalogsRepository(env),
+      audit,
+      new TicketsRepository(env),
+      new AuthRepository(env),
+    ),
     data,
     await findAdminId(auth, seedEnv.SEED_ADMIN_USERNAME),
   );

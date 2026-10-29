@@ -45,6 +45,8 @@ export interface CatalogReference {
 // la vez es el nombre de la relación de la unión. `targetName` es la columna del nombre en el destino
 // (`name` en Organization). El destino se borra físicamente, así que no tiene `deletedAt`. `empty` y
 // `invalid` son los 400 de una lista vacía y de un destino que no existe o está desactivado.
+// `scopeAgentList`: el `list` de un agente devuelve solo los ítems vinculados a su departamento (el
+// destino es el departamento); el admin recibe todos.
 export interface CatalogLinks {
   field: string;
   as: string;
@@ -55,6 +57,7 @@ export interface CatalogLinks {
   targetName: string;
   empty: string;
   invalid: string;
+  scopeAgentList: boolean;
 }
 
 export interface CatalogDefinition {
@@ -163,6 +166,7 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
       targetName: "name",
       empty: "Elegí al menos un departamento",
       invalid: "El departamento no existe o está desactivado",
+      scopeAgentList: true,
     },
     snapshotFields: [...BASE_FIELDS, "departamentos"],
   },

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@/common/authenticated-request";
+import type { DepartmentReader } from "@/common/department-reader";
 import { normalizeName } from "@/common/text";
 import type { TicketUsageReader } from "@/common/ticket-usage-reader";
 import type { AuditEntry } from "@/modules/audit/audit.repository";
@@ -48,6 +49,7 @@ function row(id: string, nombre: string, orden: number, extra: Partial<CatalogRo
 function buildService(
   initial: Record<string, CatalogRow[]> = {},
   inUse: Record<string, number> = {},
+  agentDepartments: Record<string, string> = {}, // usuario → su departamento (lo que lee el guard)
 ) {
   const tables = new Map(
     Object.entries(initial).map(([ruta, rows]) => [ruta, rows.map((r) => ({ ...r }))]),
@@ -165,8 +167,11 @@ function buildService(
   const audit = { history } as unknown as AuditService;
   const countByCatalogItem = vi.fn(async (ruta: string, id: string) => inUse[`${ruta}:${id}`] ?? 0);
   const tickets = { countByCatalogItem } as unknown as TicketUsageReader;
+  const departments: DepartmentReader = {
+    findDepartmentIdOf: async (userId) => agentDepartments[userId] ?? null,
+  };
   return {
-    service: new CatalogsService(repository, audit, tickets),
+    service: new CatalogsService(repository, audit, tickets, departments),
     countByCatalogItem,
     audits,
     actors,
@@ -189,7 +194,7 @@ describe("CatalogsService.list", () => {
   it("devuelve solo id, nombre, orden y activo de un catálogo simple", async () => {
     const { service } = buildService(threeEdificios());
 
-    expect(await service.list(edificios)).toEqual([
+    expect(await service.list(edificios, admin)).toEqual([
       { id: "a1", nombre: "Sistemas", orden: 1, activo: true },
       { id: "a2", nombre: "Redes", orden: 2, activo: true },
       { id: "a3", nombre: "Soporte", orden: 3, activo: true },
@@ -201,7 +206,7 @@ describe("CatalogsService.list", () => {
       areas: [row("a1", "Acosta", 1, { tipoId: "t1", tipo: { id: "t1", nombre: "Diputado" } })],
     });
 
-    expect(await service.list(areas)).toEqual([
+    expect(await service.list(areas, admin)).toEqual([
       {
         id: "a1",
         nombre: "Acosta",
@@ -218,10 +223,10 @@ describe("CatalogsService.list", () => {
       proveedores: [row("p1", "Acme", 1, { contacto: "Ana", telefono: null })],
     });
 
-    expect(await service.list(estados)).toEqual([
+    expect(await service.list(estados, admin)).toEqual([
       { id: "e1", nombre: "Cerrado", orden: 1, activo: true, clave: "CERRADO" },
     ]);
-    expect(await service.list(proveedores)).toEqual([
+    expect(await service.list(proveedores, admin)).toEqual([
       { id: "p1", nombre: "Acme", orden: 1, activo: true, contacto: "Ana", telefono: null },
     ]);
   });
@@ -302,7 +307,7 @@ describe("CatalogsService.create", () => {
     const again = await service.create(edificios, { nombre: "Sistemas" }, admin);
 
     expect(again.id).not.toBe(first.id);
-    expect(await service.list(edificios)).toHaveLength(1);
+    expect(await service.list(edificios, admin)).toHaveLength(1);
   });
 
   it("en Proveedores guarda los campos de contacto y los audita", async () => {
@@ -482,7 +487,7 @@ describe("CatalogsService.remove", () => {
 
     await service.remove(areas, "a2", admin);
 
-    expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+    expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     expect(audits).toEqual([
       { entityType: "Area", entityId: "a2", action: "delete", actorId: "admin-1", payload: {} },
     ]);
@@ -505,7 +510,7 @@ describe("CatalogsService.remove", () => {
         message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
       });
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a2", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a2", "a3"]);
       expect(audits).toHaveLength(0);
     });
 
@@ -514,7 +519,7 @@ describe("CatalogsService.remove", () => {
 
       await service.remove(areas, "a2", admin);
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     });
 
     it("lo que cuentan son los tickets no eliminados: uno usado solo por eliminados se elimina", async () => {
@@ -523,7 +528,7 @@ describe("CatalogsService.remove", () => {
 
       await service.remove(areas, "a2", admin);
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     });
 
     it("consulta el catálogo correcto: la misma id en otro catálogo no cuenta", async () => {
@@ -711,7 +716,7 @@ describe("CatalogsService: Módulos con departamentos", () => {
   it("list devuelve cada módulo con sus departamentos", async () => {
     const { service } = buildService({ modulos: [servidores()] });
 
-    expect(await service.list(modulos)).toEqual([
+    expect(await service.list(modulos, admin)).toEqual([
       {
         id: "m1",
         nombre: "Servidores",
@@ -923,6 +928,67 @@ describe("CatalogsService: Módulos con departamentos", () => {
   });
 });
 
+describe("CatalogsService.list: Módulos por alcance", () => {
+  const desarrollo = { id: "d1", nombre: "Desarrollo" };
+  const redes = { id: "d2", nombre: "Redes" };
+  const tecnico = { id: "d3", nombre: "Técnico" };
+  const agente = (id: string): AuthenticatedUser => ({ ...admin, id, role: "agente" });
+  const tablas = () => ({
+    modulos: [
+      row("m1", "Servidores", 1, { departamentos: [desarrollo, redes] }),
+      row("m2", "Correo", 2, { departamentos: [tecnico] }),
+      row("m3", "Red interna", 3, { departamentos: [redes], activo: false }),
+    ],
+  });
+  const agentes = { "ag-redes": "d2", "ag-tec": "d3" };
+
+  it("un agente de Redes recibe solo los módulos con Redes, activos e inactivos", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    const list = await service.list(modulos, agente("ag-redes"));
+
+    expect(list.map((m) => m.id)).toEqual(["m1", "m3"]);
+  });
+
+  it("cada módulo trae todos sus departamentos, no solo el del agente", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    const [servidores] = await service.list(modulos, agente("ag-redes"));
+
+    expect(servidores).toMatchObject({ departamentos: [desarrollo, redes] });
+  });
+
+  it("el admin recibe todos los módulos", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    expect((await service.list(modulos, admin)).map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("un agente sin departamento recibe una lista vacía", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    expect(await service.list(modulos, agente("huerfano"))).toEqual([]);
+  });
+
+  it("un agente de un departamento sin módulos recibe una lista vacía", async () => {
+    const { service } = buildService(tablas(), {}, { "ag-nuevo": "d9" });
+
+    expect(await service.list(modulos, agente("ag-nuevo"))).toEqual([]);
+  });
+
+  it("los demás catálogos no se recortan: el agente ve la lista completa", async () => {
+    const { service } = buildService(
+      { ...threeEdificios(), areas: threeAreas().areas },
+      {},
+      agentes,
+    );
+
+    expect(await service.list(edificios, agente("ag-redes"))).toHaveLength(3);
+    expect(await service.list(areas, agente("ag-redes"))).toHaveLength(3);
+    expect(await service.list(edificios, agente("huerfano"))).toHaveLength(3);
+  });
+});
+
 describe("CatalogsService.remove: Tipos de área", () => {
   const unTipoConArea = () => ({
     tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
@@ -936,7 +1002,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
       code: "CONFLICT",
       message: "Lo usa al menos un área: desactivalo en lugar de eliminarlo",
     });
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1", "t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t1", "t2"]);
     expect(audits).toEqual([]);
   });
 
@@ -945,7 +1011,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
 
     await service.remove(tiposArea, "t2", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t1"]);
   });
 
   it("con su única área eliminada, el tipo se elimina", async () => {
@@ -954,7 +1020,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
     await service.remove(areas, "a1", admin);
     await service.remove(tiposArea, "t1", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t2"]);
   });
 
   it("las áreas de otro tipo no cuentan", async () => {
@@ -965,7 +1031,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
 
     await service.remove(tiposArea, "t1", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t2"]);
   });
 
   it("desactivar un tipo con áreas está permitido", async () => {
@@ -1127,7 +1193,7 @@ describe("Estados: los de sistema (con clave)", () => {
 
     expect(audits).toEqual([]);
     expect(actors).toEqual([]);
-    expect(await service.list(estados)).toHaveLength(7);
+    expect(await service.list(estados, admin)).toHaveLength(7);
   });
 
   it("tampoco se elimina si es el único: gana la regla de la clave", async () => {
@@ -1149,7 +1215,7 @@ describe("Estados: los de sistema (con clave)", () => {
     await service.setActive(estados, "e5", true, admin);
     await service.move(estados, "e6", "subir", admin);
 
-    const byId = Object.fromEntries((await service.list(estados)).map((i) => [i.id, i]));
+    const byId = Object.fromEntries((await service.list(estados, admin)).map((i) => [i.id, i]));
     expect(byId.e4).toMatchObject({ nombre: "Resuelto", clave: "FINALIZADO" });
     expect(byId.e5).toMatchObject({ activo: true, clave: "CERRADO" });
     expect(byId.e6).toMatchObject({ orden: 5, clave: "CANCELADO" });
@@ -1160,7 +1226,7 @@ describe("Estados: los de sistema (con clave)", () => {
 
     await service.remove(estados, "e3", admin);
 
-    expect(await service.list(estados)).toHaveLength(6);
+    expect(await service.list(estados, admin)).toHaveLength(6);
     expect(audits.map((a) => a.action)).toEqual(["delete"]);
   });
 });
@@ -1208,7 +1274,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
 
     await service.remove(estados, "e2", admin);
 
-    expect((await service.list(estados)).map((i) => i.id)).toEqual(["e1"]);
+    expect((await service.list(estados, admin)).map((i) => i.id)).toEqual(["e1"]);
   });
 
   it("desactivar la única prioridad activa da 409", async () => {
@@ -1242,7 +1308,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
     });
     await service.remove(prioridades, "p1", admin);
 
-    expect((await service.list(prioridades)).map((i) => i.id)).toEqual(["p2"]);
+    expect((await service.list(prioridades, admin)).map((i) => i.id)).toEqual(["p2"]);
   });
 
   it("los otros catálogos no tienen la regla: Edificios elimina su último activo", async () => {
@@ -1250,7 +1316,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
 
     await service.remove(edificios, "b1", admin);
 
-    expect(await service.list(edificios)).toEqual([]);
+    expect(await service.list(edificios, admin)).toEqual([]);
   });
 });
 
@@ -1262,6 +1328,7 @@ describe("CatalogsService.seedIfEmpty", () => {
       repository,
       {} as unknown as AuditService,
       {} as unknown as TicketUsageReader,
+      {} as unknown as DepartmentReader,
     );
     return { service, seedIfEmpty };
   }
