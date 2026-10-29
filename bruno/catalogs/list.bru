@@ -32,7 +32,8 @@ docs {
   Método: GET
   Ruta: /catalogs/{catálogo}
 
-  Respuesta 200: arreglo de { id, nombre, orden, activo }. Proveedores suma contacto, telefono,
+  Respuesta 200: arreglo de { id, nombre, orden, activo }. Tipos de ticket (`tipos`) suma descripcion
+  (texto o null; la web la usa como ayuda en el alta del ticket). Proveedores suma contacto, telefono,
   correo y sitioWeb; Estados suma clave (`FINALIZADO` | `CERRADO` | `CANCELADO` | `REABIERTO` | null).
   Guarda el id del primer ítem en `listedItemId` (lo usan las peticiones de `tickets`: prioridad o estado).
   Errores: 401 sin sesión.

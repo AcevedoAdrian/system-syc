@@ -13,6 +13,7 @@ import spec08 from "./08-tipos-area.mjs";
 import spec09 from "./09-sistema-visual.mjs";
 import spec10 from "./10-numero-factura.mjs";
 import spec11 from "./11-modulos-departamento.mjs";
+import spec12 from "./12-descripcion-tipo-ticket.mjs";
 
 export const SPECS = [
   spec01,
@@ -26,4 +27,5 @@ export const SPECS = [
   spec09,
   spec10,
   spec11,
+  spec12,
 ];

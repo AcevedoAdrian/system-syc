@@ -37,7 +37,9 @@ docs {
   Contrato: `catalogs.<catálogo>.update` en `packages/contracts`.
   Método: PATCH
   Ruta: /catalogs/{catálogo}/{itemId}
-  Cuerpo: nombre. Proveedores suma contacto, telefono, correo y sitioWeb: lo que va en blanco se borra.
+  Cuerpo: nombre. Tipos de ticket (`tipos`) suma `descripcion` (hasta 500): como la edición reemplaza
+  todos los campos, omitirla o mandarla en blanco la borra (null); reenviar la misma con espacios en
+  los extremos no cambia nada. Proveedores suma contacto, telefono, correo y sitioWeb: lo que va en blanco se borra.
   Áreas suma `tipoId` (obligatorio): mandar otro cambia el tipo del área. Módulos suma
   `departamentoIds` (obligatorio): reemplaza la lista entera de departamentos (`moduloDepartamentoId`);
   se acepta un departamento desactivado que el módulo ya tenía, y reenviar los mismos en otro orden no
