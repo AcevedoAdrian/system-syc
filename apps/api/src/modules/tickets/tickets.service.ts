@@ -107,6 +107,7 @@ export class TicketsService {
     }
 
     await this.resolveReference("prioridad", input.prioridadId, null, MESSAGES.prioridad);
+    await this.resolveModulo(input.moduloId, input.departamentoId, null);
     await this.resolveOptional("proveedor", input.proveedorId, null, MESSAGES.proveedor);
     if (input.proveedorId && input.referenciaExterna) {
       const duplicate = await this.repository.findByReferencia(
@@ -129,6 +130,7 @@ export class TicketsService {
         departamentoId: input.departamentoId,
         prioridadId: input.prioridadId,
         estadoId: initial.id,
+        moduloId: input.moduloId,
         proveedorId: input.proveedorId,
         titulo: input.titulo,
         descripcion: input.descripcion,
@@ -178,11 +180,10 @@ export class TicketsService {
       current.tipo,
       MESSAGES.tipo,
     );
-    const modulo = await this.resolveOptional(
-      "modulo",
+    const modulo = await this.resolveModulo(
       input.moduloId,
+      current.departamento.id,
       current.modulo,
-      MESSAGES.modulo,
     );
     const proveedor = await this.resolveOptional(
       "proveedor",
@@ -346,17 +347,34 @@ export class TicketsService {
       });
     }
 
-    const next: Ticket = { ...current, departamento: { id: destino.id, nombre: destino.nombre } };
+    // El módulo se conserva solo si el departamento nuevo también lo tiene (SPEC 11, Feature 11.4). Uno
+    // eliminado no tiene departamentos: se vacía igual. Se escribe en la misma operación que el
+    // departamento, así el diff de la auditoría trae `departamento` y `modulo`.
+    const clearsModulo =
+      current.modulo !== null && !(await this.moduloHas(current.modulo, destino.id));
+    const next: Ticket = {
+      ...current,
+      departamento: { id: destino.id, nombre: destino.nombre },
+      modulo: clearsModulo ? null : current.modulo,
+    };
     const diff = computeDiff(snapshotOf(current), snapshotOf(next));
     if (!diff) return current;
 
-    return this.repository.changeDepartment(current.id, input.updatedAt, destino.id, actor.id, {
-      entityType: ENTITY_TYPE,
-      entityId: current.id,
-      action: "update",
-      actorId: actor.id,
-      payload: { ...diff },
-    });
+    return this.repository.changeDepartment(
+      current.id,
+      input.updatedAt,
+      clearsModulo
+        ? { departamentoId: destino.id, moduloId: null }
+        : { departamentoId: destino.id },
+      actor.id,
+      {
+        entityType: ENTITY_TYPE,
+        entityId: current.id,
+        action: "update",
+        actorId: actor.id,
+        payload: { ...diff },
+      },
+    );
   }
 
   // Solo el admin (el guard lo exige), también sobre un ticket de su propio departamento. Eliminar
@@ -412,6 +430,28 @@ export class TicketsService {
     return { id: row.id, nombre: row.nombre, tipo: row.tipo };
   }
 
+  // El módulo del ticket (SPEC 11, Feature 11.4): el que ya tenía se acepta siempre ("referencia
+  // válida"); uno nuevo debe existir, estar activo y tener el departamento del ticket.
+  private async resolveModulo(
+    id: string | null,
+    departamentoId: string,
+    current: Ref | null,
+  ): Promise<Ref | null> {
+    if (id === null) return null;
+    if (current?.id === id) return current;
+    const row = await this.repository.findModulo(id);
+    assertUsable(row, MESSAGES.modulo);
+    if (!row.departamentoIds.includes(departamentoId)) {
+      throw new ORPCError("BAD_REQUEST", { message: MESSAGES.moduloOtroDepartamento });
+    }
+    return { id: row.id, nombre: row.nombre };
+  }
+
+  private async moduloHas(modulo: Ref, departamentoId: string): Promise<boolean> {
+    const row = await this.repository.findModulo(modulo.id);
+    return row?.departamentoIds.includes(departamentoId) ?? false;
+  }
+
   private async resolveOptional(
     catalog: TicketCatalog,
     id: string | null,
@@ -428,6 +468,7 @@ const MESSAGES = {
   edificio: "El edificio no existe o está desactivado",
   tipo: "El tipo de ticket no existe o está desactivado",
   modulo: "El módulo no existe o está desactivado",
+  moduloOtroDepartamento: "El módulo no es del departamento del ticket",
   proveedor: "El proveedor no existe o está desactivado",
 } as const;
 

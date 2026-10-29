@@ -214,7 +214,12 @@ export class CatalogsService {
   // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.
   async seedIfEmpty(
     def: CatalogDefinition,
-    items: readonly { nombre: string; clave?: string; tipo?: { id: string; nombre: string } }[],
+    items: readonly {
+      nombre: string;
+      clave?: string;
+      tipo?: { id: string; nombre: string };
+      departamentos?: readonly RelatedItem[];
+    }[],
     adminId: string,
   ): Promise<number> {
     const entries: SeedEntry[] = items.map((item, index) => {
@@ -227,17 +232,21 @@ export class CatalogsService {
       if (item.clave) data.clave = item.clave;
       const reference = def.reference;
       if (reference && item.tipo) data[reference.field] = item.tipo.id;
+      const links = def.links;
+      const related = links && item.departamentos ? sortRelated(item.departamentos) : null;
       return {
         data,
+        ...(links && related ? { linkIds: related.map((r) => r.id) } : {}),
         audit: {
           entityType: def.entityType,
           action: "create",
           actorId: null,
           payload: {
-            after: snapshotOf(
-              def,
-              reference && item.tipo ? { ...data, [reference.as]: item.tipo } : data,
-            ),
+            after: snapshotOf(def, {
+              ...data,
+              ...(reference && item.tipo ? { [reference.as]: item.tipo } : {}),
+              ...(links && related ? { [links.as]: related } : {}),
+            }),
           },
         },
       };

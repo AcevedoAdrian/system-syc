@@ -22,17 +22,20 @@ import {
   edificiosSchema,
   estadosSchema,
   findSeedDataDir,
+  modulosSchema,
   prioridadesSchema,
   readSeedFile,
   requireSeedFile,
   resolveSeedAreas,
+  resolveSeedModulos,
   type SeedAgent,
   type SeedArea,
+  type SeedModulo,
   seedUsername,
   tiposAreaSchema,
 } from "./seed-data";
 
-// Los datos iniciales (departamentos, estados, prioridades, tipos de área, edificios, áreas y agentes) son archivos
+// Los datos iniciales (departamentos, estados, prioridades, tipos de área, edificios, áreas, módulos y agentes) son archivos
 // de `seed-data/`, no constantes: ver `seed-data/README.md`.
 interface SeedData {
   departamentos: string[];
@@ -41,6 +44,7 @@ interface SeedData {
   edificios: { nombre: string }[] | null;
   tiposArea: { nombre: string }[] | null;
   areas: SeedArea[] | null;
+  modulos: SeedModulo[] | null;
   agentes: SeedAgent[] | null;
 }
 
@@ -56,6 +60,7 @@ function loadSeedData(dir: string): SeedData {
     edificios: toItems(readSeedFile(dir, "edificios.json", edificiosSchema)),
     tiposArea: toItems(readSeedFile(dir, "tipos-area.json", tiposAreaSchema)),
     areas: readSeedFile(dir, "areas.json", areasSchema),
+    modulos: readSeedFile(dir, "modulos.json", modulosSchema),
     agentes: readSeedFile(dir, "agentes.json", agentesSchema),
   };
 }
@@ -201,11 +206,27 @@ async function seedAreas(
   return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.areas, items, adminId);
 }
 
+// Los módulos se cargan solo si la tabla está vacía (SPEC 11). Antes se resuelven los departamentos de
+// cada uno contra la base ya cargada, y cualquier departamento inexistente, módulo sin departamentos o
+// nombre repetido aborta sin crear ninguno. Con la tabla ya cargada no se mira el archivo.
+async function seedModulos(
+  catalogs: CatalogsService,
+  modulos: SeedModulo[] | null,
+  departamentos: { id: string; nombre: string }[],
+  adminId: string,
+): Promise<number | null> {
+  if (!modulos) return null;
+  if (!(await catalogs.isEmpty(CATALOG_DEFINITIONS.modulos))) return 0;
+  const items = resolveSeedModulos(modulos, departamentos);
+  return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.modulos, items, adminId);
+}
+
 // Cada catálogo se carga solo si su tabla no tiene ninguna fila; correrlo otra vez no crea nada y
 // no deshace un renombre del admin. `null` = no había archivo, no se intentó.
 async function seedCatalogs(
   catalogs: CatalogsService,
   data: SeedData,
+  departamentos: { id: string; nombre: string }[],
   adminId: string,
 ): Promise<{
   estados: number;
@@ -213,6 +234,7 @@ async function seedCatalogs(
   tiposArea: number | null;
   areas: number | null;
   edificios: number | null;
+  modulos: number | null;
 }> {
   const load = async (def: CatalogDefinition, items: { nombre: string }[] | null) =>
     items ? await catalogs.seedIfEmpty(def, items, adminId) : null;
@@ -230,7 +252,17 @@ async function seedCatalogs(
     tiposArea,
     areas: await seedAreas(catalogs, data.areas, adminId),
     edificios: await load(CATALOG_DEFINITIONS.edificios, data.edificios),
+    modulos: await seedModulos(catalogs, data.modulos, departamentos, adminId),
   };
+}
+
+// Los departamentos ya cargados, con su id, para resolver los de cada módulo.
+async function listDepartments(auth: Auth): Promise<{ id: string; nombre: string }[]> {
+  const ctx = await auth.$context;
+  const rows = await ctx.adapter.findMany<OrganizationRow & { id: string }>({
+    model: "organization",
+  });
+  return rows.map((row) => ({ id: row.id, nombre: row.name }));
 }
 
 // Los agentes se crean como `seedAdmin` crea al admin (sin sesión, por el contexto interno de Better
@@ -337,6 +369,7 @@ async function main() {
       new AuthRepository(env),
     ),
     data,
+    await listDepartments(auth),
     await findAdminId(auth, seedEnv.SEED_ADMIN_USERNAME),
   );
   const agents = data.agentes ? await seedAgents(auth, audit, data.agentes) : null;
@@ -359,6 +392,7 @@ async function main() {
   report("Tipos de área", "creados", catalogs.tiposArea, "tipos-area.json");
   report("Áreas", "creadas", catalogs.areas, "areas.json");
   report("Edificios", "creados", catalogs.edificios, "edificios.json");
+  report("Módulos", "creados", catalogs.modulos, "modulos.json");
   if (!agents) console.log("Agentes: no hay seed-data/agentes.json, no se cargaron.");
   else if (agents.creados.length === 0) console.log("Agentes: ya existían todos.");
   else {

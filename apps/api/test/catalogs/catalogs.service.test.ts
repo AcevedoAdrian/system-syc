@@ -1393,6 +1393,60 @@ describe("CatalogsService.seedIfEmpty", () => {
     ]);
   });
 
+  it("Módulos: manda la lista de la unión y deja los departamentos ordenados en la auditoría", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(
+      modulos,
+      [
+        {
+          nombre: "Servidores",
+          departamentos: [
+            { id: "d3", nombre: "Técnico" },
+            { id: "d1", nombre: "Desarrollo" },
+          ],
+        },
+      ],
+      "admin-1",
+    );
+
+    expect(seedIfEmpty).toHaveBeenCalledWith(
+      modulos,
+      [
+        {
+          data: { nombre: "Servidores", nombreNormalizado: "servidores", orden: 1, activo: true },
+          linkIds: ["d1", "d3"],
+          audit: {
+            entityType: "Modulo",
+            action: "create",
+            actorId: null,
+            payload: {
+              after: {
+                nombre: "Servidores",
+                orden: 1,
+                activo: true,
+                departamentos: [
+                  { id: "d1", nombre: "Desarrollo" },
+                  { id: "d3", nombre: "Técnico" },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      "admin-1",
+    );
+  });
+
+  it("un catálogo sin vínculo no manda linkIds", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1");
+
+    const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [unknown, object[]];
+    expect(entries[0]).not.toHaveProperty("linkIds");
+  });
+
   it("devuelve 0 cuando el repository encuentra la tabla con datos", async () => {
     const { service } = buildSeedService(0);
 

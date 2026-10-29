@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { getPrismaClient } from "@syc/db";
+import type { ModuleUsageReader } from "../../common/module-usage-reader";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
 import { normalizeName } from "../../common/text";
 import { ENV } from "../../config/config.module";
@@ -42,6 +43,7 @@ export type CatalogWrite = Record<string, CatalogValue>;
 export interface SeedEntry {
   data: CatalogWrite;
   audit: Omit<AuditEntry, "entityId">;
+  linkIds?: readonly string[]; // la lista de la unión, en un catálogo con `links` (SPEC 11)
 }
 
 export interface OrdenChange {
@@ -130,7 +132,7 @@ function translate(def: CatalogDefinition, error: unknown): never {
 }
 
 @Injectable()
-export class CatalogsRepository {
+export class CatalogsRepository implements ModuleUsageReader {
   constructor(@Inject(ENV) private readonly env: Env) {}
 
   private get db() {
@@ -139,6 +141,12 @@ export class CatalogsRepository {
 
   private delegate(def: CatalogDefinition, client: AuditTransaction | typeof this.db) {
     return client[def.model] as unknown as CatalogDelegate;
+  }
+
+  // Módulos que tienen el departamento. Un módulo eliminado ya no tiene filas en la unión, así que no
+  // hace falta cruzar con `modulo`.
+  async countByDepartment(departmentId: string): Promise<number> {
+    return this.db.moduloDepartamento.count({ where: { organizationId: departmentId } });
   }
 
   // Filas no eliminadas de `model` cuya FK `field` apunta a `id` (regla `usedBy` de la definición).
@@ -310,7 +318,12 @@ export class CatalogsRepository {
       if ((await delegate.count({})) > 0) return 0;
       for (const entry of entries) {
         const row = await delegate.create({
-          data: { ...entry.data, createdBy: actorId, updatedBy: actorId },
+          data: {
+            ...entry.data,
+            createdBy: actorId,
+            updatedBy: actorId,
+            ...(def.links && entry.linkIds ? writeLinks(def.links, entry.linkIds, false) : {}),
+          },
           select: { id: true },
         });
         await writeAuditEntry(tx, { ...entry.audit, entityId: row.id });

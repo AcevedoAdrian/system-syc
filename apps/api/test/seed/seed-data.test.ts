@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   areasSchema,
   findSeedDataDir,
+  modulosSchema,
   readSeedFile,
   requireSeedFile,
   resolveSeedAreas,
+  resolveSeedModulos,
   seedUsername,
   tiposAreaSchema,
 } from "@/seed-data";
@@ -123,6 +125,91 @@ describe("resolveSeedAreas", () => {
         tipos,
       ),
     ).toHaveLength(2);
+  });
+});
+
+describe("resolveSeedModulos", () => {
+  const deps = [
+    { id: "d1", nombre: "Desarrollo" },
+    { id: "d2", nombre: "Redes" },
+    { id: "d3", nombre: "Técnico" },
+  ];
+
+  it("resuelve los departamentos de cada módulo por nombre sin mayúsculas ni acentos", () => {
+    const resolved = resolveSeedModulos(
+      [
+        { nombre: "Servidores", departamentos: ["desarrollo", "REDES"] },
+        { nombre: "Correo", departamentos: ["Tecnico"] },
+      ],
+      deps,
+    );
+
+    expect(resolved).toEqual([
+      {
+        nombre: "Servidores",
+        departamentos: [
+          { id: "d1", nombre: "Desarrollo" },
+          { id: "d2", nombre: "Redes" },
+        ],
+      },
+      { nombre: "Correo", departamentos: [{ id: "d3", nombre: "Técnico" }] },
+    ]);
+  });
+
+  it("un departamento repetido dentro de un módulo cuenta una sola vez", () => {
+    const [servidores] = resolveSeedModulos(
+      [{ nombre: "Servidores", departamentos: ["Redes", "redes"] }],
+      deps,
+    );
+
+    expect(servidores?.departamentos).toEqual([{ id: "d2", nombre: "Redes" }]);
+  });
+
+  it("aborta nombrando el departamento que no existe", () => {
+    expect(() =>
+      resolveSeedModulos(
+        [
+          { nombre: "Servidores", departamentos: ["Redes", "Contaduría"] },
+          { nombre: "Correo", departamentos: ["Contaduría", "Legales"] },
+        ],
+        deps,
+      ),
+    ).toThrow('modulos.json pide departamentos que no existen: "Contaduría", "Legales"');
+  });
+
+  it("aborta nombrando los módulos con la lista vacía", () => {
+    expect(() => resolveSeedModulos([{ nombre: "Servidores", departamentos: [] }], deps)).toThrow(
+      'modulos.json trae módulos sin departamentos: "Servidores"',
+    );
+  });
+
+  it("aborta nombrando los módulos repetidos, sin importar mayúsculas ni acentos", () => {
+    expect(() =>
+      resolveSeedModulos(
+        [
+          { nombre: "Gestión", departamentos: ["Redes"] },
+          { nombre: "gestion", departamentos: ["Técnico"] },
+        ],
+        deps,
+      ),
+    ).toThrow('modulos.json repite módulos: "gestion"');
+  });
+});
+
+describe("modulosSchema", () => {
+  it("recorta los nombres y acepta una lista de departamentos vacía (la rechaza el resolver)", () => {
+    expect(
+      modulosSchema.parse([{ nombre: " Servidores ", departamentos: [" Redes ", "Desarrollo"] }]),
+    ).toEqual([{ nombre: "Servidores", departamentos: ["Redes", "Desarrollo"] }]);
+    expect(modulosSchema.safeParse([{ nombre: "X", departamentos: [] }]).success).toBe(true);
+  });
+
+  it("rechaza un archivo vacío, sin nombre o sin la clave departamentos", () => {
+    expect(modulosSchema.safeParse([]).success).toBe(false);
+    expect(modulosSchema.safeParse([{ nombre: " ", departamentos: ["Redes"] }]).success).toBe(
+      false,
+    );
+    expect(modulosSchema.safeParse([{ nombre: "X" }]).success).toBe(false);
   });
 });
 
