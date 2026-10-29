@@ -115,6 +115,20 @@ export function CatalogTable({
               }),
             )
           : []),
+        // Los módulos muestran los departamentos a los que pertenecen (SPEC 11).
+        ...(ruta === "modulos"
+          ? [
+              column.accessor((item) => item.departamentos?.map((dep) => dep.nombre).join(", "), {
+                id: "departamentos",
+                header: "Departamentos",
+                cell: ({ row }) => (
+                  <span className="text-body">
+                    {row.original.departamentos?.map((dep) => dep.nombre).join(", ") || "—"}
+                  </span>
+                ),
+              }),
+            ]
+          : []),
         column.accessor("activo", {
           header: "Estado",
           cell: ({ row }) => <ActivePill active={row.original.activo} />,
