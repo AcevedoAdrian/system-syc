@@ -8,6 +8,7 @@ type OptionItem = {
   activo: boolean;
   orden: number;
   tipo?: { id: string; nombre: string };
+  departamentos?: { id: string; nombre: string }[];
 };
 
 const options = vi.hoisted(() => ({
@@ -373,5 +374,144 @@ describe("CatalogOptionSelect: áreas agrupadas por tipo", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("Diputado · Archivo (inactivo)");
     await userEvent.click(screen.getByRole("combobox"));
     expect(optionNames()).toContain("Diputado · Archivo (inactivo)");
+  });
+});
+
+describe("CatalogOptionSelect: módulos por departamento (SPEC 11)", () => {
+  const tec = { id: "tec", nombre: "Técnico" };
+  const red = { id: "red", nombre: "Redes" };
+  const modulos: OptionItem[] = [
+    { id: "m1", nombre: "Servidores", activo: true, orden: 1, departamentos: [tec, red] },
+    { id: "m2", nombre: "Mesa de entradas", activo: true, orden: 2, departamentos: [red] },
+    { id: "m3", nombre: "Correo", activo: true, orden: 3, departamentos: [tec] },
+  ];
+
+  it("ofrece solo los módulos que tienen el departamento del ticket", async () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value=""
+        onChange={() => undefined}
+        departamentoId="tec"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(optionNames()).toEqual(["Servidores", "Correo"]);
+  });
+
+  it("con otro departamento ofrece otros módulos; un módulo de varios departamentos aparece en todos", async () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value=""
+        onChange={() => undefined}
+        departamentoId="red"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(optionNames()).toEqual(["Servidores", "Mesa de entradas"]);
+  });
+
+  it("sin departamento no ofrece ningún módulo", async () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect id="moduloId" ruta="modulos" value="" onChange={() => undefined} />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(screen.queryAllByRole("option")).toEqual([]);
+  });
+
+  it("el módulo actual sin ese departamento se muestra marcado «(no disponible)»", async () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value="m2"
+        onChange={() => undefined}
+        departamentoId="tec"
+        current={{ id: "m2", nombre: "Mesa de entradas" }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveTextContent("Mesa de entradas (no disponible)");
+    await userEvent.click(screen.getByRole("combobox"));
+    expect(optionNames()).toEqual(["Servidores", "Correo", "Mesa de entradas (no disponible)"]);
+  });
+
+  it("el módulo actual desactivado o eliminado también se marca «(no disponible)», no «(inactivo)»", () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value="viejo"
+        onChange={() => undefined}
+        departamentoId="tec"
+        current={{ id: "viejo", nombre: "Viejo" }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveTextContent("Viejo (no disponible)");
+    expect(screen.getByRole("combobox")).not.toHaveTextContent("(inactivo)");
+  });
+
+  it("el módulo actual que sí se ofrece no lleva marca", () => {
+    options.data = modulos;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value="m1"
+        onChange={() => undefined}
+        departamentoId="tec"
+        current={{ id: "m1", nombre: "Servidores" }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveTextContent("Servidores");
+    expect(screen.getByRole("combobox")).not.toHaveTextContent("(");
+  });
+
+  it("mientras carga el catálogo no marca el módulo actual", () => {
+    options.pending = true;
+    render(
+      <CatalogOptionSelect
+        id="moduloId"
+        ruta="modulos"
+        value="m1"
+        onChange={() => undefined}
+        departamentoId="tec"
+        current={{ id: "m1", nombre: "Servidores" }}
+      />,
+    );
+
+    expect(screen.getByRole("combobox")).not.toHaveTextContent("(no disponible)");
+  });
+
+  it("los demás catálogos ignoran el departamento: ofrecen todos sus activos", async () => {
+    render(
+      <CatalogOptionSelect
+        id="ed"
+        ruta="edificios"
+        value=""
+        onChange={() => undefined}
+        departamentoId="tec"
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("combobox"));
+
+    expect(optionNames()).toEqual(["Sistemas", "Archivo"]);
   });
 });

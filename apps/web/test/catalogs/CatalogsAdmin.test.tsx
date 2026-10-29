@@ -396,18 +396,16 @@ describe("CatalogsAdmin", () => {
     const redes = { id: "d2", nombre: "Redes" };
 
     it("la tabla suma la columna «Departamentos» con los nombres separados por coma", async () => {
-      fake
-        .table("modulos")
-        .push(
-          {
-            id: "m1",
-            nombre: "Servidores",
-            orden: 1,
-            activo: true,
-            departamentos: [desarrollo, redes],
-          },
-          { id: "m2", nombre: "Sin asignar", orden: 2, activo: true, departamentos: [] },
-        );
+      fake.table("modulos").push(
+        {
+          id: "m1",
+          nombre: "Servidores",
+          orden: 1,
+          activo: true,
+          departamentos: [desarrollo, redes],
+        },
+        { id: "m2", nombre: "Sin asignar", orden: 2, activo: true, departamentos: [] },
+      );
       renderAdmin("modulos");
       await screen.findByText("Servidores");
 

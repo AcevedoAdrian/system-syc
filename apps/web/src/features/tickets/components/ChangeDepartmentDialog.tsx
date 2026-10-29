@@ -65,6 +65,14 @@ function DepartmentForm({
 
   return (
     <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+      {ticket.modulo && (
+        // Aviso genérico: la regla es condicional (el módulo se conserva si el nuevo departamento
+        // también lo tiene), así que no depende de qué departamento se elija y no pide confirmar.
+        <p className="rounded-lg bg-muted px-3.5 py-3 text-sm text-body">
+          Este ticket tiene el módulo «{ticket.modulo.nombre}». Si el nuevo departamento no lo
+          tiene, el ticket queda sin módulo.
+        </p>
+      )}
       <Field
         id="departamentoId"
         label="Nuevo departamento"

@@ -7,5 +7,5 @@
     { "nombre": "Web Instucional", "departamentos": ["Desarrollo"] },
     { "nombre": "Correo", "departamentos": ["Desarrollo","Redes"] },
     { "nombre": "Redes", "departamentos": ["Redes"] },
-    { "nombre": "Facturacion", "departamentos": ["Desarrollo","Redes","Administracion"] }
+    { "nombre": "Facturacion", "departamentos": ["Desarrollo","Redes","Administrativo"] }
 ]

@@ -38,13 +38,18 @@ interface CatalogOptionSelectProps extends FieldControlProps {
   current?: { id: string; nombre: string; tipo?: { id: string; nombre: string } } | null;
   // Un ítem que no se ofrece (el estado actual al cambiar de estado).
   excludeId?: string;
+  // El departamento del ticket. Solo lo usa `modulos` (SPEC 11): ofrece los módulos activos que lo
+  // tienen, y el actual que no está entre ellos se marca «(no disponible)». Sin departamento no hay
+  // opciones.
+  departamentoId?: string;
   disabled?: boolean;
   // Algo que va dentro del botón, antes del valor (el punto de color de la prioridad).
   leading?: ReactNode;
 }
 
 // Los selectores de catálogo de los formularios de ticket: ofrece solo los ítems activos
-// (`useCatalogOptions`), en el orden de la administración. Las áreas van agrupadas por tipo.
+// (`useCatalogOptions`), en el orden de la administración. Las áreas van agrupadas por tipo y los
+// módulos se acotan al departamento del ticket.
 export function CatalogOptionSelect(props: CatalogOptionSelectProps) {
   return props.ruta === "areas" ? <AreaOptionSelect {...props} /> : <FlatOptionSelect {...props} />;
 }
@@ -58,12 +63,21 @@ function FlatOptionSelect({
   emptyLabel,
   current,
   excludeId,
+  departamentoId,
   disabled,
   leading,
   ...aria
 }: CatalogOptionSelectProps) {
   const { data: allOptions = [], isPending } = useCatalogOptions(ruta);
-  const options = allOptions.filter((option) => option.id !== excludeId);
+  // El recorte por permisos ya lo hizo la API: esto es para el admin, que recibe todos los módulos y
+  // trabaja tickets de cualquier departamento.
+  const scoped = ruta === "modulos";
+  const options = allOptions.filter(
+    (option) =>
+      option.id !== excludeId &&
+      (!scoped || option.departamentos?.some((dep) => dep.id === departamentoId)),
+  );
+  const outOfOptionsMark = scoped ? "no disponible" : "inactivo";
   // Hasta que llega el catálogo no se sabe si el valor actual sigue activo: se muestra sin marca, en vez de
   // parpadear con «(inactivo)» y corregirse después.
   const currentIsOutOfOptions =
@@ -88,7 +102,9 @@ function FlatOptionSelect({
         ))}
         {isPending && current && <SelectItem value={current.id}>{current.nombre}</SelectItem>}
         {currentIsOutOfOptions && (
-          <SelectItem value={current.id}>{current.nombre} (inactivo)</SelectItem>
+          <SelectItem value={current.id}>
+            {current.nombre} ({outOfOptionsMark})
+          </SelectItem>
         )}
       </SelectContent>
     </Select>
