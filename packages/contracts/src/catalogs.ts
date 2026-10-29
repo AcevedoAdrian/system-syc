@@ -10,6 +10,11 @@ export const catalogItemInputSchema = z.object({ nombre: nombreSchema });
 // SPEC 08: el tipo es obligatorio; el service valida que exista y esté activo.
 export const areaInputSchema = catalogItemInputSchema.extend({ tipoId: z.string().min(1) });
 
+// SPEC 11: un módulo pertenece a uno o más departamentos; el service valida que existan y estén activos.
+export const moduloInputSchema = catalogItemInputSchema.extend({
+  departamentoIds: z.array(z.string().min(1)).min(1, "Elegí al menos un departamento"),
+});
+
 export const proveedorInputSchema = z.object({
   nombre: nombreSchema,
   contacto: blankToNull(z.string().max(120)),
@@ -27,6 +32,10 @@ export const catalogItemSchema = z.object({
 
 export const areaSchema = catalogItemSchema.extend({
   tipo: z.object({ id: z.string(), nombre: z.string() }),
+});
+
+export const moduloSchema = catalogItemSchema.extend({
+  departamentos: z.array(z.object({ id: z.string(), nombre: z.string() })),
 });
 
 // «Diputado · Acosta»: lo comparten la API (foto auditable del ticket) y la web.
@@ -76,6 +85,8 @@ export type CatalogItem = z.infer<typeof catalogItemSchema>;
 export type CatalogItemInput = z.infer<typeof catalogItemInputSchema>;
 export type Area = z.infer<typeof areaSchema>;
 export type AreaInput = z.infer<typeof areaInputSchema>;
+export type Modulo = z.infer<typeof moduloSchema>;
+export type ModuloInput = z.infer<typeof moduloInputSchema>;
 export type Proveedor = z.infer<typeof proveedorSchema>;
 export type ProveedorInput = z.infer<typeof proveedorInputSchema>;
 export type ClaveEstado = z.infer<typeof claveEstadoSchema>;
@@ -123,7 +134,7 @@ export const catalogsContract = {
   edificios: catalogContract("edificios", catalogItemInputSchema, catalogItemSchema),
   tipos: catalogContract("tipos", catalogItemInputSchema, catalogItemSchema),
   prioridades: catalogContract("prioridades", catalogItemInputSchema, catalogItemSchema),
-  modulos: catalogContract("modulos", catalogItemInputSchema, catalogItemSchema),
+  modulos: catalogContract("modulos", moduloInputSchema, moduloSchema),
   proveedores: catalogContract("proveedores", proveedorInputSchema, proveedorSchema),
   estados: catalogContract("estados", catalogItemInputSchema, estadoTicketSchema),
 };

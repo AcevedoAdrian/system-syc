@@ -85,12 +85,18 @@ describe("createTicketInputSchema", () => {
       titulo: "Impresora rota",
       descripcion: null,
       prioridadId: "pri1",
+      moduloId: null,
       fechaRecepcion: "2026-10-01",
       actuacionSimple: null,
       proveedorId: null,
       referenciaExterna: null,
       numeroFactura: null,
     });
+  });
+
+  it("guarda como null un módulo en blanco y conserva el que viene con id", () => {
+    expect(createTicketInputSchema.parse({ ...base, moduloId: "  " }).moduloId).toBeNull();
+    expect(createTicketInputSchema.parse({ ...base, moduloId: "mod1" }).moduloId).toBe("mod1");
   });
 
   it("rechaza un título vacío tras el trim y uno de más de 200", () => {

@@ -6,6 +6,7 @@ import {
   catalogItemInputSchema,
   catalogRutas,
   catalogsContract,
+  moduloInputSchema,
   proveedorInputSchema,
 } from "../src/catalogs.js";
 
@@ -101,6 +102,25 @@ describe("areaInputSchema", () => {
       nombre: "Acosta",
       tipoId: "t1",
     });
+  });
+});
+
+describe("moduloInputSchema", () => {
+  it("exige al menos un departamento", () => {
+    const sinDepartamentos = moduloInputSchema.safeParse({ nombre: "Servidores" });
+    const listaVacia = moduloInputSchema.safeParse({ nombre: "Servidores", departamentoIds: [] });
+    const idVacio = moduloInputSchema.safeParse({ nombre: "Servidores", departamentoIds: [""] });
+
+    expect(sinDepartamentos.success).toBe(false);
+    expect(listaVacia.success).toBe(false);
+    expect(listaVacia.error?.issues[0]?.message).toBe("Elegí al menos un departamento");
+    expect(idVacio.success).toBe(false);
+  });
+
+  it("acepta varios departamentos y recorta el nombre", () => {
+    expect(
+      moduloInputSchema.parse({ nombre: " Servidores ", departamentoIds: ["d1", "d2"] }),
+    ).toEqual({ nombre: "Servidores", departamentoIds: ["d1", "d2"] });
   });
 });
 
