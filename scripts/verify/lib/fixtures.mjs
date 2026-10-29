@@ -82,10 +82,13 @@ export async function tipoAreaId() {
 }
 
 // Crea un ítem de catálogo con nombre único; `extra` pisa o suma campos. Un área sin `tipoId` recibe
-// el tipo de los fixtures.
+// el tipo de los fixtures, y un módulo sin `departamentoIds` (SPEC 11), el departamento Técnico.
 export async function createItem(ruta, extra = {}) {
   const body = { nombre: `${ruta} ${uniq()}`, ...extra };
   if (ruta === "areas" && body.tipoId === undefined) body.tipoId = await tipoAreaId();
+  if (ruta === "modulos" && body.departamentoIds === undefined) {
+    body.departamentoIds = [(await departmentNamed("Técnico")).id];
+  }
   const res = await (await admin()).post(`/catalogs/${ruta}`, body);
   assertStatus(res, 200, `crear en ${ruta}`);
   return res.body;

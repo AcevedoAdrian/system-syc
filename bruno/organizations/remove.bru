@@ -31,5 +31,7 @@ docs {
   Ruta: /organizations/{organizationId}
 
   Usa `newOrganizationId` (lo guarda `organizations.create`). No devuelve cuerpo.
-  Errores: 404 inexistente; 409 si es el último departamento activo o tiene agentes asignados.
+  Errores: 404 inexistente; 409 si es el último departamento activo, tiene agentes asignados, tiene
+  tickets o lo usa al menos un módulo («Lo usa al menos un módulo: quitáselo a esos módulos o
+  desactivalo»).
 }

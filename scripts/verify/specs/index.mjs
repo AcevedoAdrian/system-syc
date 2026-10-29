@@ -12,6 +12,7 @@ import spec07 from "./07-endurecimiento-despliegue.mjs";
 import spec08 from "./08-tipos-area.mjs";
 import spec09 from "./09-sistema-visual.mjs";
 import spec10 from "./10-numero-factura.mjs";
+import spec11 from "./11-modulos-departamento.mjs";
 
 export const SPECS = [
   spec01,
@@ -24,4 +25,5 @@ export const SPECS = [
   spec08,
   spec09,
   spec10,
+  spec11,
 ];

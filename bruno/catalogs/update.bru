@@ -17,7 +17,8 @@ params:path {
 body:json {
   {
     "nombre": "Ítem de prueba (renombrado)",
-    "tipoId": "{{areaTipoId}}"
+    "tipoId": "{{areaTipoId}}",
+    "departamentoIds": ["{{moduloDepartamentoId}}"]
   }
 }
 
@@ -37,8 +38,12 @@ docs {
   Método: PATCH
   Ruta: /catalogs/{catálogo}/{itemId}
   Cuerpo: nombre. Proveedores suma contacto, telefono, correo y sitioWeb: lo que va en blanco se borra.
-  Áreas suma `tipoId` (obligatorio): mandar otro cambia el tipo del área.
+  Áreas suma `tipoId` (obligatorio): mandar otro cambia el tipo del área. Módulos suma
+  `departamentoIds` (obligatorio): reemplaza la lista entera de departamentos (`moduloDepartamentoId`);
+  se acepta un departamento desactivado que el módulo ya tenía, y reenviar los mismos en otro orden no
+  cambia nada.
 
   Usa `catalogItemId` (lo guarda `catalogs.create`). Sin cambios efectivos responde 200 y no audita.
-  Errores: 400 validación; 403 si no es admin; 404 inexistente o eliminado; 409 si el nombre ya existe.
+  Errores: 400 validación (en módulos, también un departamento nuevo que no existe o está desactivado);
+  403 si no es admin; 404 inexistente o eliminado; 409 si el nombre ya existe.
 }
