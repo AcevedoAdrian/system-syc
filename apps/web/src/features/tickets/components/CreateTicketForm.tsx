@@ -10,6 +10,7 @@ import {
   Hash,
   Lock,
   Receipt,
+  Tag,
   TextAlignStart,
   Ticket,
   Truck,
@@ -33,11 +34,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentUser } from "@/features/auth/hooks/useCurrentUser";
+import { useCatalogOptions } from "@/features/catalogs/hooks/useCatalogOptions";
 import { useOrganizations } from "@/features/organizations/hooks/useOrganizations";
 import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage } from "@/lib/errors";
 import { useCreateTicket } from "../hooks/useTicketMutations";
 import { isModuloError } from "../modulo-error";
+import { isTipoError } from "../tipo-error";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
 import { PrioridadDot } from "./TicketBadges";
 
@@ -128,6 +131,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       titulo: "",
       descripcion: "",
       prioridadId: "",
+      tipoId: "",
       moduloId: "",
       fechaRecepcion: hoyArgentina(),
       actuacionSimple: actuacionPrefijo,
@@ -138,6 +142,9 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
   });
   const hasProveedor = Boolean(watch("proveedorId"));
   const departamentoId = watch("departamentoId");
+  // La ayuda del tipo sale de la misma lista que llena el selector: cambiar el tipo no llama a la API.
+  const { data: tipos = [] } = useCatalogOptions("tipos");
+  const tipoAyuda = tipos.find((tipo) => tipo.id === watch("tipoId"))?.descripcion || undefined;
 
   const submit = handleSubmit(async (values) => {
     setServerError(undefined);
@@ -149,8 +156,9 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       await navigate({ to: "/tickets/$ticketId", params: { ticketId: ticket.id } });
     } catch (error) {
       const message = getErrorMessage(error);
-      // Un 400 sobre el módulo se muestra bajo su campo; el resto, en la barra de acciones.
-      if (isModuloError(message)) setError("moduloId", { type: "server", message });
+      // Un 400 sobre el tipo o el módulo se muestra bajo su campo; el resto, en la barra de acciones.
+      if (isTipoError(message)) setError("tipoId", { type: "server", message });
+      else if (isModuloError(message)) setError("moduloId", { type: "server", message });
       else setServerError(message);
     }
   });
@@ -256,24 +264,24 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Field
-            id="prioridadId"
-            label="Prioridad"
-            icon={Flag}
-            required
-            error={errors.prioridadId?.message}
+            id="tipoId"
+            label="Tipo de ticket"
+            icon={Tag}
+            hint={tipoAyuda}
+            error={errors.tipoId?.message}
           >
             {(aria) => (
               <Controller
                 control={control}
-                name="prioridadId"
+                name="tipoId"
                 render={({ field }) => (
                   <CatalogOptionSelect
-                    id="prioridadId"
-                    ruta="prioridades"
-                    value={field.value}
+                    id="tipoId"
+                    ruta="tipos"
+                    value={field.value ?? ""}
                     onChange={field.onChange}
-                    placeholder="Elegí una prioridad"
-                    leading={<PrioridadDot id={field.value} />}
+                    placeholder="Sin asignar"
+                    emptyLabel="Sin asignar"
                     {...aria}
                   />
                 )}
@@ -307,9 +315,31 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
               />
             )}
           </Field>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            id="prioridadId"
+            label="Prioridad"
+            icon={Flag}
+            required
+            error={errors.prioridadId?.message}
+          >
+            {(aria) => (
+              <Controller
+                control={control}
+                name="prioridadId"
+                render={({ field }) => (
+                  <CatalogOptionSelect
+                    id="prioridadId"
+                    ruta="prioridades"
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Elegí una prioridad"
+                    leading={<PrioridadDot id={field.value} />}
+                    {...aria}
+                  />
+                )}
+              />
+            )}
+          </Field>
           <Field
             id="fechaRecepcion"
             label="Fecha de recepción"
@@ -456,9 +486,10 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
   );
 }
 
-// Alta de un ticket. No pide estado, número, fechas de cierre ni área, edificio o tipo: el estado y el
-// número los pone el servidor, y el resto se completa al editar (Feature 5.1). El módulo sí se puede
-// elegir al crear, entre los del departamento del ticket (SPEC 11).
+// Alta de un ticket. No pide estado, número, fechas de cierre ni área o edificio: el estado y el
+// número los pone el servidor, y el resto se completa al editar (Feature 5.1). El módulo (SPEC 11) y el
+// tipo (SPEC 12) sí se pueden elegir al crear: el módulo entre los del departamento del ticket, y el tipo
+// con su descripción como ayuda.
 export function CreateTicketForm() {
   const { data: user } = useCurrentUser();
   if (!user) return null;
