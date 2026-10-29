@@ -106,6 +106,37 @@ describe("CatalogTable: proveedores", () => {
   });
 });
 
+describe("CatalogTable: tipos de ticket", () => {
+  const larga = "Texto largo. ".repeat(40).trim();
+  const tipos: CatalogEntry[] = [
+    { id: "k1", nombre: "Incidente", orden: 1, activo: true, descripcion: "Algo falló." },
+    { id: "k2", nombre: "Sin texto", orden: 2, activo: true, descripcion: null },
+    { id: "k3", nombre: "Larga", orden: 3, activo: true, descripcion: larga },
+  ];
+
+  it("suma la columna Descripción después del nombre y muestra — si falta", () => {
+    render(<CatalogTable ruta="tipos" items={tipos} {...handlers} />);
+
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toEqual([
+      "Orden",
+      "Nombre",
+      "Descripción",
+      "Estado",
+      "Acciones",
+    ]);
+    expect(within(row("Incidente")).getByText("Algo falló.")).toBeInTheDocument();
+    expect(within(row("Sin texto")).getByText("—")).toBeInTheDocument();
+  });
+
+  it("una descripción larga se corta en la tabla pero conserva el texto entero", () => {
+    render(<CatalogTable ruta="tipos" items={tipos} {...handlers} />);
+
+    const celda = within(row("Larga")).getByText(larga);
+    expect(celda).toHaveClass("truncate");
+    expect(celda).toHaveAttribute("title", larga);
+  });
+});
+
 describe("CatalogTable: áreas", () => {
   const areas: CatalogEntry[] = [
     { id: "a1", nombre: "Acosta", orden: 1, activo: true, tipo: { id: "t1", nombre: "Diputado" } },

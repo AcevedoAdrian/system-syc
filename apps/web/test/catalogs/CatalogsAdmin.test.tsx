@@ -64,19 +64,23 @@ const fake = vi.hoisted(() => {
         nombre,
         tipoId,
         departamentoIds,
+        descripcion,
       }: {
         nombre: string;
         tipoId?: string;
         departamentoIds?: string[];
+        descripcion?: string | null;
       }) => {
         if (state.createError) throw state.createError;
         state.creates.push({
           nombre,
+          ...(descripcion === undefined ? {} : { descripcion }),
           ...(tipoId === undefined ? {} : { tipoId }),
           ...(departamentoIds === undefined ? {} : { departamentoIds }),
         });
         const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
         const item = withTipo({ id: `i${state.nextId++}`, nombre, orden, activo: true }, tipoId);
+        if (descripcion !== undefined) item.descripcion = descripcion;
         withDepartamentos(item, departamentoIds);
         table(ruta).push(item);
         return item;
@@ -341,6 +345,74 @@ describe("CatalogsAdmin", () => {
       await screen.findByText("El nombre es obligatorio (hasta 120 caracteres)."),
     ).toBeVisible();
     expect(rowNames()).toEqual(["Sistemas"]);
+  });
+
+  describe("Tipos de ticket con descripción (SPEC 12)", () => {
+    beforeEach(() => {
+      fake.table("tipos").push({
+        id: "tk1",
+        nombre: "Incidente",
+        orden: 1,
+        activo: true,
+        descripcion: "Algo que funcionaba dejó de funcionar.",
+      });
+    });
+
+    it("la tabla muestra la descripción", async () => {
+      renderAdmin("tipos");
+
+      expect(await screen.findByText("Algo que funcionaba dejó de funcionar.")).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Descripción" })).toBeInTheDocument();
+    });
+
+    it("el alta envía la descripción y el tipo aparece en la tabla", async () => {
+      renderAdmin("tipos");
+      await screen.findByText("Incidente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo tipo" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Consulta");
+      await userEvent.type(screen.getByLabelText("Descripción"), "Pedir que revisen algo.");
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      expect(await screen.findByText("Pedir que revisen algo.")).toBeInTheDocument();
+      expect(fake.state.creates).toEqual([
+        { nombre: "Consulta", descripcion: "Pedir que revisen algo." },
+      ]);
+    });
+
+    it("editar precarga el texto entero y vaciarlo envía null", async () => {
+      renderAdmin("tipos");
+      await screen.findByText("Incidente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Editar «Incidente»" }));
+      const campo = screen.getByLabelText("Descripción");
+      expect(campo).toHaveValue("Algo que funcionaba dejó de funcionar.");
+      await userEvent.clear(campo);
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      await waitFor(() =>
+        expect(fake.state.updates).toEqual([
+          { itemId: "tk1", nombre: "Incidente", descripcion: null },
+        ]),
+      );
+    });
+
+    it("un error del servidor se muestra dentro del panel", async () => {
+      fake.state.createError = new ORPCError("CONFLICT", {
+        status: 409,
+        message: "Ya existe un tipo de ticket con ese nombre",
+      });
+      renderAdmin("tipos");
+      await screen.findByText("Incidente");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo tipo" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "incidente");
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Ya existe un tipo de ticket con ese nombre",
+      );
+    });
   });
 
   it("muestra el error 409 de la API dentro del panel", async () => {

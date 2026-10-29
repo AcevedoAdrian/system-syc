@@ -18,6 +18,7 @@ import { CatalogItemFormDialog } from "./CatalogItemFormDialog";
 import { CatalogTable } from "./CatalogTable";
 import { ModuloFormDialog } from "./ModuloFormDialog";
 import { ProveedorFormDialog } from "./ProveedorFormDialog";
+import { TipoTicketFormDialog } from "./TipoTicketFormDialog";
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "todos", label: "Todos" },
@@ -222,6 +223,24 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
             onSubmit={(values) => create.mutateAsync(values)}
           />
           <ProveedorFormDialog
+            open={editing !== null}
+            onOpenChange={(open) => !open && setEditing(null)}
+            title={kind.editLabel}
+            submitLabel="Guardar"
+            initial={editing}
+            onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
+          />
+        </>
+      ) : ruta === "tipos" ? (
+        <>
+          <TipoTicketFormDialog
+            open={creating}
+            onOpenChange={setCreating}
+            title={kind.newLabel}
+            submitLabel="Crear"
+            onSubmit={(values) => create.mutateAsync(values)}
+          />
+          <TipoTicketFormDialog
             open={editing !== null}
             onOpenChange={(open) => !open && setEditing(null)}
             title={kind.editLabel}

@@ -115,6 +115,23 @@ export function CatalogTable({
               }),
             )
           : []),
+        // Los tipos de ticket muestran su descripción (SPEC 12). Una larga se corta para no ensanchar la
+        // fila; el panel de edición muestra el texto entero.
+        ...(ruta === "tipos"
+          ? [
+              column.accessor("descripcion", {
+                header: "Descripción",
+                cell: ({ row }) => (
+                  <span
+                    className="block max-w-md truncate text-body"
+                    title={row.original.descripcion ?? undefined}
+                  >
+                    {row.original.descripcion || "—"}
+                  </span>
+                ),
+              }),
+            ]
+          : []),
         // Los módulos muestran los departamentos a los que pertenecen (SPEC 11).
         ...(ruta === "modulos"
           ? [
