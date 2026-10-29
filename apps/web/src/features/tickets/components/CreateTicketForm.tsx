@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type CreateTicketInput, createTicketInputSchema, hoyArgentina } from "@syc/contracts";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  Box,
   Building2,
   CalendarDays,
   FileText,
@@ -36,6 +37,7 @@ import { useOrganizations } from "@/features/organizations/hooks/useOrganization
 import { DepartmentSelect } from "@/features/users/components/DepartmentSelect";
 import { getErrorMessage } from "@/lib/errors";
 import { useCreateTicket } from "../hooks/useTicketMutations";
+import { isModuloError } from "../modulo-error";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
 import { PrioridadDot } from "./TicketBadges";
 
@@ -96,6 +98,8 @@ const REFERENCIA_ERROR =
 const REFERENCIA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la referencia.";
 const FACTURA_ERROR = "Hasta 50 caracteres.";
 const FACTURA_SIN_PROVEEDOR = "Elegí un proveedor para cargar la factura.";
+const MODULO_SIN_DEPARTAMENTO = "Elegí un departamento para cargar el módulo.";
+const MODULO_HINT = "Parte del sistema a la que se refiere el pedido.";
 
 interface FormProps {
   isAdmin: boolean;
@@ -115,6 +119,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
     handleSubmit,
     watch,
     setValue,
+    setError,
     formState: { errors, isSubmitting, submitCount },
   } = useForm<CreateTicketFormInput, unknown, CreateTicketInput>({
     resolver: zodResolver(createTicketFormSchema),
@@ -123,6 +128,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       titulo: "",
       descripcion: "",
       prioridadId: "",
+      moduloId: "",
       fechaRecepcion: hoyArgentina(),
       actuacionSimple: actuacionPrefijo,
       proveedorId: "",
@@ -131,6 +137,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
     },
   });
   const hasProveedor = Boolean(watch("proveedorId"));
+  const departamentoId = watch("departamentoId");
 
   const submit = handleSubmit(async (values) => {
     setServerError(undefined);
@@ -141,7 +148,10 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       const ticket = await create.mutateAsync({ ...values, actuacionSimple });
       await navigate({ to: "/tickets/$ticketId", params: { ticketId: ticket.id } });
     } catch (error) {
-      setServerError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      // Un 400 sobre el módulo se muestra bajo su campo; el resto, en la barra de acciones.
+      if (isModuloError(message)) setError("moduloId", { type: "server", message });
+      else setServerError(message);
     }
   });
 
@@ -193,7 +203,11 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
                   render={({ field }) => (
                     <AdminDepartmentSelect
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        // El módulo es del departamento: al cambiarlo no se conserva el elegido.
+                        setValue("moduloId", "", { shouldDirty: true });
+                      }}
                       {...aria}
                     />
                   )}
@@ -266,6 +280,36 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
               />
             )}
           </Field>
+          <Field
+            id="moduloId"
+            label="Módulo"
+            icon={Box}
+            hint={departamentoId ? MODULO_HINT : MODULO_SIN_DEPARTAMENTO}
+            error={errors.moduloId?.message}
+          >
+            {(aria) => (
+              <Controller
+                control={control}
+                name="moduloId"
+                render={({ field }) => (
+                  <CatalogOptionSelect
+                    id="moduloId"
+                    ruta="modulos"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Sin asignar"
+                    emptyLabel="Sin asignar"
+                    departamentoId={departamentoId}
+                    disabled={!departamentoId}
+                    {...aria}
+                  />
+                )}
+              />
+            )}
+          </Field>
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
           <Field
             id="fechaRecepcion"
             label="Fecha de recepción"
@@ -412,8 +456,9 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
   );
 }
 
-// Alta de un ticket. No pide estado, número, fechas de cierre ni área, edificio, tipo o módulo: el
-// estado y el número los pone el servidor, y el resto se completa al editar (Feature 5.1).
+// Alta de un ticket. No pide estado, número, fechas de cierre ni área, edificio o tipo: el estado y el
+// número los pone el servidor, y el resto se completa al editar (Feature 5.1). El módulo sí se puede
+// elegir al crear, entre los del departamento del ticket (SPEC 11).
 export function CreateTicketForm() {
   const { data: user } = useCurrentUser();
   if (!user) return null;

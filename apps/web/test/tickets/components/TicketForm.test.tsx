@@ -38,6 +38,7 @@ vi.mock("@/features/tickets/components/CatalogOptionSelect", () => ({
     onChange,
     emptyLabel,
     current,
+    departamentoId,
     ...aria
   }: {
     id: string;
@@ -46,10 +47,17 @@ vi.mock("@/features/tickets/components/CatalogOptionSelect", () => ({
     onChange: (v: string) => void;
     emptyLabel?: string;
     current?: { id: string; nombre: string } | null;
+    departamentoId?: string;
   }) => {
     const options = mocks.options[ruta] ?? [];
     return (
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} {...aria}>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        data-departamento={departamentoId}
+        {...aria}
+      >
         {emptyLabel && <option value="">{emptyLabel}</option>}
         {options.map((o) => (
           <option key={o.id} value={o.id}>
@@ -727,6 +735,44 @@ describe("TicketForm", () => {
       expect(await screen.findByText("Hasta 50 caracteres.")).toBeInTheDocument();
       expect(screen.getByLabelText("N.º de factura")).toBeInvalid();
       expect(mocks.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("módulo (SPEC 11)", () => {
+    it("el selector de módulo recibe el departamento del ticket", () => {
+      renderForm({ departamento: { id: "red", nombre: "Redes" } });
+
+      expect(screen.getByLabelText("Módulo")).toHaveAttribute("data-departamento", "red");
+    });
+
+    it("un módulo actual que ya no se ofrece se conserva al guardar otra cosa", async () => {
+      renderForm({ modulo: { id: "viejo", nombre: "Viejo" } });
+      expect(screen.getByLabelText("Módulo")).toHaveValue("viejo");
+
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+      await save();
+
+      await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1));
+      expect(mocks.update.mock.calls[0]?.[0]).toMatchObject({ moduloId: "viejo" });
+    });
+
+    it("un 400 sobre el módulo se muestra bajo el campo y no en la barra de acciones", async () => {
+      mocks.update.mockRejectedValue(
+        new ORPCError("BAD_REQUEST", {
+          status: 400,
+          message: "El módulo no es del departamento del ticket",
+        }),
+      );
+      renderForm();
+
+      await userEvent.selectOptions(screen.getByLabelText("Módulo"), "mesa");
+      await save();
+
+      expect(await screen.findByText("El módulo no es del departamento del ticket")).toBeVisible();
+      expect(screen.getByLabelText("Módulo")).toHaveAccessibleDescription(
+        expect.stringContaining("El módulo no es del departamento del ticket"),
+      );
+      expect(screen.queryByRole("alert", { name: /módulo/i })).not.toBeInTheDocument();
     });
   });
 

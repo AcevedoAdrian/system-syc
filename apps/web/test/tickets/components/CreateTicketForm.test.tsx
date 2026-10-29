@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
       { id: "baja", nombre: "Baja" },
     ],
     proveedores: [{ id: "acme", nombre: "Acme" }],
+    modulos: [{ id: "serv", nombre: "Servidores" }],
   } as Record<string, { id: string; nombre: string }[]>,
 }));
 
@@ -70,6 +71,7 @@ vi.mock("@/features/tickets/components/CatalogOptionSelect", () => ({
     onChange,
     emptyLabel,
     placeholder,
+    departamentoId,
     ...aria
   }: {
     id: string;
@@ -78,8 +80,15 @@ vi.mock("@/features/tickets/components/CatalogOptionSelect", () => ({
     onChange: (v: string) => void;
     emptyLabel?: string;
     placeholder?: string;
+    departamentoId?: string;
   }) => (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} {...aria}>
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      data-departamento={departamentoId}
+      {...aria}
+    >
       <option value="">{emptyLabel ?? placeholder}</option>
       {(mocks.options[ruta] ?? []).map((o) => (
         <option key={o.id} value={o.id}>
@@ -113,7 +122,7 @@ describe("CreateTicketForm", () => {
     mocks.navigate.mockReset();
   });
 
-  it("no pide estado, número, área, edificio, tipo, módulo ni nada del cierre", () => {
+  it("no pide estado, número, área, edificio, tipo ni nada del cierre", () => {
     render(<CreateTicketForm />);
 
     for (const label of [
@@ -122,7 +131,6 @@ describe("CreateTicketForm", () => {
       "Área",
       "Edificio",
       "Tipo",
-      "Módulo",
       "Fecha de cierre",
       "Fecha de reapertura",
       "Solución",
@@ -133,6 +141,7 @@ describe("CreateTicketForm", () => {
     for (const label of [
       "Título",
       "Prioridad",
+      "Módulo",
       "Fecha de recepción",
       "Descripción",
       "Actuación simple",
@@ -307,6 +316,7 @@ describe("CreateTicketForm", () => {
         titulo: "Impresora rota",
         descripcion: null,
         prioridadId: "alta",
+        moduloId: null,
         fechaRecepcion: hoyArgentina(),
         actuacionSimple: null,
         proveedorId: null,
@@ -319,6 +329,107 @@ describe("CreateTicketForm", () => {
           params: { ticketId: "t-77" },
         }),
       );
+    });
+  });
+
+  describe("módulo (SPEC 11)", () => {
+    it("el agente lo elige entre los de su departamento y se manda con el alta", async () => {
+      render(<CreateTicketForm />);
+      const modulo = screen.getByLabelText("Módulo");
+      expect(modulo).toBeEnabled();
+      expect(modulo).toHaveAttribute("data-departamento", "tec");
+
+      await userEvent.type(screen.getByLabelText("Título"), "Servidor caído");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.selectOptions(modulo, "serv");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({
+        departamentoId: "tec",
+        moduloId: "serv",
+      });
+    });
+
+    it("el admin sin departamento lo ve deshabilitado, con la pista", () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+
+      const modulo = screen.getByLabelText("Módulo");
+      expect(modulo).toBeDisabled();
+      expect(modulo).toHaveAccessibleDescription("Elegí un departamento para cargar el módulo.");
+    });
+
+    it("al elegir un departamento se habilita y recibe ese departamento", async () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+
+      await userEvent.selectOptions(screen.getByLabelText("Departamento"), "red");
+
+      const modulo = screen.getByLabelText("Módulo");
+      expect(modulo).toBeEnabled();
+      expect(modulo).toHaveAttribute("data-departamento", "red");
+      expect(modulo).not.toHaveAccessibleDescription(
+        "Elegí un departamento para cargar el módulo.",
+      );
+    });
+
+    it("cambiar el departamento vacía el módulo elegido", async () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+      await userEvent.selectOptions(screen.getByLabelText("Departamento"), "tec");
+      await userEvent.selectOptions(screen.getByLabelText("Módulo"), "serv");
+      expect(screen.getByLabelText("Módulo")).toHaveValue("serv");
+
+      await userEvent.selectOptions(screen.getByLabelText("Departamento"), "red");
+
+      expect(screen.getByLabelText("Módulo")).toHaveValue("");
+    });
+
+    it("volver a dejar el departamento sin elegir lo deshabilita y lo vacía", async () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+      await userEvent.selectOptions(screen.getByLabelText("Departamento"), "tec");
+      await userEvent.selectOptions(screen.getByLabelText("Módulo"), "serv");
+
+      await userEvent.selectOptions(screen.getByLabelText("Departamento"), "");
+
+      expect(screen.getByLabelText("Módulo")).toBeDisabled();
+      expect(screen.getByLabelText("Módulo")).toHaveValue("");
+    });
+
+    it("un 400 del servidor sobre el módulo se muestra bajo el campo", async () => {
+      mocks.create.mockRejectedValue(
+        new ORPCError("BAD_REQUEST", {
+          status: 400,
+          message: "El módulo no es del departamento del ticket",
+        }),
+      );
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Servidor caído");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.selectOptions(screen.getByLabelText("Módulo"), "serv");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByText("El módulo no es del departamento del ticket")).toBeVisible();
+      expect(screen.getByLabelText("Módulo")).toHaveAccessibleDescription(
+        expect.stringContaining("El módulo no es del departamento del ticket"),
+      );
+      expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it("otro error del servidor sigue yendo a la barra de acciones", async () => {
+      mocks.create.mockRejectedValue(
+        new ORPCError("BAD_REQUEST", { status: 400, message: "La prioridad no existe" }),
+      );
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Servidor caído");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("La prioridad no existe");
     });
   });
 

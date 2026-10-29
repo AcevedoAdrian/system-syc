@@ -13,10 +13,12 @@ import type { AuditService } from "@/modules/audit/audit.service";
 import type {
   AreaRow,
   EstadoRow,
+  ModuloRow,
   ReferenceMatch,
   ReferenceRow,
   TicketCatalog,
   TicketCreateData,
+  TicketDepartmentData,
   TicketRow,
   TicketStatusData,
   TicketSummaryRow,
@@ -56,6 +58,7 @@ const input = (extra: Partial<CreateTicketInput> = {}): CreateTicketInput => ({
   titulo: "Impresora rota",
   descripcion: null,
   prioridadId: "alta",
+  moduloId: null,
   fechaRecepcion: "2026-10-01",
   actuacionSimple: null,
   proveedorId: null,
@@ -72,6 +75,12 @@ const area = (id: string, nombre: string, activo = true): AreaRow => ({
   activo,
   tipo: diputado,
 });
+const modulo = (
+  id: string,
+  nombre: string,
+  departamentoIds: string[],
+  activo = true,
+): ModuloRow => ({ id, nombre, activo, departamentoIds });
 const estado = (id: string, nombre: string, activo = true): EstadoRow => ({
   id,
   nombre,
@@ -135,6 +144,7 @@ interface World {
   departamentos?: ReferenceRow[];
   catalogos?: Partial<Record<TicketCatalog, ReferenceRow[]>>;
   areas?: AreaRow[];
+  modulos?: ModuloRow[];
   estados?: EstadoRow[];
   tickets?: TicketRow[];
   referencias?: (ReferenceMatch & { proveedorId: string; referenciaExterna: string })[];
@@ -146,11 +156,11 @@ interface World {
 function buildService(world: World = {}) {
   const departamentos = world.departamentos ?? [ref("tec", "Técnico"), ref("red", "Redes")];
   const areas = world.areas ?? [];
+  const modulos = world.modulos ?? [];
   const catalogos: Record<TicketCatalog, ReferenceRow[]> = {
     edificio: [],
     tipoTicket: [],
     prioridad: [ref("alta", "Alta"), ref("baja", "Baja", false)],
-    modulo: [],
     proveedor: [ref("acme", "Acme"), ref("viejo", "Viejo", false)],
     ...world.catalogos,
   };
@@ -162,7 +172,7 @@ function buildService(world: World = {}) {
   const departmentChanges: {
     id: string;
     expectedUpdatedAt: string;
-    departamentoId: string;
+    data: TicketDepartmentData;
     actorId: string;
   }[] = [];
   const deletions: { id: string; actorId: string }[] = [];
@@ -187,6 +197,7 @@ function buildService(world: World = {}) {
     findArea: async (id: string) => areas.find((a) => a.id === id) ?? null,
     findCatalogItem: async (catalog: TicketCatalog, id: string) =>
       catalogos[catalog].find((item) => item.id === id) ?? null,
+    findModulo: async (id: string) => modulos.find((m) => m.id === id) ?? null,
     findEstados: async () => estados,
     findByReferencia: async (proveedorId: string, referenciaExterna: string, exceptId?: string) =>
       referencias.find(
@@ -227,7 +238,7 @@ function buildService(world: World = {}) {
         area: null,
         edificio: null,
         tipo: null,
-        modulo: null,
+        modulo: nombreDe(modulos, data.moduloId),
         prioridad: nombreDe(catalogos.prioridad, data.prioridadId) as {
           id: string;
           nombre: string;
@@ -279,7 +290,7 @@ function buildService(world: World = {}) {
         area: areaDe(data.areaId),
         edificio: refOf(catalogos.edificio, data.edificioId),
         tipo: refOf(catalogos.tipoTicket, data.tipoId),
-        modulo: refOf(catalogos.modulo, data.moduloId),
+        modulo: refOf(modulos, data.moduloId),
         proveedor: refOf(catalogos.proveedor, data.proveedorId),
         updatedAt: "2026-10-06T11:00:00.000Z",
       };
@@ -307,17 +318,18 @@ function buildService(world: World = {}) {
     changeDepartment: async (
       id: string,
       expectedUpdatedAt: string,
-      departamentoId: string,
+      data: TicketDepartmentData,
       actorId: string,
       audit: AuditEntry,
     ): Promise<TicketRow> => {
-      departmentChanges.push({ id, expectedUpdatedAt, departamentoId, actorId });
+      departmentChanges.push({ id, expectedUpdatedAt, data, actorId });
       audits.push(audit);
       const current = tickets.find((t) => t.id === id) as TicketRow;
-      const destino = departamentos.find((d) => d.id === departamentoId) as ReferenceRow;
+      const destino = departamentos.find((d) => d.id === data.departamentoId) as ReferenceRow;
       return {
         ...current,
         departamento: { id: destino.id, nombre: destino.nombre },
+        ...(data.moduloId === null ? { modulo: null } : {}),
         updatedAt: "2026-10-06T11:00:00.000Z",
       };
     },
@@ -593,6 +605,70 @@ describe("TicketsService.create", () => {
   });
 });
 
+describe("TicketsService.create: módulo (SPEC 11)", () => {
+  const modulos = [
+    modulo("serv", "Servidores", ["tec", "red"]),
+    modulo("mesa", "Mesa de entradas", ["red"]),
+    modulo("viejo", "Viejo", ["tec"], false),
+  ];
+
+  it("con un módulo del departamento del ticket: lo guarda y lo audita", async () => {
+    const { service, created, audits } = buildService({ modulos });
+
+    const ticket = await service.create(input({ moduloId: "serv" }), agenteTecnico);
+
+    expect(created[0]?.data.moduloId).toBe("serv");
+    expect(ticket.modulo).toEqual({ id: "serv", nombre: "Servidores" });
+    expect(audits[0]?.payload).toMatchObject({
+      after: { modulo: { id: "serv", nombre: "Servidores" } },
+    });
+  });
+
+  it("sin módulo sigue funcionando: queda en null", async () => {
+    const { service, created } = buildService({ modulos });
+
+    const ticket = await service.create(input(), agenteTecnico);
+
+    expect(created[0]?.data.moduloId).toBeNull();
+    expect(ticket.modulo).toBeNull();
+  });
+
+  it("un módulo de otro departamento: 400 y no crea nada", async () => {
+    const { service, created, audits } = buildService({ modulos });
+
+    await expect(service.create(input({ moduloId: "mesa" }), agenteTecnico)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      status: 400,
+      message: "El módulo no es del departamento del ticket",
+    });
+    expect(created).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it("un módulo inexistente, eliminado o desactivado: 400 «no existe o está desactivado»", async () => {
+    const { service, created } = buildService({ modulos });
+
+    for (const moduloId of ["nada", "viejo"]) {
+      await expect(service.create(input({ moduloId }), agenteTecnico)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El módulo no existe o está desactivado",
+      });
+    }
+    expect(created).toHaveLength(0);
+  });
+
+  it("el admin crea en otro departamento: el módulo se valida contra el del ticket", async () => {
+    const { service } = buildService({ modulos });
+
+    await expect(
+      service.create(input({ departamentoId: "red", moduloId: "mesa" }), admin),
+    ).resolves.toMatchObject({ modulo: { id: "mesa" } });
+    await expect(
+      service.create(input({ departamentoId: "red", moduloId: "viejo" }), admin),
+    ).rejects.toMatchObject({ message: "El módulo no existe o está desactivado" });
+  });
+});
+
 describe("TicketsService.update", () => {
   const ticket = unTicket();
   const finalizado = { id: "fin", nombre: "Finalizado", clave: "FINALIZADO" as const };
@@ -693,11 +769,16 @@ describe("TicketsService.update", () => {
     const catalogos = {
       edificio: [ref("ed1", "Edificio 1")],
       tipoTicket: [ref("inc", "Incidente")],
-      modulo: [ref("mesa", "Mesa de entradas")],
     };
+    const modulos = [modulo("mesa", "Mesa de entradas", ["tec"])];
 
     it("se completan después del alta, con su nombre en la auditoría", async () => {
-      const { service, updates, audits } = buildService({ tickets: [ticket], catalogos, areas });
+      const { service, updates, audits } = buildService({
+        tickets: [ticket],
+        catalogos,
+        areas,
+        modulos,
+      });
 
       await service.update(
         edit(ticket, { areaId: "sist", edificioId: "ed1", tipoId: "inc", moduloId: "mesa" }),
@@ -1148,6 +1229,90 @@ const cambio = (
   extra: Partial<ChangeTicketStatusInput> = {},
 ): ChangeTicketStatusInput => ({ ticketId: t.id, updatedAt: t.updatedAt, estadoId, ...extra });
 
+describe("TicketsService.update: módulo (SPEC 11)", () => {
+  const modulos = [
+    modulo("serv", "Servidores", ["tec", "red"]),
+    modulo("mesa", "Mesa de entradas", ["red"]),
+    modulo("correo", "Correo", ["tec"]),
+  ];
+
+  it("elegir un módulo nuevo de otro departamento: 400", async () => {
+    const ticket = unTicket();
+    const { service, updates } = buildService({ tickets: [ticket], modulos });
+
+    await expect(
+      service.update(edit(ticket, { moduloId: "mesa" }), agenteTecnico),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "El módulo no es del departamento del ticket",
+    });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("elegir un módulo nuevo del departamento actual del ticket: 200", async () => {
+    const ticket = unTicket();
+    const { service, updates } = buildService({ tickets: [ticket], modulos });
+
+    await service.update(edit(ticket, { moduloId: "correo" }), agenteTecnico);
+
+    expect(updates[0]?.data.moduloId).toBe("correo");
+  });
+
+  it("se valida contra el departamento actual del ticket, no contra el del agente que edita", async () => {
+    const ticket = unTicket({ departamento: { id: "red", nombre: "Redes" } });
+    const { service } = buildService({ tickets: [ticket], modulos });
+
+    await expect(service.update(edit(ticket, { moduloId: "mesa" }), admin)).resolves.toMatchObject({
+      modulo: { id: "mesa" },
+    });
+    await expect(service.update(edit(ticket, { moduloId: "correo" }), admin)).rejects.toMatchObject(
+      { message: "El módulo no es del departamento del ticket" },
+    );
+  });
+
+  it("conservar un módulo al que le quitaron el departamento: 200, sin tocar el módulo", async () => {
+    // «Mesa» ya no es de Técnico, pero el ticket de Técnico lo tenía: se acepta el que ya tenía.
+    const ticket = unTicket({ modulo: { id: "mesa", nombre: "Mesa de entradas" } });
+    const { service, updates } = buildService({ tickets: [ticket], modulos });
+
+    const result = await service.update(
+      edit(ticket, { titulo: "Impresora sin tinta" }),
+      agenteTecnico,
+    );
+
+    expect(result.modulo).toEqual({ id: "mesa", nombre: "Mesa de entradas" });
+    expect(updates[0]?.data.moduloId).toBe("mesa");
+  });
+
+  it("conservar un módulo desactivado o eliminado también se acepta", async () => {
+    // «borrado» no figura en el catálogo (eliminado) y «apagado» está desactivado.
+    const apagado = modulo("apagado", "Apagado", ["tec"], false);
+    for (const actual of [
+      { id: "borrado", nombre: "Borrado" },
+      { id: "apagado", nombre: "Apagado" },
+    ]) {
+      const ticket = unTicket({ modulo: actual });
+      const { service, updates } = buildService({
+        tickets: [ticket],
+        modulos: [...modulos, apagado],
+      });
+
+      await service.update(edit(ticket, { titulo: "Otro título" }), agenteTecnico);
+
+      expect(updates[0]?.data.moduloId).toBe(actual.id);
+    }
+  });
+
+  it("update no vacía el módulo por su cuenta: solo lo cambia si la web manda otro valor", async () => {
+    const ticket = unTicket({ modulo: { id: "mesa", nombre: "Mesa de entradas" } });
+    const { service, updates } = buildService({ tickets: [ticket], modulos });
+
+    await service.update(edit(ticket, { moduloId: null }), agenteTecnico);
+
+    expect(updates[0]?.data.moduloId).toBeNull();
+  });
+});
+
 describe("TicketsService.changeStatus", () => {
   const ticket = unTicket();
   const cerrado = unTicket({
@@ -1554,7 +1719,12 @@ describe("TicketsService.changeDepartment", () => {
       titulo: "Impresora rota",
     });
     expect(departmentChanges).toEqual([
-      { id: "t-1", expectedUpdatedAt: ticket.updatedAt, departamentoId: "red", actorId: "admin-1" },
+      {
+        id: "t-1",
+        expectedUpdatedAt: ticket.updatedAt,
+        data: { departamentoId: "red" },
+        actorId: "admin-1",
+      },
     ]);
     expect(audits).toEqual([
       {
@@ -1637,6 +1807,85 @@ describe("TicketsService.changeDepartment", () => {
       code: "NOT_FOUND",
       status: 404,
     });
+  });
+});
+
+describe("TicketsService.changeDepartment: módulo (SPEC 11)", () => {
+  const modulos = [
+    modulo("solo-tec", "Correo", ["tec"]),
+    modulo("ambos", "Servidores", ["tec", "red"]),
+  ];
+  const mover = (t: TicketRow, departamentoId: string): ChangeTicketDepartmentInput => ({
+    ticketId: t.id,
+    updatedAt: t.updatedAt,
+    departamentoId,
+  });
+
+  it("un módulo sin el departamento nuevo se vacía, y el diff trae departamento y modulo", async () => {
+    const ticket = unTicket({ modulo: { id: "solo-tec", nombre: "Correo" } });
+    const { service, departmentChanges, audits } = buildService({ tickets: [ticket], modulos });
+
+    const result = await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(result).toMatchObject({ departamento: { id: "red" }, modulo: null });
+    expect(departmentChanges[0]?.data).toEqual({ departamentoId: "red", moduloId: null });
+    expect(audits).toEqual([
+      {
+        entityType: "Ticket",
+        entityId: "t-1",
+        action: "update",
+        actorId: "admin-1",
+        payload: {
+          before: {
+            departamento: { id: "tec", nombre: "Técnico" },
+            modulo: { id: "solo-tec", nombre: "Correo" },
+          },
+          after: { departamento: { id: "red", nombre: "Redes" }, modulo: null },
+        },
+      },
+    ]);
+  });
+
+  it("un módulo que tiene los dos departamentos se conserva y no se toca", async () => {
+    const ticket = unTicket({ modulo: { id: "ambos", nombre: "Servidores" } });
+    const { service, departmentChanges, audits } = buildService({ tickets: [ticket], modulos });
+
+    const result = await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(result.modulo).toEqual({ id: "ambos", nombre: "Servidores" });
+    expect(departmentChanges[0]?.data).toEqual({ departamentoId: "red" });
+    expect(audits[0]?.payload).toEqual({
+      before: { departamento: { id: "tec", nombre: "Técnico" } },
+      after: { departamento: { id: "red", nombre: "Redes" } },
+    });
+  });
+
+  it("un ticket sin módulo no cambia nada más", async () => {
+    const ticket = unTicket();
+    const { service, departmentChanges } = buildService({ tickets: [ticket], modulos });
+
+    await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(departmentChanges[0]?.data).toEqual({ departamentoId: "red" });
+  });
+
+  it("un módulo eliminado se vacía igual: no tiene departamentos", async () => {
+    const ticket = unTicket({ modulo: { id: "borrado", nombre: "Borrado" } });
+    const { service, departmentChanges } = buildService({ tickets: [ticket], modulos });
+
+    const result = await service.changeDepartment(mover(ticket, "red"), admin);
+
+    expect(result.modulo).toBeNull();
+    expect(departmentChanges[0]?.data).toEqual({ departamentoId: "red", moduloId: null });
+  });
+
+  it("el mismo departamento no vacía el módulo ni escribe", async () => {
+    const ticket = unTicket({ modulo: { id: "solo-tec", nombre: "Correo" } });
+    const { service, departmentChanges } = buildService({ tickets: [ticket], modulos });
+
+    await service.changeDepartment(mover(ticket, "tec"), admin);
+
+    expect(departmentChanges).toHaveLength(0);
   });
 });
 

@@ -63,8 +63,8 @@ import { ChangeDepartmentDialog } from "@/features/tickets/components/ChangeDepa
 const onOpenChange = vi.fn();
 const onReload = vi.fn();
 
-function renderDialog() {
-  const ticket = makeTicket();
+function renderDialog(extra: Parameters<typeof makeTicket>[0] = {}) {
+  const ticket = makeTicket(extra);
   render(
     <ChangeDepartmentDialog ticket={ticket} open onOpenChange={onOpenChange} onReload={onReload} />,
   );
@@ -190,5 +190,38 @@ describe("ChangeDepartmentDialog", () => {
       "No se pudo completar la operación. Intentá de nuevo.",
     );
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChangeDepartmentDialog: aviso del módulo (SPEC 11)", () => {
+  beforeEach(() => {
+    for (const mock of [mocks.change, onOpenChange, onReload]) mock.mockReset();
+    mocks.change.mockResolvedValue(undefined);
+  });
+
+  it("si el ticket tiene módulo, avisa con su nombre que puede quedar sin él", () => {
+    renderDialog({ modulo: { id: "serv", nombre: "Servidores" } });
+
+    expect(
+      screen.getByText(
+        "Este ticket tiene el módulo «Servidores». Si el nuevo departamento no lo tiene, el ticket queda sin módulo.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("si el ticket no tiene módulo, no muestra ningún aviso", () => {
+    renderDialog();
+
+    expect(screen.queryByText(/Este ticket tiene el módulo/)).not.toBeInTheDocument();
+  });
+
+  it("el aviso no bloquea ni pide otra confirmación: un solo clic cambia el departamento", async () => {
+    renderDialog({ modulo: { id: "serv", nombre: "Servidores" } });
+
+    await userEvent.selectOptions(screen.getByLabelText("Nuevo departamento"), "red");
+    await confirmar();
+
+    await waitFor(() => expect(mocks.change).toHaveBeenCalledTimes(1));
+    expect(mocks.change.mock.calls[0]?.[0]).toMatchObject({ departamentoId: "red" });
   });
 });

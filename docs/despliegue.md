@@ -179,6 +179,23 @@ Este deploy migra una base que ya tiene áreas, y la migración `tipos_area` las
 
 La base de un entorno nuevo (sin áreas) no pasa por esto: el seed carga los tipos y las áreas con su tipo.
 
+### Deploy que trae los módulos por departamento (SPEC 11)
+
+Cada módulo pasa a pertenecer a uno o más departamentos, y un ticket solo admite módulos de su departamento. La migración `modulos_departamentos` crea la tabla de unión y un índice en `ticket`, y **no asigna departamentos a ningún módulo**. Producción no tiene módulos cargados, así que después del paso 4 del deploy regular hay que cargarlos con el seed:
+
+1. Volvé a poner en el `.env` las variables del seed (`SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME`, las del admin que ya existe: el seed las exige aunque no cambia la contraseña de un admin existente). Verificá que `seed-data/modulos.json` esté en el clon (viene en git con el tag).
+2. Corré el seed y borrá las variables, como en el primer deploy:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml run --rm api node dist/seed.mjs
+   sed -i '/^SEED_/d' .env
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+   Tiene que informar `Módulos creados: N.`. Todo lo demás lo salta («la tabla ya tenía datos»), y los agentes que ya existían no se tocan. Si un departamento de `modulos.json` no existe en la base, el seed aborta nombrándolo y no crea ningún módulo.
+3. Si por algún motivo la tabla `modulo` ya tuviera filas, el seed no las completa (carga solo en una tabla vacía) y esos módulos quedan sin departamentos: no aparecen en ningún selector ni en la lista de un agente. El admin los edita en **Catálogos → Módulos** y elige al menos un departamento en cada uno.
+4. Un departamento que se cree después empieza **sin módulos**: sus agentes ven la lista vacía hasta que el admin lo tilda en cada módulo desde **Catálogos → Módulos**. No hay asignación masiva.
+
 ## Volver atrás
 
 Elegí según si el deploy fallido aplicó migraciones nuevas. Ante la duda, usá la segunda opción.

@@ -37,9 +37,15 @@ export interface EstadoRow extends ReferenceRow {
   clave: ClaveEstado | null;
 }
 
+// Un módulo con los departamentos que lo tienen: el ticket solo admite módulos de su departamento
+// (SPEC 11). Un módulo eliminado no figura (`findModulo` devuelve `null`).
+export interface ModuloRow extends ReferenceRow {
+  departamentoIds: string[];
+}
+
 // Los catálogos que un ticket puede referenciar de forma opcional u obligatoria, salvo `estado`,
-// que se lee aparte porque trae la `clave`.
-export type TicketCatalog = "edificio" | "tipoTicket" | "prioridad" | "modulo" | "proveedor";
+// que se lee aparte porque trae la `clave`, y `modulo`, que se lee aparte porque trae sus departamentos.
+export type TicketCatalog = "edificio" | "tipoTicket" | "prioridad" | "proveedor";
 
 export interface ReferenceMatch {
   id: string;
@@ -52,6 +58,7 @@ export interface TicketCreateData {
   departamentoId: string;
   prioridadId: string;
   estadoId: string;
+  moduloId: string | null;
   proveedorId: string | null;
   titulo: string;
   descripcion: string | null;
@@ -89,6 +96,13 @@ export interface TicketStatusData {
   fechaCierre?: string | null;
   fechaReabierto?: string | null;
   solucionDescripcion?: string | null;
+}
+
+// Lo que escribe el cambio de departamento. `moduloId: null` vacía el módulo (SPEC 11: el nuevo
+// departamento no lo tiene); ausente no lo toca.
+export interface TicketDepartmentData {
+  departamentoId: string;
+  moduloId?: null;
 }
 
 // Los campos que una escritura con bloqueo optimista puede tocar (la unión de las anteriores).
@@ -390,11 +404,30 @@ export class TicketsRepository implements TicketUsageReader {
         return this.db.tipoTicket.findFirst({ where, select });
       case "prioridad":
         return this.db.prioridad.findFirst({ where, select });
-      case "modulo":
-        return this.db.modulo.findFirst({ where, select });
       case "proveedor":
         return this.db.proveedor.findFirst({ where, select });
     }
+  }
+
+  // Un módulo no eliminado con los departamentos que lo tienen, o `null`.
+  async findModulo(id: string): Promise<ModuloRow | null> {
+    const row = await this.db.modulo.findFirst({
+      where: { id, ...notDeleted },
+      select: {
+        id: true,
+        nombre: true,
+        activo: true,
+        departamentos: { select: { organizationId: true } },
+      },
+    });
+    return (
+      row && {
+        id: row.id,
+        nombre: row.nombre,
+        activo: row.activo,
+        departamentoIds: row.departamentos.map((d) => d.organizationId),
+      }
+    );
   }
 
   // Todos los estados no eliminados, en el orden de `catalogs.estados.list`.
@@ -474,11 +507,11 @@ export class TicketsRepository implements TicketUsageReader {
   async changeDepartment(
     id: string,
     expectedUpdatedAt: string,
-    departamentoId: string,
+    data: TicketDepartmentData,
     actorId: string,
     audit: AuditEntry,
   ): Promise<TicketRow> {
-    return this.writeLocked(id, expectedUpdatedAt, { departamentoId }, actorId, audit);
+    return this.writeLocked(id, expectedUpdatedAt, data, actorId, audit);
   }
 
   // Eliminación lógica: nunca hay `DELETE` físico. El número no se reutiliza y la referencia externa

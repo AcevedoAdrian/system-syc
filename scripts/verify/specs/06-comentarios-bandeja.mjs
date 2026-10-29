@@ -551,7 +551,7 @@ export default defineSpec({
         const dept = await newDepartment();
         const [proveedor, modulo, area] = [
           await createItem("proveedores"),
-          await createItem("modulos"),
+          await createItem("modulos", { departamentoIds: [dept.id] }), // el módulo es del departamento
           await createItem("areas"),
         ];
         const t1 = await newTicket(a, dept.id, {

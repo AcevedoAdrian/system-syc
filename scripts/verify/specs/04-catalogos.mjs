@@ -1,6 +1,6 @@
 import { adminId, auditCount, auditRows, q, same } from "../lib/audit.mjs";
 import { ADMIN, cleanEnv } from "../lib/env.mjs";
-import { admin, loggedIn, newUser, tipoAreaId, uniq } from "../lib/fixtures.mjs";
+import { admin, departmentNamed, loggedIn, newUser, tipoAreaId, uniq } from "../lib/fixtures.mjs";
 import { scalar, sql } from "../lib/infra.mjs";
 import { turboCriterion } from "../lib/shared-criteria.mjs";
 import { criterion, defineSpec } from "../lib/spec.mjs";
@@ -22,9 +22,15 @@ const SYSTEM_STATES = ["FINALIZADO", "CERRADO", "CANCELADO", "REABIERTO"];
 
 const path = (ruta, id = "", suffix = "") => `/catalogs/${ruta}${id ? `/${id}` : ""}${suffix}`;
 
-// SPEC 08: un área exige `tipoId`; los demás catálogos solo el nombre.
-const withTipo = async (ruta, body) =>
-  ruta === "areas" && body.tipoId === undefined ? { ...body, tipoId: await tipoAreaId() } : body;
+// SPEC 08: un área exige `tipoId`; SPEC 11: un módulo exige `departamentoIds`; los demás catálogos
+// solo el nombre.
+const withTipo = async (ruta, body) => {
+  if (ruta === "areas" && body.tipoId === undefined) return { ...body, tipoId: await tipoAreaId() };
+  if (ruta === "modulos" && body.departamentoIds === undefined) {
+    return { ...body, departamentoIds: [(await departmentNamed("Técnico")).id] };
+  }
+  return body;
+};
 
 async function create(ruta, nombre) {
   const res = await (await admin()).post(path(ruta), await withTipo(ruta, { nombre }));

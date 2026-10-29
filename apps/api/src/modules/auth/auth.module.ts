@@ -28,6 +28,6 @@ import { auditPasswordChanged } from "./auth-audit";
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
-  exports: [AUTH],
+  exports: [AUTH, DEPARTMENT_READER],
 })
 export class AuthModule {}

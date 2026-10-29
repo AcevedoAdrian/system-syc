@@ -1,0 +1,11 @@
+[
+  { "nombre": "Servidores", "departamentos": ["Desarrollo", "Redes"] },
+  { "nombre": "Bases de Datos", "departamentos": ["Desarrollo", "Redes"] },
+  { "nombre": "Seguridad", "departamentos": ["Desarrollo", "Redes"] },
+  { "nombre": "SEGLE", "departamentos": ["Desarrollo", "Redes"] },
+  { "nombre": "Participacion Ciudadana", "departamentos": ["Desarrollo"] },
+  { "nombre": "Web Instucional", "departamentos": ["Desarrollo"] },
+  { "nombre": "Correo", "departamentos": ["Desarrollo", "Redes"] },
+  { "nombre": "Redes", "departamentos": ["Redes"] },
+  { "nombre": "Facturacion", "departamentos": ["Desarrollo", "Redes", "Administrativo"] }
+]

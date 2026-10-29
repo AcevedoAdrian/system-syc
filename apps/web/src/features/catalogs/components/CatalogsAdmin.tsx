@@ -16,6 +16,7 @@ import { useCatalog } from "../hooks/useCatalog";
 import { useCatalogMutations } from "../hooks/useCatalogMutations";
 import { CatalogItemFormDialog } from "./CatalogItemFormDialog";
 import { CatalogTable } from "./CatalogTable";
+import { ModuloFormDialog } from "./ModuloFormDialog";
 import { ProveedorFormDialog } from "./ProveedorFormDialog";
 
 const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
@@ -193,7 +194,25 @@ function CatalogPanel({ ruta }: { ruta: CatalogRuta }) {
         )}
       </section>
 
-      {ruta === "proveedores" ? (
+      {ruta === "modulos" ? (
+        <>
+          <ModuloFormDialog
+            open={creating}
+            onOpenChange={setCreating}
+            title={kind.newLabel}
+            submitLabel="Crear"
+            onSubmit={(values) => create.mutateAsync(values)}
+          />
+          <ModuloFormDialog
+            open={editing !== null}
+            onOpenChange={(open) => !open && setEditing(null)}
+            title={kind.editLabel}
+            submitLabel="Guardar"
+            initial={editing}
+            onSubmit={(values) => update.mutateAsync({ ...values, itemId: editing?.id ?? "" })}
+          />
+        </>
+      ) : ruta === "proveedores" ? (
         <>
           <ProveedorFormDialog
             open={creating}

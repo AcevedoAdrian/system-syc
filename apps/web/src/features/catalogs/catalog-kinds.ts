@@ -53,7 +53,8 @@ export const CATALOG_KINDS: Record<CatalogRuta, CatalogKind> = {
     loadErrorLabel: "No se pudieron cargar las prioridades.",
   },
   modulos: {
-    description: "Partes del sistema donde puede estar el problema.",
+    description:
+      "Partes del sistema donde puede estar el problema. Cada módulo pertenece a uno o más departamentos.",
     title: "Módulos",
     newLabel: "Nuevo módulo",
     editLabel: "Editar módulo",

@@ -19,6 +19,8 @@ Este documento fue la propuesta inicial de specs, con preguntas abiertas. Todas 
 | 07 | Endurecimiento y despliegue | `specs/07-endurecimiento-despliegue.md` | 6 |
 | 08 | Tipos de área (agrega un catálogo; no estaba en las preguntas Q1 a Q38) | `specs/08-tipos-de-area.md` | 3 (extiende) |
 | 09 | Sistema visual (maqueta de Claude Design, por etapas; tampoco estaba en las preguntas) | `specs/09-sistema-visual.md` | — |
+| 10 | Número de factura del ticket (agrega un campo al ticket; tampoco estaba en las preguntas) | `specs/10-numero-factura.md` | 4 (extiende) |
+| 11 | Módulos por departamento (extiende los catálogos y los tickets; tampoco estaba en las preguntas) | `specs/11-modulos-por-departamento.md` | 3 y 4 (extiende) |
 
 ## Decisiones que resolvieron conflictos entre respuestas (2026-09-29)
 

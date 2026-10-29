@@ -13,7 +13,8 @@ post {
 body:json {
   {
     "nombre": "Ítem de prueba",
-    "tipoId": "{{areaTipoId}}"
+    "tipoId": "{{areaTipoId}}",
+    "departamentoIds": ["{{moduloDepartamentoId}}"]
   }
 }
 
@@ -43,9 +44,12 @@ docs {
   Ruta: /catalogs/{catálogo}
   Cuerpo: nombre (1 a 120 caracteres). Proveedores suma contacto, telefono, correo y sitioWeb,
   todos opcionales; en blanco se guardan como null. Áreas suma `tipoId` (obligatorio): el id de un
-  tipo de área activo; los demás catálogos ignoran ese campo.
+  tipo de área activo. Módulos suma `departamentoIds` (obligatorio, al menos uno): ids de
+  departamentos activos, que se toman de la variable `moduloDepartamentoId` (el id de un departamento,
+  de `organizations.list`); los demás catálogos ignoran esos dos campos.
 
   El ítem nace activo y al final del orden. Guarda el id en `catalogItemId`.
-  Errores: 400 validación (en áreas, también un `tipoId` que no existe o está desactivado); 403 si no es admin;
+  Errores: 400 validación (en áreas, también un `tipoId` que no existe o está desactivado; en módulos,
+  sin departamentos o con uno que no existe o está desactivado); 403 si no es admin;
   409 si el nombre ya existe en ese catálogo (en áreas, dentro del mismo tipo).
 }

@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage, isStaleTicket } from "@/lib/errors";
 import { useUpdateTicket } from "../hooks/useTicketMutations";
+import { isModuloError } from "../modulo-error";
 import { CatalogOptionSelect } from "./CatalogOptionSelect";
 import { EstadoDot, PrioridadDot } from "./TicketBadges";
 
@@ -108,6 +109,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
     handleSubmit,
     watch,
     setValue,
+    setError,
     reset,
     formState: { errors, isSubmitting, isDirty, submitCount },
   } = useForm<TicketFormInput, unknown, UpdateTicketInput>({
@@ -126,7 +128,10 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
       onSaved();
     } catch (error) {
       setStale(isStaleTicket(error));
-      setServerError(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      // Un 400 sobre el módulo se muestra bajo su campo; el resto, en la barra de acciones.
+      if (isModuloError(message)) setError("moduloId", { type: "server", message });
+      else setServerError(message);
     }
   });
 
@@ -424,6 +429,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                 label={catalog.label}
                 icon={catalog.icon}
                 hint={catalog.hint}
+                error={catalog.id === "moduloId" ? errors.moduloId?.message : undefined}
               >
                 {(aria) => (
                   <Controller
@@ -438,6 +444,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                         placeholder="Sin asignar"
                         emptyLabel="Sin asignar"
                         current={catalog.current}
+                        departamentoId={ticket.departamento.id}
                         {...aria}
                       />
                     )}

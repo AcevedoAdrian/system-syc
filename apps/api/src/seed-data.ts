@@ -21,6 +21,16 @@ export const areasSchema = z
     }),
   )
   .min(1);
+// Cada módulo nombra los departamentos a los que pertenece (SPEC 11). La lista vacía no se rechaza acá:
+// `resolveSeedModulos` la rechaza nombrando el módulo, que un mensaje de Zod con un índice no hace.
+export const modulosSchema = z
+  .array(
+    z.object({
+      nombre: z.string().trim().min(1).max(120),
+      departamentos: z.array(z.string().trim().min(1).max(120)),
+    }),
+  )
+  .min(1);
 export const estadosSchema = z
   .array(z.object({ nombre: z.string().trim().min(1).max(120), clave: z.string().optional() }))
   .min(1);
@@ -36,6 +46,7 @@ export const agentesSchema = z
 
 export type SeedAgent = z.infer<typeof agentesSchema>[number];
 export type SeedArea = z.infer<typeof areasSchema>[number];
+export type SeedModulo = z.infer<typeof modulosSchema>[number];
 
 // Resuelve el `tipo` de cada área contra los tipos que ya están en la base. Aborta antes de crear
 // nada si algún tipo no existe o si dos áreas comparten nombre normalizado dentro de un mismo tipo
@@ -69,6 +80,56 @@ export function resolveSeedAreas(
   return areas.map((area) => ({
     nombre: area.nombre,
     tipo: byName.get(normalizeName(area.tipo)) as { id: string; nombre: string },
+  }));
+}
+
+// Resuelve los departamentos de cada módulo contra los que ya están en la base. Aborta antes de crear
+// nada, nombrando los valores, si un módulo trae la lista vacía, si algún departamento no existe o si
+// dos módulos comparten nombre normalizado (el índice único rechazaría el segundo a mitad de la
+// carga). Un departamento repetido dentro de un módulo cuenta una sola vez.
+export function resolveSeedModulos(
+  modulos: readonly SeedModulo[],
+  departamentos: readonly { id: string; nombre: string }[],
+): { nombre: string; departamentos: { id: string; nombre: string }[] }[] {
+  const byName = new Map(departamentos.map((dep) => [normalizeName(dep.nombre), dep]));
+
+  const empty = modulos.filter((m) => m.departamentos.length === 0).map((m) => `"${m.nombre}"`);
+  if (empty.length > 0) {
+    throw new Error(`modulos.json trae módulos sin departamentos: ${empty.join(", ")}`);
+  }
+
+  const missing = [
+    ...new Set(
+      modulos.flatMap((m) => m.departamentos).filter((name) => !byName.has(normalizeName(name))),
+    ),
+  ];
+  if (missing.length > 0) {
+    throw new Error(
+      `modulos.json pide departamentos que no existen: ${missing.map((m) => `"${m}"`).join(", ")}`,
+    );
+  }
+
+  const seen = new Set<string>();
+  const repeated: string[] = [];
+  for (const modulo of modulos) {
+    const key = normalizeName(modulo.nombre);
+    if (seen.has(key)) repeated.push(`"${modulo.nombre}"`);
+    seen.add(key);
+  }
+  if (repeated.length > 0) {
+    throw new Error(`modulos.json repite módulos: ${repeated.join(", ")}`);
+  }
+
+  return modulos.map((modulo) => ({
+    nombre: modulo.nombre,
+    departamentos: [
+      ...new Map(
+        modulo.departamentos.map((name) => {
+          const dep = byName.get(normalizeName(name)) as { id: string; nombre: string };
+          return [dep.id, dep] as const;
+        }),
+      ).values(),
+    ],
   }));
 }
 

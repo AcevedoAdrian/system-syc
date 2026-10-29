@@ -1,7 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { AuditHistory, CatalogItem, EstadoTicket, Proveedor } from "@syc/contracts";
+import type { AuditHistory, CatalogItem, EstadoTicket, Modulo, Proveedor } from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
+import { DEPARTMENT_READER, type DepartmentReader } from "../../common/department-reader";
 import { normalizeName } from "../../common/text";
 import { TICKET_USAGE_READER, type TicketUsageReader } from "../../common/ticket-usage-reader";
 import type { AuditEntry } from "../audit/audit.repository";
@@ -13,15 +14,18 @@ import {
   CatalogsRepository,
   type CatalogWrite,
   type OrdenChange,
+  type RelatedItem,
   type SeedEntry,
+  sortRelated,
 } from "./catalogs.repository";
 
 // Lo que devuelve cualquiera de los 8 catálogos; cada controller lo ajusta a su esquema de salida.
-export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket;
+export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket | Modulo;
 
 // Entrada de alta y edición: el service solo lee los campos de `def.inputFields`, así que un campo
 // de más (por ejemplo `clave` en un alta) nunca llega a la base.
-type CatalogInput = { nombre: string } & Record<string, string | null | undefined>;
+// La lista de ids de un vínculo (`departamentoIds`) es la única entrada que no es texto.
+type CatalogInput = { nombre: string } & Record<string, string | string[] | null | undefined>;
 
 // Foto auditable (SPEC 03): solo los campos de la definición entran en el diff.
 function snapshotOf(def: CatalogDefinition, values: Record<string, unknown>): AuditSnapshot {
@@ -40,9 +44,27 @@ export class CatalogsService {
     private readonly repository: CatalogsRepository,
     private readonly audit: AuditService,
     @Inject(TICKET_USAGE_READER) private readonly tickets: TicketUsageReader,
+    @Inject(DEPARTMENT_READER) private readonly departments: DepartmentReader,
   ) {}
 
-  async list(def: CatalogDefinition): Promise<CatalogItemView[]> {
+  // Cualquier usuario con sesión lo lee. Un catálogo con `links.scopeAgentList` (Módulos) le devuelve
+  // a un agente solo los ítems de su departamento, con todos sus departamentos; el admin recibe todos.
+  // Un agente sin departamento recibe `[]`. El recorte es de la API, no de la pantalla (SPEC 11).
+  async list(def: CatalogDefinition, actor: AuthenticatedUser): Promise<CatalogItemView[]> {
+    const rows = await this.repository.findAll(def);
+    if (!def.links?.scopeAgentList || actor.role === "admin") {
+      return rows.map((row) => toItem(def, row));
+    }
+    const departmentId = await this.departments.findDepartmentIdOf(actor.id);
+    if (!departmentId) return [];
+    return rows
+      .filter((row) => this.relatedOf(def, row).some((item) => item.id === departmentId))
+      .map((row) => toItem(def, row));
+  }
+
+  // Todos los ítems, sin recorte por usuario: para código del sistema sin sesión (el seed). Nunca
+  // desde un endpoint.
+  async listAll(def: CatalogDefinition): Promise<CatalogItemView[]> {
     return (await this.repository.findAll(def)).map((row) => toItem(def, row));
   }
 
@@ -60,15 +82,22 @@ export class CatalogsService {
     const all = await this.repository.findAll(def);
     const fields = this.writableFields(def, input);
     const relation = await this.resolveReference(def, fields);
+    const links = await this.resolveLinks(def, input);
     this.assertNameIsFree(def, all, input.nombre, fields);
     const orden = all.reduce((max, row) => Math.max(max, row.orden), 0) + 1;
     const data = { ...fields, orden, activo: true };
-    const created = await this.repository.create(def, data, actor.id, {
-      entityType: def.entityType,
-      action: "create",
-      actorId: actor.id,
-      payload: { after: snapshotOf(def, { ...data, ...relation }) },
-    });
+    const created = await this.repository.create(
+      def,
+      data,
+      actor.id,
+      {
+        entityType: def.entityType,
+        action: "create",
+        actorId: actor.id,
+        payload: { after: snapshotOf(def, { ...data, ...relation, ...links.relation }) },
+      },
+      links.ids,
+    );
     return toItem(def, created);
   }
 
@@ -84,10 +113,18 @@ export class CatalogsService {
     const current = this.requireIn(def, all, itemId);
     const data = this.writableFields(def, input);
     const relation = await this.resolveReference(def, data, current);
+    const links = await this.resolveLinks(def, input, current);
     this.assertNameIsFree(def, all, input.nombre, data, itemId);
-    const audit = this.updateEntry(def, current, { ...current, ...data, ...relation }, actor);
+    const audit = this.updateEntry(
+      def,
+      current,
+      { ...current, ...data, ...relation, ...links.relation },
+      actor,
+    );
     if (!audit) return toItem(def, current);
-    return toItem(def, await this.repository.update(def, itemId, data, actor.id, audit));
+    // La unión solo se reescribe si el conjunto cambió; `move` y `setActive` nunca la tocan.
+    const linkIds = this.linksChanged(def, current, links.ids) ? links.ids : undefined;
+    return toItem(def, await this.repository.update(def, itemId, data, actor.id, audit, linkIds));
   }
 
   async setActive(
@@ -177,7 +214,12 @@ export class CatalogsService {
   // `createdBy` obligatorio de la fila. Devuelve cuántas filas creó.
   async seedIfEmpty(
     def: CatalogDefinition,
-    items: readonly { nombre: string; clave?: string; tipo?: { id: string; nombre: string } }[],
+    items: readonly {
+      nombre: string;
+      clave?: string;
+      tipo?: { id: string; nombre: string };
+      departamentos?: readonly RelatedItem[];
+    }[],
     adminId: string,
   ): Promise<number> {
     const entries: SeedEntry[] = items.map((item, index) => {
@@ -190,17 +232,21 @@ export class CatalogsService {
       if (item.clave) data.clave = item.clave;
       const reference = def.reference;
       if (reference && item.tipo) data[reference.field] = item.tipo.id;
+      const links = def.links;
+      const related = links && item.departamentos ? sortRelated(item.departamentos) : null;
       return {
         data,
+        ...(links && related ? { linkIds: related.map((r) => r.id) } : {}),
         audit: {
           entityType: def.entityType,
           action: "create",
           actorId: null,
           payload: {
-            after: snapshotOf(
-              def,
-              reference && item.tipo ? { ...data, [reference.as]: item.tipo } : data,
-            ),
+            after: snapshotOf(def, {
+              ...data,
+              ...(reference && item.tipo ? { [reference.as]: item.tipo } : {}),
+              ...(links && related ? { [links.as]: related } : {}),
+            }),
           },
         },
       };
@@ -211,7 +257,10 @@ export class CatalogsService {
   // Los campos del cliente según la definición, más `nombreNormalizado`, que nunca llega de afuera.
   private writableFields(def: CatalogDefinition, input: CatalogInput): CatalogWrite {
     const data: CatalogWrite = { nombreNormalizado: normalizeName(input.nombre) };
-    for (const field of def.inputFields) data[field] = input[field] ?? null;
+    for (const field of def.inputFields) {
+      const value = input[field];
+      data[field] = typeof value === "string" ? value : null;
+    }
     return data;
   }
 
@@ -228,13 +277,61 @@ export class CatalogsService {
     if (!reference) return {};
     const id = data[reference.field];
     const kept = current?.[reference.as];
-    if (typeof id === "string" && kept && typeof kept === "object" && kept.id === id) {
+    if (
+      typeof id === "string" &&
+      kept &&
+      !Array.isArray(kept) &&
+      typeof kept === "object" &&
+      kept.id === id
+    ) {
       return { [reference.as]: kept };
     }
     const target =
       typeof id === "string" ? await this.repository.findReference(reference.model, id) : null;
     if (!target?.activo) throw new ORPCError("BAD_REQUEST", { message: reference.invalid });
     return { [reference.as]: { id: target.id, nombre: target.nombre } };
+  }
+
+  // Valida la lista de un vínculo (SPEC 11, Feature 11.1) y devuelve los ids sin repetir y la relación
+  // `[{ id, nombre }]` ordenada para la foto auditable. Cada destino tiene que existir y estar activo,
+  // salvo que el ítem ya lo tuviera (misma "referencia válida"). Sin vínculo en la definición no hace
+  // nada.
+  private async resolveLinks(
+    def: CatalogDefinition,
+    input: CatalogInput,
+    current?: CatalogRow,
+  ): Promise<{ ids: string[]; relation: Record<string, RelatedItem[]> }> {
+    const links = def.links;
+    if (!links) return { ids: [], relation: {} };
+    const raw = input[links.field];
+    const ids = Array.isArray(raw) ? [...new Set(raw)] : [];
+    if (ids.length === 0) throw new ORPCError("BAD_REQUEST", { message: links.empty });
+    const had = new Map(this.relatedOf(def, current).map((item) => [item.id, item]));
+    const toCheck = ids.filter((id) => !had.has(id));
+    const found = new Map(
+      (toCheck.length > 0 ? await this.repository.findLinkTargets(links, toCheck) : []).map(
+        (target) => [target.id, target],
+      ),
+    );
+    const related = ids.map((id): RelatedItem => {
+      const kept = had.get(id);
+      if (kept) return kept;
+      const target = found.get(id);
+      if (!target?.activo) throw new ORPCError("BAD_REQUEST", { message: links.invalid });
+      return { id: target.id, nombre: target.nombre };
+    });
+    return { ids, relation: { [links.as]: sortRelated(related) } };
+  }
+
+  private relatedOf(def: CatalogDefinition, row?: CatalogRow): RelatedItem[] {
+    const value = def.links && row ? row[def.links.as] : undefined;
+    return Array.isArray(value) ? value : [];
+  }
+
+  // ¿Cambió el conjunto de ids? El orden en que llegan no importa.
+  private linksChanged(def: CatalogDefinition, current: CatalogRow, ids: readonly string[]) {
+    const before = new Set(this.relatedOf(def, current).map((item) => item.id));
+    return before.size !== ids.length || ids.some((id) => !before.has(id));
   }
 
   // `null` cuando la foto auditable no cambió: no hay nada que escribir ni auditar.

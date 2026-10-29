@@ -113,6 +113,7 @@ model Organization {
   members     Member[]
   invitations Invitation[]
   tickets     Ticket[]
+  modulos     ModuloDepartamento[]
 
   @@unique([slug])
   @@map("organization")
@@ -284,8 +285,20 @@ model Modulo {
   editor            User      @relation("ModuloEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
   tickets           Ticket[]
+  departamentos     ModuloDepartamento[]
 
   @@map("modulo")
+}
+
+model ModuloDepartamento {
+  moduloId       String
+  modulo         Modulo       @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@id([moduloId, organizationId])
+  @@index([organizationId])
+  @@map("modulo_departamento")
 }
 
 model Proveedor {
@@ -381,6 +394,7 @@ model Ticket {
 
   @@index([departamentoId])
   @@index([departamentoId, fechaRecepcion(sort: Desc), numero(sort: Desc)])
+  @@index([departamentoId, moduloId])
   @@map("ticket")
 }
 

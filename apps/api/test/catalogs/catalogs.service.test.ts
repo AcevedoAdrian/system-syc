@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@/common/authenticated-request";
+import type { DepartmentReader } from "@/common/department-reader";
 import { normalizeName } from "@/common/text";
 import type { TicketUsageReader } from "@/common/ticket-usage-reader";
 import type { AuditEntry } from "@/modules/audit/audit.repository";
@@ -19,6 +20,7 @@ const edificios = CATALOG_DEFINITIONS.edificios;
 const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
 const prioridades = CATALOG_DEFINITIONS.prioridades;
+const modulos = CATALOG_DEFINITIONS.modulos;
 
 const admin: AuthenticatedUser = {
   id: "admin-1",
@@ -47,6 +49,7 @@ function row(id: string, nombre: string, orden: number, extra: Partial<CatalogRo
 function buildService(
   initial: Record<string, CatalogRow[]> = {},
   inUse: Record<string, number> = {},
+  agentDepartments: Record<string, string> = {}, // usuario → su departamento (lo que lee el guard)
 ) {
   const tables = new Map(
     Object.entries(initial).map(([ruta, rows]) => [ruta, rows.map((r) => ({ ...r }))]),
@@ -55,6 +58,7 @@ function buildService(
   const audits: AuditEntry[] = [];
   const actors: string[] = [];
   const creates: CatalogWrite[] = []; // lo que el service le pasa al repository en cada alta
+  const linkWrites: string[][] = []; // las listas de la unión que el service pide escribir
   const table = (ruta: string) => {
     if (!tables.has(ruta)) tables.set(ruta, []);
     return tables.get(ruta) as CatalogRow[];
@@ -75,6 +79,16 @@ function buildService(
     return r;
   };
   const find = (ruta: string, id: string) => table(ruta).find((r) => r.id === id) as CatalogRow;
+  // Como la base: la relación de un vínculo sale de los destinos (tabla "departamentos") a los que
+  // apuntan los ids escritos, ordenada por nombre normalizado.
+  const withLinks = (r: CatalogRow, ids: readonly string[]): CatalogRow => {
+    linkWrites.push([...ids]);
+    r.departamentos = ids
+      .map((id) => find("departamentos", id))
+      .map((d) => ({ id: d.id, nombre: d.nombre }))
+      .sort((a, b) => normalizeName(a.nombre).localeCompare(normalizeName(b.nombre)));
+    return r;
+  };
 
   const repository = {
     // Regla `usedBy`: filas no eliminadas de otro catálogo cuya FK apunta al ítem.
@@ -87,18 +101,24 @@ function buildService(
       const found = live(def?.ruta ?? "").find((r) => r.id === id);
       return found ? { id: found.id, nombre: found.nombre, activo: found.activo } : null;
     },
+    findLinkTargets: async (_links: unknown, ids: string[]) =>
+      table("departamentos")
+        .filter((d) => ids.includes(d.id))
+        .map((d) => ({ id: d.id, nombre: d.nombre, activo: d.activo })),
     findAll: async (def: { ruta: string }) => live(def.ruta).map((r) => ({ ...r })),
     create: async (
       def: { ruta: string },
       data: CatalogWrite,
       actorId: string,
       audit: Omit<AuditEntry, "entityId">,
+      linkIds: string[] = [],
     ) => {
       creates.push(data);
       const created = withRelation(def, {
         id: `${def.ruta}-${table(def.ruta).length + 1}`,
         ...data,
       } as CatalogRow);
+      if (def.ruta === "modulos") withLinks(created, linkIds);
       table(def.ruta).push(created);
       actors.push(actorId);
       audits.push({ ...audit, entityId: created.id });
@@ -110,10 +130,13 @@ function buildService(
       data: CatalogWrite,
       actorId: string,
       audit: AuditEntry,
+      linkIds?: string[],
     ) => {
       actors.push(actorId);
       audits.push(audit);
-      return { ...withRelation(def, Object.assign(find(def.ruta, id), data)) };
+      const updated = withRelation(def, Object.assign(find(def.ruta, id), data));
+      if (linkIds) withLinks(updated, linkIds);
+      return { ...updated };
     },
     setActive: async (
       def: { ruta: string },
@@ -144,12 +167,16 @@ function buildService(
   const audit = { history } as unknown as AuditService;
   const countByCatalogItem = vi.fn(async (ruta: string, id: string) => inUse[`${ruta}:${id}`] ?? 0);
   const tickets = { countByCatalogItem } as unknown as TicketUsageReader;
+  const departments: DepartmentReader = {
+    findDepartmentIdOf: async (userId) => agentDepartments[userId] ?? null,
+  };
   return {
-    service: new CatalogsService(repository, audit, tickets),
+    service: new CatalogsService(repository, audit, tickets, departments),
     countByCatalogItem,
     audits,
     actors,
     creates,
+    linkWrites,
     history,
     ordenes: (ruta: string) => live(ruta).map((r) => [r.id, r.orden]),
   };
@@ -167,7 +194,7 @@ describe("CatalogsService.list", () => {
   it("devuelve solo id, nombre, orden y activo de un catálogo simple", async () => {
     const { service } = buildService(threeEdificios());
 
-    expect(await service.list(edificios)).toEqual([
+    expect(await service.list(edificios, admin)).toEqual([
       { id: "a1", nombre: "Sistemas", orden: 1, activo: true },
       { id: "a2", nombre: "Redes", orden: 2, activo: true },
       { id: "a3", nombre: "Soporte", orden: 3, activo: true },
@@ -179,7 +206,7 @@ describe("CatalogsService.list", () => {
       areas: [row("a1", "Acosta", 1, { tipoId: "t1", tipo: { id: "t1", nombre: "Diputado" } })],
     });
 
-    expect(await service.list(areas)).toEqual([
+    expect(await service.list(areas, admin)).toEqual([
       {
         id: "a1",
         nombre: "Acosta",
@@ -196,10 +223,10 @@ describe("CatalogsService.list", () => {
       proveedores: [row("p1", "Acme", 1, { contacto: "Ana", telefono: null })],
     });
 
-    expect(await service.list(estados)).toEqual([
+    expect(await service.list(estados, admin)).toEqual([
       { id: "e1", nombre: "Cerrado", orden: 1, activo: true, clave: "CERRADO" },
     ]);
-    expect(await service.list(proveedores)).toEqual([
+    expect(await service.list(proveedores, admin)).toEqual([
       { id: "p1", nombre: "Acme", orden: 1, activo: true, contacto: "Ana", telefono: null },
     ]);
   });
@@ -280,7 +307,7 @@ describe("CatalogsService.create", () => {
     const again = await service.create(edificios, { nombre: "Sistemas" }, admin);
 
     expect(again.id).not.toBe(first.id);
-    expect(await service.list(edificios)).toHaveLength(1);
+    expect(await service.list(edificios, admin)).toHaveLength(1);
   });
 
   it("en Proveedores guarda los campos de contacto y los audita", async () => {
@@ -460,7 +487,7 @@ describe("CatalogsService.remove", () => {
 
     await service.remove(areas, "a2", admin);
 
-    expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+    expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     expect(audits).toEqual([
       { entityType: "Area", entityId: "a2", action: "delete", actorId: "admin-1", payload: {} },
     ]);
@@ -483,7 +510,7 @@ describe("CatalogsService.remove", () => {
         message: "Lo usa al menos un ticket: desactivalo en lugar de eliminarlo",
       });
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a2", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a2", "a3"]);
       expect(audits).toHaveLength(0);
     });
 
@@ -492,7 +519,7 @@ describe("CatalogsService.remove", () => {
 
       await service.remove(areas, "a2", admin);
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     });
 
     it("lo que cuentan son los tickets no eliminados: uno usado solo por eliminados se elimina", async () => {
@@ -501,7 +528,7 @@ describe("CatalogsService.remove", () => {
 
       await service.remove(areas, "a2", admin);
 
-      expect((await service.list(areas)).map((i) => i.id)).toEqual(["a1", "a3"]);
+      expect((await service.list(areas, admin)).map((i) => i.id)).toEqual(["a1", "a3"]);
     });
 
     it("consulta el catálogo correcto: la misma id en otro catálogo no cuenta", async () => {
@@ -673,6 +700,295 @@ describe("CatalogsService: Áreas con tipo", () => {
   });
 });
 
+describe("CatalogsService: Módulos con departamentos", () => {
+  const desarrollo = { id: "d1", nombre: "Desarrollo" };
+  const redes = { id: "d2", nombre: "Redes" };
+  const tecnico = { id: "d3", nombre: "Técnico" };
+  const departamentos = () => [
+    row("d1", "Desarrollo", 1),
+    row("d2", "Redes", 2),
+    row("d3", "Técnico", 3),
+    row("d4", "Archivo", 4, { activo: false }),
+  ];
+  const servidores = (deps = [desarrollo, redes]) =>
+    row("m1", "Servidores", 1, { departamentos: deps });
+
+  it("list devuelve cada módulo con sus departamentos", async () => {
+    const { service } = buildService({ modulos: [servidores()] });
+
+    expect(await service.list(modulos, admin)).toEqual([
+      {
+        id: "m1",
+        nombre: "Servidores",
+        orden: 1,
+        activo: true,
+        departamentos: [desarrollo, redes],
+      },
+    ]);
+  });
+
+  it("el alta con dos departamentos devuelve los dos ordenados y los audita", async () => {
+    const { service, audits, linkWrites } = buildService({ departamentos: departamentos() });
+
+    const created = await service.create(
+      modulos,
+      { nombre: "Servidores", departamentoIds: ["d2", "d1"] },
+      admin,
+    );
+
+    expect(created).toMatchObject({ departamentos: [desarrollo, redes] });
+    expect(linkWrites).toEqual([["d2", "d1"]]);
+    expect(audits[0]).toMatchObject({
+      entityType: "Modulo",
+      action: "create",
+      payload: {
+        after: { nombre: "Servidores", orden: 1, activo: true, departamentos: [desarrollo, redes] },
+      },
+    });
+  });
+
+  it("el mismo departamento dos veces cuenta una sola", async () => {
+    const { service, linkWrites } = buildService({ departamentos: departamentos() });
+
+    const created = await service.create(
+      modulos,
+      { nombre: "Servidores", departamentoIds: ["d1", "d1", "d1"] },
+      admin,
+    );
+
+    expect(linkWrites).toEqual([["d1"]]);
+    expect(created).toMatchObject({ departamentos: [desarrollo] });
+  });
+
+  it("sin departamentos, con lista vacía: 400 y no escribe", async () => {
+    const { service, audits } = buildService({ departamentos: departamentos() });
+
+    for (const input of [{ nombre: "Servidores" }, { nombre: "Servidores", departamentoIds: [] }]) {
+      await expect(service.create(modulos, input, admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Elegí al menos un departamento",
+      });
+    }
+    expect(audits).toEqual([]);
+  });
+
+  it("un departamento inexistente o desactivado en el alta: 400", async () => {
+    const { service, audits } = buildService({ departamentos: departamentos() });
+
+    for (const departamentoIds of [["nada"], ["d1", "nada"], ["d4"]]) {
+      await expect(
+        service.create(modulos, { nombre: "Servidores", departamentoIds }, admin),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El departamento no existe o está desactivado",
+      });
+    }
+    expect(audits).toEqual([]);
+  });
+
+  it("editar conservando un departamento que se desactivó después: 200", async () => {
+    const archivo = { id: "d4", nombre: "Archivo" };
+    const { service, audits } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores([archivo, desarrollo])],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d4", "d1", "d2"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [archivo, desarrollo, redes] });
+    expect(audits[0]?.payload).toEqual({
+      before: { departamentos: [archivo, desarrollo] },
+      after: { departamentos: [archivo, desarrollo, redes] },
+    });
+  });
+
+  it("agregar un departamento desactivado que el módulo no tenía: 400", async () => {
+    const { service } = buildService({ departamentos: departamentos(), modulos: [servidores()] });
+
+    await expect(
+      service.update(modulos, "m1", { nombre: "Servidores", departamentoIds: ["d1", "d4"] }, admin),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("quitar un departamento deja un update con departamentos antes y después", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d1"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [desarrollo] });
+    expect(linkWrites).toEqual([["d1"]]);
+    expect(audits).toEqual([
+      {
+        entityType: "Modulo",
+        entityId: "m1",
+        action: "update",
+        actorId: "admin-1",
+        payload: {
+          before: { departamentos: [desarrollo, redes] },
+          after: { departamentos: [desarrollo] },
+        },
+      },
+    ]);
+  });
+
+  it("reenviar los mismos departamentos en otro orden: 200, sin escribir ni auditar", async () => {
+    const { service, audits, actors, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d2", "d1"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [desarrollo, redes] });
+    expect(audits).toEqual([]);
+    expect(actors).toEqual([]);
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("renombrar sin tocar los departamentos no reescribe la unión", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores web", departamentoIds: ["d1", "d2"] },
+      admin,
+    );
+
+    expect(audits[0]?.payload).toEqual({
+      before: { nombre: "Servidores" },
+      after: { nombre: "Servidores web" },
+    });
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("el nombre sigue siendo único en todo el catálogo, no por departamento", async () => {
+    const { service } = buildService({ departamentos: departamentos(), modulos: [servidores()] });
+
+    await expect(
+      service.create(modulos, { nombre: "servidores", departamentoIds: ["d3"] }, admin),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "Ya existe un módulo con ese nombre" });
+  });
+
+  it("desactivar y mover no cambian los departamentos", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores(), row("m2", "Correo", 2, { departamentos: [tecnico] })],
+    });
+
+    const inactive = await service.setActive(modulos, "m1", false, admin);
+    await service.move(modulos, "m1", "bajar", admin);
+
+    expect(inactive).toMatchObject({ activo: false, departamentos: [desarrollo, redes] });
+    expect(audits[0]?.payload).toEqual({ before: { activo: true }, after: { activo: false } });
+    expect(JSON.stringify(audits.slice(1))).not.toContain("departamentos");
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("un módulo con un ticket no eliminado sigue dando 409; sin tickets se elimina", async () => {
+    const { service, audits } = buildService(
+      { modulos: [servidores(), row("m2", "Correo", 2, { departamentos: [tecnico] })] },
+      { "modulos:m1": 1 },
+    );
+
+    await expect(service.remove(modulos, "m1", admin)).rejects.toMatchObject({ code: "CONFLICT" });
+    await service.remove(modulos, "m2", admin);
+
+    expect(audits.map((a) => [a.entityId, a.action])).toEqual([["m2", "delete"]]);
+  });
+
+  it("un catálogo simple ignora departamentoIds: no valida ni escribe nada", async () => {
+    const { service, creates, linkWrites } = buildService();
+
+    await service.create(edificios, { nombre: "Anexo", departamentoIds: [] }, admin);
+
+    expect(creates[0]).not.toHaveProperty("departamentoIds");
+    expect(linkWrites).toEqual([]);
+  });
+});
+
+describe("CatalogsService.list: Módulos por alcance", () => {
+  const desarrollo = { id: "d1", nombre: "Desarrollo" };
+  const redes = { id: "d2", nombre: "Redes" };
+  const tecnico = { id: "d3", nombre: "Técnico" };
+  const agente = (id: string): AuthenticatedUser => ({ ...admin, id, role: "agente" });
+  const tablas = () => ({
+    modulos: [
+      row("m1", "Servidores", 1, { departamentos: [desarrollo, redes] }),
+      row("m2", "Correo", 2, { departamentos: [tecnico] }),
+      row("m3", "Red interna", 3, { departamentos: [redes], activo: false }),
+    ],
+  });
+  const agentes = { "ag-redes": "d2", "ag-tec": "d3" };
+
+  it("un agente de Redes recibe solo los módulos con Redes, activos e inactivos", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    const list = await service.list(modulos, agente("ag-redes"));
+
+    expect(list.map((m) => m.id)).toEqual(["m1", "m3"]);
+  });
+
+  it("cada módulo trae todos sus departamentos, no solo el del agente", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    const [servidores] = await service.list(modulos, agente("ag-redes"));
+
+    expect(servidores).toMatchObject({ departamentos: [desarrollo, redes] });
+  });
+
+  it("el admin recibe todos los módulos", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    expect((await service.list(modulos, admin)).map((m) => m.id)).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("un agente sin departamento recibe una lista vacía", async () => {
+    const { service } = buildService(tablas(), {}, agentes);
+
+    expect(await service.list(modulos, agente("huerfano"))).toEqual([]);
+  });
+
+  it("un agente de un departamento sin módulos recibe una lista vacía", async () => {
+    const { service } = buildService(tablas(), {}, { "ag-nuevo": "d9" });
+
+    expect(await service.list(modulos, agente("ag-nuevo"))).toEqual([]);
+  });
+
+  it("los demás catálogos no se recortan: el agente ve la lista completa", async () => {
+    const { service } = buildService(
+      { ...threeEdificios(), areas: threeAreas().areas },
+      {},
+      agentes,
+    );
+
+    expect(await service.list(edificios, agente("ag-redes"))).toHaveLength(3);
+    expect(await service.list(areas, agente("ag-redes"))).toHaveLength(3);
+    expect(await service.list(edificios, agente("huerfano"))).toHaveLength(3);
+  });
+});
+
 describe("CatalogsService.remove: Tipos de área", () => {
   const unTipoConArea = () => ({
     tiposArea: [row("t1", "Diputado", 1), row("t2", "Bloque", 2)],
@@ -686,7 +1002,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
       code: "CONFLICT",
       message: "Lo usa al menos un área: desactivalo en lugar de eliminarlo",
     });
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1", "t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t1", "t2"]);
     expect(audits).toEqual([]);
   });
 
@@ -695,7 +1011,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
 
     await service.remove(tiposArea, "t2", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t1"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t1"]);
   });
 
   it("con su única área eliminada, el tipo se elimina", async () => {
@@ -704,7 +1020,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
     await service.remove(areas, "a1", admin);
     await service.remove(tiposArea, "t1", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t2"]);
   });
 
   it("las áreas de otro tipo no cuentan", async () => {
@@ -715,7 +1031,7 @@ describe("CatalogsService.remove: Tipos de área", () => {
 
     await service.remove(tiposArea, "t1", admin);
 
-    expect((await service.list(tiposArea)).map((i) => i.id)).toEqual(["t2"]);
+    expect((await service.list(tiposArea, admin)).map((i) => i.id)).toEqual(["t2"]);
   });
 
   it("desactivar un tipo con áreas está permitido", async () => {
@@ -877,7 +1193,7 @@ describe("Estados: los de sistema (con clave)", () => {
 
     expect(audits).toEqual([]);
     expect(actors).toEqual([]);
-    expect(await service.list(estados)).toHaveLength(7);
+    expect(await service.list(estados, admin)).toHaveLength(7);
   });
 
   it("tampoco se elimina si es el único: gana la regla de la clave", async () => {
@@ -899,7 +1215,7 @@ describe("Estados: los de sistema (con clave)", () => {
     await service.setActive(estados, "e5", true, admin);
     await service.move(estados, "e6", "subir", admin);
 
-    const byId = Object.fromEntries((await service.list(estados)).map((i) => [i.id, i]));
+    const byId = Object.fromEntries((await service.list(estados, admin)).map((i) => [i.id, i]));
     expect(byId.e4).toMatchObject({ nombre: "Resuelto", clave: "FINALIZADO" });
     expect(byId.e5).toMatchObject({ activo: true, clave: "CERRADO" });
     expect(byId.e6).toMatchObject({ orden: 5, clave: "CANCELADO" });
@@ -910,7 +1226,7 @@ describe("Estados: los de sistema (con clave)", () => {
 
     await service.remove(estados, "e3", admin);
 
-    expect(await service.list(estados)).toHaveLength(6);
+    expect(await service.list(estados, admin)).toHaveLength(6);
     expect(audits.map((a) => a.action)).toEqual(["delete"]);
   });
 });
@@ -958,7 +1274,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
 
     await service.remove(estados, "e2", admin);
 
-    expect((await service.list(estados)).map((i) => i.id)).toEqual(["e1"]);
+    expect((await service.list(estados, admin)).map((i) => i.id)).toEqual(["e1"]);
   });
 
   it("desactivar la única prioridad activa da 409", async () => {
@@ -992,7 +1308,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
     });
     await service.remove(prioridades, "p1", admin);
 
-    expect((await service.list(prioridades)).map((i) => i.id)).toEqual(["p2"]);
+    expect((await service.list(prioridades, admin)).map((i) => i.id)).toEqual(["p2"]);
   });
 
   it("los otros catálogos no tienen la regla: Edificios elimina su último activo", async () => {
@@ -1000,7 +1316,7 @@ describe("Estados y Prioridades: siempre queda un ítem activo", () => {
 
     await service.remove(edificios, "b1", admin);
 
-    expect(await service.list(edificios)).toEqual([]);
+    expect(await service.list(edificios, admin)).toEqual([]);
   });
 });
 
@@ -1012,6 +1328,7 @@ describe("CatalogsService.seedIfEmpty", () => {
       repository,
       {} as unknown as AuditService,
       {} as unknown as TicketUsageReader,
+      {} as unknown as DepartmentReader,
     );
     return { service, seedIfEmpty };
   }
@@ -1074,6 +1391,60 @@ describe("CatalogsService.seedIfEmpty", () => {
       "nombreNormalizado",
       "orden",
     ]);
+  });
+
+  it("Módulos: manda la lista de la unión y deja los departamentos ordenados en la auditoría", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(
+      modulos,
+      [
+        {
+          nombre: "Servidores",
+          departamentos: [
+            { id: "d3", nombre: "Técnico" },
+            { id: "d1", nombre: "Desarrollo" },
+          ],
+        },
+      ],
+      "admin-1",
+    );
+
+    expect(seedIfEmpty).toHaveBeenCalledWith(
+      modulos,
+      [
+        {
+          data: { nombre: "Servidores", nombreNormalizado: "servidores", orden: 1, activo: true },
+          linkIds: ["d1", "d3"],
+          audit: {
+            entityType: "Modulo",
+            action: "create",
+            actorId: null,
+            payload: {
+              after: {
+                nombre: "Servidores",
+                orden: 1,
+                activo: true,
+                departamentos: [
+                  { id: "d1", nombre: "Desarrollo" },
+                  { id: "d3", nombre: "Técnico" },
+                ],
+              },
+            },
+          },
+        },
+      ],
+      "admin-1",
+    );
+  });
+
+  it("un catálogo sin vínculo no manda linkIds", async () => {
+    const { service, seedIfEmpty } = buildSeedService(1);
+
+    await service.seedIfEmpty(prioridades, [{ nombre: "Baja" }], "admin-1");
+
+    const [, entries] = seedIfEmpty.mock.calls[0] as unknown as [unknown, object[]];
+    expect(entries[0]).not.toHaveProperty("linkIds");
   });
 
   it("devuelve 0 cuando el repository encuentra la tabla con datos", async () => {

@@ -11,6 +11,7 @@ que el seed lee al correr; no forman parte del código.
 | `edificios.json` | Nombres | no | sí |
 | `tipos-area.json` | Nombres de los tipos de área (Diputado, Dirección…) | no | sí |
 | `areas.json` | `{ tipo, nombre }`; el `tipo` es uno de `tipos-area.json` | no | **no** (`.gitignore`) |
+| `modulos.json` | `{ nombre, departamentos }`; `departamentos` es una lista de uno o más de `departamentos.json` | no | sí |
 | `agentes.json` | `{ nombre, apellido, departamento }` | no | **no** (`.gitignore`) |
 
 - El orden del archivo es el `orden` del catálogo. Los tipos de área se cargan antes que las áreas.
@@ -19,6 +20,12 @@ que el seed lee al correr; no forman parte del código.
   áreas. Un catálogo (tipos o áreas) solo se carga si su tabla está vacía: en una base con áreas ya
   cargadas (por ejemplo después de la migración `tipos_area`, que las deja todas en «Otro») el seed no
   las toca.
+- Cada módulo nombra los `departamentos` a los que pertenece (uno o más), que se buscan por nombre sin
+  mayúsculas ni acentos. Si un departamento no existe, un módulo trae la lista vacía o dos módulos
+  repiten el nombre, el seed aborta nombrando los valores y no crea módulos. Se carga después de los
+  departamentos y solo si la tabla `modulo` está vacía: en una base con módulos ya cargados el seed no
+  los toca, así que no les asigna departamentos (eso se hace desde Catálogos → Módulos). Un departamento
+  que se cree después empieza sin módulos.
 - Un archivo opcional que no existe se saltea y el seed lo avisa. `areas.example.json` y
   `agentes.example.json` muestran el formato: copialos como `areas.json` y `agentes.json` y
   completalos. En el servidor de producción esos dos se copian a mano a `seed-data/`.

@@ -126,21 +126,21 @@ numeroFactura: z.string().nullable(),
 
 ## Criterios de aceptación
 
-- [ ] Después de `prisma migrate deploy`, la tabla `ticket` tiene la columna `numeroFactura` nullable, y los tickets existentes la tienen en `null`.
-- [ ] `tickets.create` con proveedor, sin referencia externa y con `numeroFactura: "0003-00004567"` devuelve 200, y `tickets.get` trae `numeroFactura: "0003-00004567"`.
-- [ ] `tickets.create` con `numeroFactura` y sin `proveedorId` devuelve 400.
-- [ ] `tickets.update` con `proveedorId: null` y `numeroFactura` cargado devuelve 400.
-- [ ] `numeroFactura` de 51 caracteres devuelve 400, en `create` y en `update`.
-- [ ] `numeroFactura: "   "` se guarda como `null`, y `"  A-12  "` como `"A-12"`.
-- [ ] Dos tickets del mismo proveedor con el mismo `numeroFactura` se guardan los dos (200).
-- [ ] Cambiar la factura de un ticket deja un `AuditLog` `update` cuyo diff tiene `numeroFactura` antes y después.
-- [ ] Una edición que solo agrega espacios en los extremos de la factura responde 200 y no deja `AuditLog`.
-- [ ] `tickets.list` no incluye `numeroFactura` en sus filas.
-- [ ] En la web, el campo «N.º de factura» está deshabilitado sin proveedor, en el alta y en la edición.
-- [ ] En la web, en la edición, cambiar el proveedor vacía el campo «N.º de factura».
-- [ ] En la web, el historial del ticket muestra el cambio con la etiqueta «N.º de factura».
-- [ ] La tabla §6.1 del PRD tiene la fila `numeroFactura`.
-- [ ] `pnpm verify --spec 05,06,08,10` y `pnpm turbo lint typecheck test build` terminan con código 0.
+- [X] Después de `prisma migrate deploy`, la tabla `ticket` tiene la columna `numeroFactura` nullable, y los tickets existentes la tienen en `null`.
+- [X] `tickets.create` con proveedor, sin referencia externa y con `numeroFactura: "0003-00004567"` devuelve 200, y `tickets.get` trae `numeroFactura: "0003-00004567"`.
+- [X] `tickets.create` con `numeroFactura` y sin `proveedorId` devuelve 400.
+- [X] `tickets.update` con `proveedorId: null` y `numeroFactura` cargado devuelve 400.
+- [X] `numeroFactura` de 51 caracteres devuelve 400, en `create` y en `update`.
+- [X] `numeroFactura: "   "` se guarda como `null`, y `"  A-12  "` como `"A-12"`.
+- [X] Dos tickets del mismo proveedor con el mismo `numeroFactura` se guardan los dos (200).
+- [X] Cambiar la factura de un ticket deja un `AuditLog` `update` cuyo diff tiene `numeroFactura` antes y después.
+- [X] Una edición que solo agrega espacios en los extremos de la factura responde 200 y no deja `AuditLog`.
+- [X] `tickets.list` no incluye `numeroFactura` en sus filas.
+- [X] En la web, el campo «N.º de factura» está deshabilitado sin proveedor, en el alta y en la edición.
+- [X] En la web, en la edición, cambiar el proveedor vacía el campo «N.º de factura».
+- [X] En la web, el historial del ticket muestra el cambio con la etiqueta «N.º de factura».
+- [X] La tabla §6.1 del PRD tiene la fila `numeroFactura`.
+- [X] `pnpm verify --spec 05,06,08,10` y `pnpm turbo lint typecheck test build` terminan con código 0.
 
 ## Decisiones
 

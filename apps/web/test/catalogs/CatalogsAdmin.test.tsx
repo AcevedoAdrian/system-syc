@@ -29,6 +29,22 @@ const fake = vi.hoisted(() => {
     if (tipo) item.tipo = { id: tipo.id, nombre: tipo.nombre };
     return item;
   };
+  // Como la API: un módulo sale con sus departamentos `{ id, nombre }` según `departamentoIds`.
+  const departments = [
+    { id: "d1", nombre: "Desarrollo", activo: true, agentes: 0 },
+    { id: "d2", nombre: "Redes", activo: true, agentes: 0 },
+    { id: "d3", nombre: "Técnico", activo: true, agentes: 0 },
+    { id: "d4", nombre: "Archivo", activo: false, agentes: 0 },
+  ];
+  const withDepartamentos = (item: Item, ids: unknown): Item => {
+    if (!Array.isArray(ids)) return item;
+    item.departamentos = ids
+      .map((id) => departments.find((d) => d.id === id))
+      .filter((d) => d !== undefined)
+      .map((d) => ({ id: d.id, nombre: d.nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    return item;
+  };
   const procedure = <TInput, TOutput>(fn: (input: TInput) => TOutput) => ({
     mutationOptions: (options: object = {}) => ({
       mutationFn: async (input: TInput) => fn(input),
@@ -43,19 +59,44 @@ const fake = vi.hoisted(() => {
         queryFn: async () => structuredClone(sorted(ruta)),
       }),
     },
-    create: procedure(({ nombre, tipoId }: { nombre: string; tipoId?: string }) => {
-      if (state.createError) throw state.createError;
-      state.creates.push({ nombre, ...(tipoId === undefined ? {} : { tipoId }) });
-      const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
-      const item = withTipo({ id: `i${state.nextId++}`, nombre, orden, activo: true }, tipoId);
-      table(ruta).push(item);
-      return item;
-    }),
+    create: procedure(
+      ({
+        nombre,
+        tipoId,
+        departamentoIds,
+      }: {
+        nombre: string;
+        tipoId?: string;
+        departamentoIds?: string[];
+      }) => {
+        if (state.createError) throw state.createError;
+        state.creates.push({
+          nombre,
+          ...(tipoId === undefined ? {} : { tipoId }),
+          ...(departamentoIds === undefined ? {} : { departamentoIds }),
+        });
+        const orden = Math.max(0, ...table(ruta).map((i) => i.orden)) + 1;
+        const item = withTipo({ id: `i${state.nextId++}`, nombre, orden, activo: true }, tipoId);
+        withDepartamentos(item, departamentoIds);
+        table(ruta).push(item);
+        return item;
+      },
+    ),
     update: procedure(
-      ({ itemId, ...fields }: { itemId: string; nombre: string; tipoId?: string }) => {
+      ({
+        itemId,
+        ...fields
+      }: {
+        itemId: string;
+        nombre: string;
+        tipoId?: string;
+        departamentoIds?: string[];
+      }) => {
         state.updates.push({ itemId, ...fields });
         const item = table(ruta).find((i) => i.id === itemId) as Item;
-        Object.assign(item, fields);
+        const { departamentoIds, ...rest } = fields;
+        Object.assign(item, rest);
+        withDepartamentos(item, departamentoIds);
         return withTipo(item, fields.tipoId);
       },
     ),
@@ -79,11 +120,21 @@ const fake = vi.hoisted(() => {
       );
     }),
   });
-  return { state, table, api };
+  return { state, table, api, departments };
 });
 
 vi.mock("@/lib/orpc-client", () => ({
-  orpc: { catalogs: new Proxy({}, { get: (_target, ruta: string) => fake.api(ruta) }) },
+  orpc: {
+    catalogs: new Proxy({}, { get: (_target, ruta: string) => fake.api(ruta) }),
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ["organizations", "list"],
+          queryFn: async () => structuredClone(fake.departments),
+        }),
+      },
+    },
+  },
 }));
 
 import { CatalogsAdmin } from "@/features/catalogs/components/CatalogsAdmin";
@@ -338,6 +389,145 @@ describe("CatalogsAdmin", () => {
       sitioWeb: null,
     });
     expect(await within(row("Acme")).findByText("soporte@acme.com")).toBeInTheDocument();
+  });
+
+  describe("Módulos con departamentos (SPEC 11)", () => {
+    const desarrollo = { id: "d1", nombre: "Desarrollo" };
+    const redes = { id: "d2", nombre: "Redes" };
+
+    it("la tabla suma la columna «Departamentos» con los nombres separados por coma", async () => {
+      fake.table("modulos").push(
+        {
+          id: "m1",
+          nombre: "Servidores",
+          orden: 1,
+          activo: true,
+          departamentos: [desarrollo, redes],
+        },
+        { id: "m2", nombre: "Sin asignar", orden: 2, activo: true, departamentos: [] },
+      );
+      renderAdmin("modulos");
+      await screen.findByText("Servidores");
+
+      expect(screen.getByRole("columnheader", { name: "Departamentos" })).toBeInTheDocument();
+      expect(within(row("Servidores")).getByText("Desarrollo, Redes")).toBeInTheDocument();
+      expect(within(row("Sin asignar")).getByText("—")).toBeInTheDocument();
+    });
+
+    it("las otras pestañas no tienen la columna", async () => {
+      renderAdmin("edificios");
+      await screen.findByText("Sistemas");
+
+      expect(screen.queryByRole("columnheader", { name: "Departamentos" })).toBeNull();
+    });
+
+    it("el alta sin ninguna casilla muestra el error y no envía", async () => {
+      renderAdmin("modulos");
+      await screen.findByText("Todavía no hay registros.");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo módulo" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Servidores");
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      expect(await screen.findByText("Elegí al menos un departamento.")).toBeInTheDocument();
+      expect(fake.state.creates).toHaveLength(0);
+    });
+
+    it("el panel ofrece una casilla por departamento activo y no los desactivados", async () => {
+      renderAdmin("modulos");
+      await screen.findByText("Todavía no hay registros.");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo módulo" }));
+
+      expect(await screen.findByRole("checkbox", { name: "Desarrollo" })).not.toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Redes" })).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: "Técnico" })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: /Archivo/ })).toBeNull();
+    });
+
+    it("el alta con casillas tildadas manda departamentoIds y la fila aparece", async () => {
+      renderAdmin("modulos");
+      await screen.findByText("Todavía no hay registros.");
+
+      await userEvent.click(screen.getByRole("button", { name: "Nuevo módulo" }));
+      await userEvent.type(screen.getByLabelText("Nombre"), "Servidores");
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Redes" }));
+      await userEvent.click(screen.getByRole("checkbox", { name: "Desarrollo" }));
+      await userEvent.click(screen.getByRole("button", { name: "Crear" }));
+
+      await waitFor(() => expect(fake.state.creates).toHaveLength(1));
+      expect(fake.state.creates[0]).toEqual({
+        nombre: "Servidores",
+        departamentoIds: ["d2", "d1"],
+      });
+      expect(
+        await within(await screen.findByTestId("catalog-row-Servidores")).findByText(
+          "Desarrollo, Redes",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("al editar, un departamento desactivado ya asignado aparece tildado y marcado «(inactivo)»", async () => {
+      const archivo = { id: "d4", nombre: "Archivo" };
+      fake.table("modulos").push({
+        id: "m1",
+        nombre: "Servidores",
+        orden: 1,
+        activo: true,
+        departamentos: [archivo, desarrollo],
+      });
+      renderAdmin("modulos");
+      await screen.findByText("Servidores");
+
+      await userEvent.click(within(row("Servidores")).getByRole("button", { name: /^Editar/ }));
+
+      expect(await screen.findByRole("checkbox", { name: "Archivo (inactivo)" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Desarrollo" })).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Redes" })).not.toBeChecked();
+    });
+
+    it("editar conservando el departamento desactivado lo manda junto con los demás", async () => {
+      const archivo = { id: "d4", nombre: "Archivo" };
+      fake.table("modulos").push({
+        id: "m1",
+        nombre: "Servidores",
+        orden: 1,
+        activo: true,
+        departamentos: [archivo, desarrollo],
+      });
+      renderAdmin("modulos");
+      await screen.findByText("Servidores");
+
+      await userEvent.click(within(row("Servidores")).getByRole("button", { name: /^Editar/ }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Redes" }));
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      await waitFor(() => expect(fake.state.updates).toHaveLength(1));
+      expect(fake.state.updates[0]).toEqual({
+        itemId: "m1",
+        nombre: "Servidores",
+        departamentoIds: ["d4", "d1", "d2"],
+      });
+    });
+
+    it("destildar todas las casillas al editar bloquea el envío", async () => {
+      fake.table("modulos").push({
+        id: "m1",
+        nombre: "Servidores",
+        orden: 1,
+        activo: true,
+        departamentos: [desarrollo],
+      });
+      renderAdmin("modulos");
+      await screen.findByText("Servidores");
+
+      await userEvent.click(within(row("Servidores")).getByRole("button", { name: /^Editar/ }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: "Desarrollo" }));
+      await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+      expect(await screen.findByText("Elegí al menos un departamento.")).toBeInTheDocument();
+      expect(fake.state.updates).toHaveLength(0);
+    });
   });
 
   it("en Estados las filas de sistema no tienen Eliminar", async () => {

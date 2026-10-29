@@ -1,18 +1,27 @@
-import type { Area, CatalogItem, CatalogRuta, EstadoTicket, Proveedor } from "@syc/contracts";
+import type {
+  Area,
+  CatalogItem,
+  CatalogRuta,
+  EstadoTicket,
+  Modulo,
+  Proveedor,
+} from "@syc/contracts";
 import type { QueryKey, UseMutationOptions, UseQueryOptions } from "@tanstack/react-query";
 import { orpc } from "@/lib/orpc-client";
 
 // Un ítem de cualquiera de los 8 catálogos: la base, más los campos que solo tienen Proveedores
-// (contacto), Estados (`clave`) y Áreas (`tipo`). La pantalla y los hooks trabajan con esta unión.
+// (contacto), Estados (`clave`), Áreas (`tipo`) y Módulos (`departamentos`). La pantalla y los hooks
+// trabajan con esta unión.
 export type CatalogEntry = CatalogItem &
   Partial<Omit<Proveedor, keyof CatalogItem>> &
   Partial<Pick<EstadoTicket, "clave">> &
-  Partial<Pick<Area, "tipo">>;
+  Partial<Pick<Area, "tipo">> &
+  Partial<Pick<Modulo, "departamentos">>;
 
 // Campos que el cliente puede mandar en un alta o una edición.
 export type CatalogFormValues = { nombre: string } & Partial<
   Record<"contacto" | "telefono" | "correo" | "sitioWeb" | "tipoId", string | null>
->;
+> & { departamentoIds?: string[] };
 
 interface Procedure<TInput, TOutput> {
   mutationOptions(options?: {
