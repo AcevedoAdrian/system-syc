@@ -1,6 +1,6 @@
 # SPEC 12 — Descripción del tipo de ticket, seed y tipo en el alta
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos y seed), SPEC 05 (tickets núcleo), SPEC 09 (sistema visual: el formulario del alta), SPEC 11 (módulos por departamento: el campo «Módulo» del alta y su verify, que se corre junto)
 > **Date:** 2026-10-29
 > **Objective:** que el tipo de ticket tenga una descripción opcional, que se cargue con un seed inicial, y que el alta del ticket permita elegir el tipo (mostrando esa descripción como ayuda) en la grilla «Tipo de ticket · Módulo» con «Prioridad · Fecha de recepción» debajo.

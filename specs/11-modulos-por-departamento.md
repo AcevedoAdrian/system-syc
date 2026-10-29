@@ -1,6 +1,6 @@
 # SPEC 11 — Módulos por departamento
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 02 (autenticación y acceso), SPEC 03 (auditoría y eliminación lógica), SPEC 04 (catálogos), SPEC 05 (tickets núcleo), SPEC 06 (comentarios y bandeja), SPEC 08 (tipos de área: la referencia a otro catálogo y la «referencia válida»), SPEC 10 (número de factura: su verify se corre junto)
 > **Date:** 2026-10-29
 > **Objective:** que cada módulo pertenezca a uno o más departamentos, y que el selector de módulo del ticket (en el alta y en la edición) ofrezca solo los del departamento de ese ticket.
