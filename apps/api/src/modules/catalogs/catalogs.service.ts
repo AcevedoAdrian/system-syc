@@ -1,6 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
-import type { AuditHistory, CatalogItem, EstadoTicket, Modulo, Proveedor } from "@syc/contracts";
+import type {
+  AuditHistory,
+  CatalogItem,
+  EstadoTicket,
+  Modulo,
+  Proveedor,
+  TipoTicket,
+} from "@syc/contracts";
 import type { AuthenticatedUser } from "../../common/authenticated-request";
 import { DEPARTMENT_READER, type DepartmentReader } from "../../common/department-reader";
 import { normalizeName } from "../../common/text";
@@ -20,7 +27,7 @@ import {
 } from "./catalogs.repository";
 
 // Lo que devuelve cualquiera de los 8 catálogos; cada controller lo ajusta a su esquema de salida.
-export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket | Modulo;
+export type CatalogItemView = CatalogItem | Proveedor | EstadoTicket | Modulo | TipoTicket;
 
 // Entrada de alta y edición: el service solo lee los campos de `def.inputFields`, así que un campo
 // de más (por ejemplo `clave` en un alta) nunca llega a la base.
@@ -217,6 +224,7 @@ export class CatalogsService {
     items: readonly {
       nombre: string;
       clave?: string;
+      descripcion?: string;
       tipo?: { id: string; nombre: string };
       departamentos?: readonly RelatedItem[];
     }[],
@@ -230,6 +238,9 @@ export class CatalogsService {
         activo: true,
       };
       if (item.clave) data.clave = item.clave;
+      if (item.descripcion && def.inputFields.includes("descripcion")) {
+        data.descripcion = item.descripcion;
+      }
       const reference = def.reference;
       if (reference && item.tipo) data[reference.field] = item.tipo.id;
       const links = def.links;

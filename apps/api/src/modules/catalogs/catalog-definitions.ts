@@ -132,10 +132,15 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
     notFound: "El edificio no existe",
     duplicate: "Ya existe un edificio con ese nombre",
   }),
-  tipos: simple("tipos", "TipoTicket", "tipoTicket", {
-    notFound: "El tipo de ticket no existe",
-    duplicate: "Ya existe un tipo de ticket con ese nombre",
-  }),
+  // SPEC 12: suma una descripción opcional, que la web muestra como ayuda en el alta del ticket.
+  tipos: {
+    ...simple("tipos", "TipoTicket", "tipoTicket", {
+      notFound: "El tipo de ticket no existe",
+      duplicate: "Ya existe un tipo de ticket con ese nombre",
+    }),
+    inputFields: ["nombre", "descripcion"],
+    snapshotFields: [...BASE_FIELDS, "descripcion"],
+  },
   // Siempre queda una prioridad activa: SPEC 05 la exige para crear un ticket.
   prioridades: {
     ...simple("prioridades", "Prioridad", "prioridad", {

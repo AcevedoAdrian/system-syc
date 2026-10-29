@@ -1,3 +1,4 @@
+import { tipoTicketInputSchema } from "@syc/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthenticatedUser } from "@/common/authenticated-request";
 import type { DepartmentReader } from "@/common/department-reader";
@@ -21,6 +22,7 @@ const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
 const prioridades = CATALOG_DEFINITIONS.prioridades;
 const modulos = CATALOG_DEFINITIONS.modulos;
+const tipos = CATALOG_DEFINITIONS.tipos;
 
 const admin: AuthenticatedUser = {
   id: "admin-1",
@@ -1043,6 +1045,145 @@ describe("CatalogsService.remove: Tipos de área", () => {
   });
 });
 
+describe("CatalogsService: Tipos de ticket con descripción (SPEC 12)", () => {
+  const unTipo = () => ({
+    tipos: [row("t1", "Incidente", 1, { descripcion: "Algo falló" })],
+  });
+
+  it("el alta con descripción la devuelve y la audita", async () => {
+    const { service, audits } = buildService();
+
+    const created = await service.create(
+      tipos,
+      { nombre: "Incidente", descripcion: "Algo falló" },
+      admin,
+    );
+
+    expect(created).toEqual({
+      id: "tipos-1",
+      nombre: "Incidente",
+      orden: 1,
+      activo: true,
+      descripcion: "Algo falló",
+    });
+    expect(audits[0]?.payload).toEqual({
+      after: { nombre: "Incidente", orden: 1, activo: true, descripcion: "Algo falló" },
+    });
+  });
+
+  it("el alta sin descripción la devuelve como null", async () => {
+    const { service, audits } = buildService();
+
+    const created = await service.create(tipos, { nombre: "Incidente" }, admin);
+
+    expect(created).toMatchObject({ descripcion: null });
+    expect(audits[0]?.payload).toEqual({
+      after: { nombre: "Incidente", orden: 1, activo: true, descripcion: null },
+    });
+  });
+
+  it("list trae la descripción, y null en un tipo que no la tiene", async () => {
+    const { service } = buildService({
+      tipos: [
+        row("t1", "Incidente", 1, { descripcion: "Algo falló" }),
+        row("t2", "Consulta", 2, { descripcion: null }), // la base devuelve null, no undefined
+      ],
+    });
+
+    const items = await service.list(tipos, admin);
+
+    expect(items.map((i) => (i as { descripcion: string | null }).descripcion)).toEqual([
+      "Algo falló",
+      null,
+    ]);
+  });
+
+  it("editar solo la descripción deja un update con descripcion antes y después", async () => {
+    const { service, audits } = buildService(unTipo());
+
+    const updated = await service.update(
+      tipos,
+      "t1",
+      { nombre: "Incidente", descripcion: "Dejó de funcionar" },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ descripcion: "Dejó de funcionar" });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.payload).toEqual({
+      before: { descripcion: "Algo falló" },
+      after: { descripcion: "Dejó de funcionar" },
+    });
+  });
+
+  it("omitir la descripción en la edición la vacía y lo audita", async () => {
+    const { service, audits } = buildService(unTipo());
+
+    const updated = await service.update(tipos, "t1", { nombre: "Incidente" }, admin);
+
+    expect(updated).toMatchObject({ descripcion: null });
+    expect(audits[0]?.payload).toEqual({
+      before: { descripcion: "Algo falló" },
+      after: { descripcion: null },
+    });
+  });
+
+  it("reenviar la misma descripción con espacios en los extremos no escribe ni audita", async () => {
+    const { service, audits, actors } = buildService(unTipo());
+    // El contrato recorta los espacios antes de que la entrada llegue al service.
+    const input = tipoTicketInputSchema.parse({
+      nombre: "Incidente",
+      descripcion: "  Algo falló  ",
+    });
+
+    const result = await service.update(tipos, "t1", input, admin);
+
+    expect(result).toMatchObject({ descripcion: "Algo falló" });
+    expect(audits).toEqual([]);
+    expect(actors).toEqual([]);
+  });
+
+  it("la descripción no participa de la unicidad del nombre", async () => {
+    const { service } = buildService(unTipo());
+
+    await expect(
+      service.create(tipos, { nombre: "Consulta", descripcion: "Algo falló" }, admin),
+    ).resolves.toMatchObject({ nombre: "Consulta" });
+    await expect(
+      service.create(tipos, { nombre: "incidente", descripcion: "Otra" }, admin),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("desactivar y mover no cambian la descripción, y el tipo desactivado la conserva", async () => {
+    const { service, audits } = buildService({
+      tipos: [row("t1", "Incidente", 1, { descripcion: "Algo falló" }), row("t2", "Consulta", 2)],
+    });
+
+    const inactive = await service.setActive(tipos, "t1", false, admin);
+    await service.move(tipos, "t1", "bajar", admin);
+
+    expect(inactive).toMatchObject({ activo: false, descripcion: "Algo falló" });
+    expect(audits.map((a) => a.payload)).toEqual([
+      { before: { activo: true }, after: { activo: false } },
+      { before: { orden: 1 }, after: { orden: 2 } },
+      { before: { orden: 2 }, after: { orden: 1 } },
+    ]);
+  });
+
+  it("los otros catálogos no aceptan ni devuelven descripcion", async () => {
+    const { service, creates } = buildService();
+
+    const created = await service.create(
+      prioridades,
+      { nombre: "Alta", descripcion: "No debería guardarse" },
+      admin,
+    );
+
+    expect(created).toEqual({ id: "prioridades-1", nombre: "Alta", orden: 1, activo: true });
+    expect(Object.keys(creates[0] ?? {})).not.toContain("descripcion");
+  });
+});
+
 describe("CatalogsService.move", () => {
   it("intercambia el orden con el vecino y deja dos update con solo orden", async () => {
     const { service, audits, ordenes } = buildService(threeAreas());
@@ -1372,6 +1513,49 @@ describe("CatalogsService.seedIfEmpty", () => {
             payload: {
               after: { nombre: "Cerrado", orden: 2, activo: true, clave: "CERRADO" },
             },
+          },
+        },
+      ],
+      "admin-1",
+    );
+  });
+
+  it("Tipos de ticket: escribe la descripción y la deja en la auditoría; sin ella, null", async () => {
+    const { service, seedIfEmpty } = buildSeedService(2);
+
+    await service.seedIfEmpty(
+      tipos,
+      [{ nombre: "Incidente", descripcion: "Algo falló" }, { nombre: "Consulta" }],
+      "admin-1",
+    );
+
+    expect(seedIfEmpty).toHaveBeenCalledWith(
+      tipos,
+      [
+        {
+          data: {
+            nombre: "Incidente",
+            nombreNormalizado: "incidente",
+            orden: 1,
+            activo: true,
+            descripcion: "Algo falló",
+          },
+          audit: {
+            entityType: "TipoTicket",
+            action: "create",
+            actorId: null,
+            payload: {
+              after: { nombre: "Incidente", orden: 1, activo: true, descripcion: "Algo falló" },
+            },
+          },
+        },
+        {
+          data: { nombre: "Consulta", nombreNormalizado: "consulta", orden: 2, activo: true },
+          audit: {
+            entityType: "TipoTicket",
+            action: "create",
+            actorId: null,
+            payload: { after: { nombre: "Consulta", orden: 2, activo: true, descripcion: null } },
           },
         },
       ],
