@@ -1,0 +1,66 @@
+[
+  {
+    "nombre": "Incidente / Falla",
+    "descripcion": "Algo que funcionaba dejó de funcionar; incluye bugs no diagnosticados. Ej.: La web no responde; el correo no envía."
+  },
+  {
+    "nombre": "Corrección de errores",
+    "descripcion": "Arreglo de un bug ya reportado o identificado. Ej.: Un botón guarda mal; un cálculo muestra un dato incorrecto."
+  },
+  {
+    "nombre": "Mejora / Cambio",
+    "descripcion": "Funcionalidad nueva o modificación de una existente. Ej.: Agregar un reporte; cambiar un flujo de trabajo."
+  },
+  {
+    "nombre": "Actualización",
+    "descripcion": "Versiones, parches y renovación de certificado SSL. Ej.: Actualizar el sistema; renovar el SSL de la web."
+  },
+  {
+    "nombre": "Configuración / Parametrización",
+    "descripcion": "Ajustar la configuración de algo que ya existe. Ej.: Configurar una regla de correo; parametrizar un firewall."
+  },
+  {
+    "nombre": "Migración",
+    "descripcion": "Mover datos, sistemas o servicios de un entorno a otro. Ej.: Migrar correos a otro servidor; mover una base de datos."
+  },
+  {
+    "nombre": "Instalación / Alta",
+    "descripcion": "Puesta en marcha de algo nuevo. Ej.: Servidor nuevo; cableado; cuenta de correo."
+  },
+  {
+    "nombre": "Baja / Desactivación",
+    "descripcion": "Dar de baja o retirar un servicio, cuenta o equipo. Ej.: Dar de baja una cuenta; retirar un servidor."
+  },
+  {
+    "nombre": "Mantenimiento programado",
+    "descripcion": "Trabajo planificado y recurrente. Ej.: Backup de servidores; revisión preventiva."
+  },
+  {
+    "nombre": "Recuperación / Restauración",
+    "descripcion": "Recuperar datos o servicios después de una pérdida o falla. Ej.: Restaurar un backup; recuperar datos borrados."
+  },
+  {
+    "nombre": "Consulta / Verificación",
+    "descripcion": "Pedir que revisen o confirmen algo puntual. Ej.: Verificar que el backup corrió; confirmar una versión."
+  },
+  {
+    "nombre": "Relevamiento / Asesoramiento",
+    "descripcion": "Analizar una necesidad y proponer una solución. Ej.: Relevar la red para una ampliación; asesorar sobre una renovación."
+  },
+  {
+    "nombre": "Capacitación",
+    "descripcion": "Formación o acompañamiento para usar una herramienta. Ej.: Capacitar en el nuevo sistema; explicar el uso del correo."
+  },
+  {
+    "nombre": "Auditoría / Revisión",
+    "descripcion": "Revisión formal de configuraciones, accesos o seguridad. Ej.: Auditoría de accesos; revisión de vulnerabilidades."
+  },
+  {
+    "nombre": "Gestión administrativa",
+    "descripcion": "Trámites comerciales o administrativos. Ej.: Renovar un contrato; gestionar una factura."
+  },
+  {
+    "nombre": "Otro / Sin clasificar",
+    "descripcion": "Solo si no encaja en ninguno; aclarar en el título. Ej.: Pedido atípico o mixto."
+  }
+]

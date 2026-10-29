@@ -28,14 +28,17 @@ import {
   requireSeedFile,
   resolveSeedAreas,
   resolveSeedModulos,
+  resolveSeedTiposTicket,
   type SeedAgent,
   type SeedArea,
   type SeedModulo,
+  type SeedTipoTicket,
   seedUsername,
   tiposAreaSchema,
+  tiposTicketSchema,
 } from "./seed-data";
 
-// Los datos iniciales (departamentos, estados, prioridades, tipos de área, edificios, áreas, módulos y agentes) son archivos
+// Los datos iniciales (departamentos, estados, prioridades, tipos de área, tipos de ticket, edificios, áreas, módulos y agentes) son archivos
 // de `seed-data/`, no constantes: ver `seed-data/README.md`.
 interface SeedData {
   departamentos: string[];
@@ -43,6 +46,7 @@ interface SeedData {
   prioridades: { nombre: string }[];
   edificios: { nombre: string }[] | null;
   tiposArea: { nombre: string }[] | null;
+  tiposTicket: SeedTipoTicket[] | null;
   areas: SeedArea[] | null;
   modulos: SeedModulo[] | null;
   agentes: SeedAgent[] | null;
@@ -59,6 +63,7 @@ function loadSeedData(dir: string): SeedData {
     prioridades: toItems(requireSeedFile(dir, "prioridades.json", prioridadesSchema)) ?? [],
     edificios: toItems(readSeedFile(dir, "edificios.json", edificiosSchema)),
     tiposArea: toItems(readSeedFile(dir, "tipos-area.json", tiposAreaSchema)),
+    tiposTicket: readSeedFile(dir, "tipos-ticket.json", tiposTicketSchema),
     areas: readSeedFile(dir, "areas.json", areasSchema),
     modulos: readSeedFile(dir, "modulos.json", modulosSchema),
     agentes: readSeedFile(dir, "agentes.json", agentesSchema),
@@ -206,6 +211,19 @@ async function seedAreas(
   return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.areas, items, adminId);
 }
 
+// Los tipos de ticket se cargan solo si la tabla está vacía (SPEC 12). Antes se valida que no haya
+// nombres repetidos, y si los hay aborta sin crear ninguno. Con la tabla ya cargada no se mira el
+// archivo: no completa ni actualiza la descripción de tipos existentes.
+async function seedTiposTicket(
+  catalogs: CatalogsService,
+  tipos: SeedTipoTicket[] | null,
+  adminId: string,
+): Promise<number | null> {
+  if (!tipos) return null;
+  if (!(await catalogs.isEmpty(CATALOG_DEFINITIONS.tipos))) return 0;
+  return catalogs.seedIfEmpty(CATALOG_DEFINITIONS.tipos, resolveSeedTiposTicket(tipos), adminId);
+}
+
 // Los módulos se cargan solo si la tabla está vacía (SPEC 11). Antes se resuelven los departamentos de
 // cada uno contra la base ya cargada, y cualquier departamento inexistente, módulo sin departamentos o
 // nombre repetido aborta sin crear ninguno. Con la tabla ya cargada no se mira el archivo.
@@ -232,6 +250,7 @@ async function seedCatalogs(
   estados: number;
   prioridades: number;
   tiposArea: number | null;
+  tiposTicket: number | null;
   areas: number | null;
   edificios: number | null;
   modulos: number | null;
@@ -250,6 +269,7 @@ async function seedCatalogs(
     estados,
     prioridades,
     tiposArea,
+    tiposTicket: await seedTiposTicket(catalogs, data.tiposTicket, adminId),
     areas: await seedAreas(catalogs, data.areas, adminId),
     edificios: await load(CATALOG_DEFINITIONS.edificios, data.edificios),
     modulos: await seedModulos(catalogs, data.modulos, departamentos, adminId),
@@ -390,6 +410,7 @@ async function main() {
   report("Estados", "creados", catalogs.estados, "estados.json");
   report("Prioridades", "creadas", catalogs.prioridades, "prioridades.json");
   report("Tipos de área", "creados", catalogs.tiposArea, "tipos-area.json");
+  report("Tipos de ticket", "creados", catalogs.tiposTicket, "tipos-ticket.json");
   report("Áreas", "creadas", catalogs.areas, "areas.json");
   report("Edificios", "creados", catalogs.edificios, "edificios.json");
   report("Módulos", "creados", catalogs.modulos, "modulos.json");

@@ -12,6 +12,15 @@ export const departamentosSchema = nombres;
 export const prioridadesSchema = nombres;
 export const edificiosSchema = nombres;
 export const tiposAreaSchema = nombres;
+// SPEC 12: cada tipo de ticket trae una descripción opcional, de hasta 500 como en el catálogo.
+export const tiposTicketSchema = z
+  .array(
+    z.object({
+      nombre: z.string().trim().min(1).max(120),
+      descripcion: z.string().trim().max(500).optional(),
+    }),
+  )
+  .min(1);
 // Cada área nombra su tipo (SPEC 08); el tipo tiene que existir en `tipos-area.json` o en la base.
 export const areasSchema = z
   .array(
@@ -47,6 +56,30 @@ export const agentesSchema = z
 export type SeedAgent = z.infer<typeof agentesSchema>[number];
 export type SeedArea = z.infer<typeof areasSchema>[number];
 export type SeedModulo = z.infer<typeof modulosSchema>[number];
+export type SeedTipoTicket = z.infer<typeof tiposTicketSchema>[number];
+
+// Aborta antes de crear nada, nombrando los valores, si dos tipos de ticket comparten nombre
+// normalizado (el índice único rechazaría el segundo a mitad de la carga). Una descripción en blanco
+// se descarta: el tipo queda sin descripción.
+export function resolveSeedTiposTicket(
+  tipos: readonly SeedTipoTicket[],
+): { nombre: string; descripcion?: string }[] {
+  const seen = new Set<string>();
+  const repeated: string[] = [];
+  for (const tipo of tipos) {
+    const key = normalizeName(tipo.nombre);
+    if (seen.has(key)) repeated.push(`"${tipo.nombre}"`);
+    seen.add(key);
+  }
+  if (repeated.length > 0) {
+    throw new Error(`tipos-ticket.json repite tipos de ticket: ${repeated.join(", ")}`);
+  }
+
+  return tipos.map((tipo) => ({
+    nombre: tipo.nombre,
+    ...(tipo.descripcion ? { descripcion: tipo.descripcion } : {}),
+  }));
+}
 
 // Resuelve el `tipo` de cada área contra los tipos que ya están en la base. Aborta antes de crear
 // nada si algún tipo no existe o si dos áreas comparten nombre normalizado dentro de un mismo tipo

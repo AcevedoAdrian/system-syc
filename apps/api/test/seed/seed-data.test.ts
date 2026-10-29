@@ -10,8 +10,10 @@ import {
   requireSeedFile,
   resolveSeedAreas,
   resolveSeedModulos,
+  resolveSeedTiposTicket,
   seedUsername,
   tiposAreaSchema,
+  tiposTicketSchema,
 } from "@/seed-data";
 
 function tmp(): string {
@@ -210,6 +212,66 @@ describe("modulosSchema", () => {
       false,
     );
     expect(modulosSchema.safeParse([{ nombre: "X" }]).success).toBe(false);
+  });
+});
+
+describe("tiposTicketSchema", () => {
+  it("recorta nombre y descripción, y la descripción es opcional", () => {
+    expect(
+      tiposTicketSchema.parse([
+        { nombre: " Incidente ", descripcion: "  Algo falló  " },
+        { nombre: "Consulta" },
+      ]),
+    ).toEqual([{ nombre: "Incidente", descripcion: "Algo falló" }, { nombre: "Consulta" }]);
+  });
+
+  it("rechaza un archivo vacío, un tipo sin nombre y una descripción de más de 500", () => {
+    expect(tiposTicketSchema.safeParse([]).success).toBe(false);
+    expect(tiposTicketSchema.safeParse([{ descripcion: "x" }]).success).toBe(false);
+    expect(
+      tiposTicketSchema.safeParse([{ nombre: "Incidente", descripcion: "a".repeat(501) }]).success,
+    ).toBe(false);
+  });
+
+  it("el archivo tipos-ticket.json se lee con readSeedFile y falta sin error", () => {
+    const dir = tmp();
+    expect(readSeedFile(dir, "tipos-ticket.json", tiposTicketSchema)).toBeNull();
+
+    writeFileSync(
+      path.join(dir, "tipos-ticket.json"),
+      JSON.stringify([{ nombre: "Incidente", descripcion: "Algo falló" }]),
+    );
+
+    expect(readSeedFile(dir, "tipos-ticket.json", tiposTicketSchema)).toEqual([
+      { nombre: "Incidente", descripcion: "Algo falló" },
+    ]);
+  });
+});
+
+describe("resolveSeedTiposTicket", () => {
+  it("conserva el orden y la descripción, y descarta una en blanco", () => {
+    expect(
+      resolveSeedTiposTicket([
+        { nombre: "Incidente", descripcion: "Algo falló" },
+        { nombre: "Consulta", descripcion: "" },
+        { nombre: "Pedido" },
+      ]),
+    ).toEqual([
+      { nombre: "Incidente", descripcion: "Algo falló" },
+      { nombre: "Consulta" },
+      { nombre: "Pedido" },
+    ]);
+  });
+
+  it("aborta nombrando los tipos repetidos, sin importar mayúsculas ni acentos", () => {
+    expect(() =>
+      resolveSeedTiposTicket([
+        { nombre: "Instalación" },
+        { nombre: "Consulta" },
+        { nombre: "INSTALACION" },
+        { nombre: " consulta " },
+      ]),
+    ).toThrow('tipos-ticket.json repite tipos de ticket: "INSTALACION", " consulta "');
   });
 });
 
