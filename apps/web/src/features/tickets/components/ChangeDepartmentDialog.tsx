@@ -105,6 +105,9 @@ function DepartmentForm({
         </div>
       )}
       <DialogFooter>
+        <Button type="button" variant="outline" onClick={onDone} disabled={pending}>
+          Cancelar
+        </Button>
         <Button type="submit" disabled={pending}>
           {pending ? "Cambiando…" : "Cambiar departamento"}
         </Button>

@@ -103,6 +103,16 @@ describe("ChangeDepartmentDialog", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
+  it("«Cancelar» cierra el diálogo sin cambiar nada", async () => {
+    renderDialog();
+
+    await userEvent.selectOptions(screen.getByLabelText("Nuevo departamento"), "red");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mocks.change).not.toHaveBeenCalled();
+  });
+
   it("sin elegir un departamento no envía", async () => {
     renderDialog();
 

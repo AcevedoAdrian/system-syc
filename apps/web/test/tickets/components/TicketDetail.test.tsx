@@ -154,23 +154,21 @@ describe("TicketDetail", () => {
   });
 
   describe("diseño (SPEC 09, etapa 9.5)", () => {
-    it("el título lleva el número y el título del ticket, y la bajada explica los campos obligatorios", () => {
+    it("el título lleva el número y el título del ticket, sin bajada", () => {
       show(makeTicket({ numero: 13, titulo: "Impresora rota" }));
 
       expect(
         screen.getByRole("heading", { level: 1, name: "TE-000013 · Impresora rota" }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText("Actualizá los datos del ticket. Los campos con * son obligatorios."),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(/Actualizá los datos del ticket/)).not.toBeInTheDocument();
     });
 
-    it("bajo el título muestra el estado, como píldora, y el departamento", () => {
+    it("el encabezado no repite el estado ni el departamento", () => {
       show(makeTicket());
 
       const encabezado = screen.getByRole("banner");
-      expect(within(encabezado).getByText("Pendiente")).toHaveClass("rounded-full");
-      expect(within(encabezado).getByText("Técnico")).toBeInTheDocument();
+      expect(within(encabezado).queryByText("Pendiente")).not.toBeInTheDocument();
+      expect(within(encabezado).queryByText("Técnico")).not.toBeInTheDocument();
     });
 
     it("tiene las pestañas Datos, Comentarios e Historial, con Datos activa", () => {
@@ -252,14 +250,12 @@ describe("TicketDetail", () => {
   });
 
   describe("encabezado y partes", () => {
-    it("muestra el número formateado, el título, el estado y el departamento", () => {
+    it("muestra el número formateado y el título", () => {
       show(makeTicket({ numero: 13 }));
 
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
         "TE-000013 · Impresora rota",
       );
-      expect(screen.getByText("Pendiente")).toBeInTheDocument();
-      expect(screen.getByText("Técnico")).toBeInTheDocument();
     });
 
     it("un título larguísimo se parte en líneas en vez de desbordar la pantalla", () => {
