@@ -196,6 +196,26 @@ Cada módulo pasa a pertenecer a uno o más departamentos, y un ticket solo admi
 3. Si por algún motivo la tabla `modulo` ya tuviera filas, el seed no las completa (carga solo en una tabla vacía) y esos módulos quedan sin departamentos: no aparecen en ningún selector ni en la lista de un agente. El admin los edita en **Catálogos → Módulos** y elige al menos un departamento en cada uno.
 4. Un departamento que se cree después empieza **sin módulos**: sus agentes ven la lista vacía hasta que el admin lo tilda en cada módulo desde **Catálogos → Módulos**. No hay asignación masiva.
 
+### Deploy que trae la descripción del tipo de ticket (SPEC 12)
+
+Cada tipo de ticket pasa a tener una descripción opcional, que se ve como ayuda al elegirlo en el alta. La migración `descripcion_tipo_ticket` solo agrega la columna: los tipos que ya existen quedan con la descripción vacía. Qué hacer depende de si producción ya tiene tipos de ticket:
+
+- **Si ya tiene tipos de ticket** (los cargó el admin a mano): el seed **no** los toca, porque la tabla `tipo_ticket` no está vacía (la regla de «solo si la tabla está vacía»). Correrlo no rompe nada, pero tampoco carga las descripciones. El admin las completa en **Catálogos → Tipos de ticket**, editando cada tipo. El texto de referencia está en `seed-data/tipos-ticket.json`.
+- **Si no tiene ninguno**: después del paso 4 del deploy regular, corré el seed para cargarlos con su descripción.
+
+  1. Volvé a poner en el `.env` las variables del seed (`SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD` y `SEED_ADMIN_NAME`, las del admin que ya existe: el seed las exige aunque no cambia la contraseña de un admin existente). Verificá que `seed-data/tipos-ticket.json` esté en el clon (viene en git con el tag).
+  2. Corré el seed y borrá las variables, como en el primer deploy:
+
+     ```bash
+     docker compose -f docker-compose.prod.yml run --rm api node dist/seed.mjs
+     sed -i '/^SEED_/d' .env
+     docker compose -f docker-compose.prod.yml up -d
+     ```
+
+     Tiene que informar `Tipos de ticket creados: N.`. Todo lo demás lo salta («la tabla ya tenía datos»). Si dos tipos del archivo tienen el mismo nombre (sin mayúsculas ni acentos), el seed aborta nombrándolos y no crea ninguno.
+
+Sin el archivo, el seed avisa «no hay seed-data/tipos-ticket.json» y sigue: los tipos se cargan entonces desde la pantalla.
+
 ## Volver atrás
 
 Elegí según si el deploy fallido aplicó migraciones nuevas. Ante la duda, usá la segunda opción.

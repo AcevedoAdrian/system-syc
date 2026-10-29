@@ -58,6 +58,7 @@ export interface TicketCreateData {
   departamentoId: string;
   prioridadId: string;
   estadoId: string;
+  tipoId: string | null;
   moduloId: string | null;
   proveedorId: string | null;
   titulo: string;

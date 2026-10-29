@@ -10,6 +10,7 @@ que el seed lee al correr; no forman parte del código.
 | `prioridades.json` | Nombres | sí | sí |
 | `edificios.json` | Nombres | no | sí |
 | `tipos-area.json` | Nombres de los tipos de área (Diputado, Dirección…) | no | sí |
+| `tipos-ticket.json` | `{ nombre, descripcion? }`; la descripción (hasta 500) es la ayuda que se ve al elegir el tipo en el alta | no | sí |
 | `areas.json` | `{ tipo, nombre }`; el `tipo` es uno de `tipos-area.json` | no | **no** (`.gitignore`) |
 | `modulos.json` | `{ nombre, departamentos }`; `departamentos` es una lista de uno o más de `departamentos.json` | no | sí |
 | `agentes.json` | `{ nombre, apellido, departamento }` | no | **no** (`.gitignore`) |
@@ -20,6 +21,10 @@ que el seed lee al correr; no forman parte del código.
   áreas. Un catálogo (tipos o áreas) solo se carga si su tabla está vacía: en una base con áreas ya
   cargadas (por ejemplo después de la migración `tipos_area`, que las deja todas en «Otro») el seed no
   las toca.
+- Los tipos de ticket se cargan solo si la tabla `tipo_ticket` está vacía (eliminados incluidos), con su
+  descripción en el `AuditLog`. Si dos tipos repiten el nombre (sin mayúsculas ni acentos), el seed
+  aborta nombrándolos y no crea tipos. En una base con tipos ya cargados el seed no los toca, ni
+  completa ni actualiza su descripción: eso se hace desde Catálogos → Tipos de ticket.
 - Cada módulo nombra los `departamentos` a los que pertenece (uno o más), que se buscan por nombre sin
   mayúsculas ni acentos. Si un departamento no existe, un módulo trae la lista vacía o dos módulos
   repiten el nombre, el seed aborta nombrando los valores y no crea módulos. Se carga después de los

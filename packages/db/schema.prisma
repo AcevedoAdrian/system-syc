@@ -248,6 +248,7 @@ model TipoTicket {
   updatedBy         String
   editor            User      @relation("TipoTicketEditor", fields: [updatedBy], references: [id], onDelete: Restrict)
   deletedAt         DateTime?
+  descripcion       String? // texto libre, hasta 500; en blanco = null
   tickets           Ticket[]
 
   @@map("tipo_ticket")

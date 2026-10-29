@@ -8,6 +8,7 @@ import {
   catalogsContract,
   moduloInputSchema,
   proveedorInputSchema,
+  tipoTicketInputSchema,
 } from "../src/catalogs.js";
 
 describe("proveedorInputSchema", () => {
@@ -124,6 +125,40 @@ describe("moduloInputSchema", () => {
   });
 });
 
+describe("tipoTicketInputSchema", () => {
+  it("guarda la descripción recortada", () => {
+    expect(tipoTicketInputSchema.parse({ nombre: "Incidente", descripcion: "  Texto  " })).toEqual({
+      nombre: "Incidente",
+      descripcion: "Texto",
+    });
+  });
+
+  it("guarda null si la descripción falta o está en blanco", () => {
+    expect(tipoTicketInputSchema.parse({ nombre: "Incidente" }).descripcion).toBeNull();
+    expect(
+      tipoTicketInputSchema.parse({ nombre: "Incidente", descripcion: "   " }).descripcion,
+    ).toBeNull();
+    expect(
+      tipoTicketInputSchema.parse({ nombre: "Incidente", descripcion: null }).descripcion,
+    ).toBeNull();
+  });
+
+  it("acepta 500 caracteres y rechaza 501", () => {
+    const con = (n: number) => ({ nombre: "Incidente", descripcion: "a".repeat(n) });
+
+    expect(tipoTicketInputSchema.safeParse(con(500)).success).toBe(true);
+    expect(tipoTicketInputSchema.safeParse(con(501)).success).toBe(false);
+  });
+
+  it("cuenta el largo después de recortar los espacios", () => {
+    const descripcion = ` ${"a".repeat(500)} `;
+
+    expect(tipoTicketInputSchema.safeParse({ nombre: "Incidente", descripcion }).success).toBe(
+      true,
+    );
+  });
+});
+
 describe("areaLabel", () => {
   it("formatea «Tipo · Nombre»", () => {
     expect(areaLabel({ nombre: "Acosta", tipo: { nombre: "Diputado" } })).toBe("Diputado · Acosta");
@@ -147,6 +182,7 @@ describe("tipos del contrato", () => {
       tipoId: string;
       itemId: string;
     }>();
+    expectTypeOf<Inputs<typeof catalogsContract.tipos.update>>().toHaveProperty("descripcion");
     expectTypeOf<Inputs<typeof catalogsContract.proveedores.update>>().toHaveProperty("itemId");
     expectTypeOf<Inputs<typeof catalogsContract.proveedores.update>>().toHaveProperty("correo");
   });

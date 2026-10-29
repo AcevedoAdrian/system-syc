@@ -19,11 +19,23 @@ const mocks = vi.hoisted(() => ({
     ],
     proveedores: [{ id: "acme", nombre: "Acme" }],
     modulos: [{ id: "serv", nombre: "Servidores" }],
-  } as Record<string, { id: string; nombre: string }[]>,
+    tipos: [
+      { id: "inc", nombre: "Incidente", descripcion: "Algo que funcionaba dejó de funcionar." },
+      { id: "mejora", nombre: "Mejora", descripcion: null },
+    ],
+  } as Record<string, { id: string; nombre: string; descripcion?: string | null }[]>,
+  // La lista de tipos todavía no llegó (el selector ya se muestra, sin ayuda).
+  tiposPending: false,
 }));
 
 // Los puntos de color salen de los catálogos; su lógica tiene sus propios tests.
 vi.mock("@/features/catalogs/hooks/useCatalog", () => ({ useCatalog: () => ({ data: [] }) }));
+// La ayuda del tipo sale de la misma lista que llena el selector.
+vi.mock("@/features/catalogs/hooks/useCatalogOptions", () => ({
+  useCatalogOptions: (ruta: string) => ({
+    data: ruta === "tipos" && mocks.tiposPending ? undefined : (mocks.options[ruta] ?? []),
+  }),
+}));
 vi.mock("@/features/auth/hooks/useCurrentUser", () => ({
   useCurrentUser: () => ({ data: mocks.user }),
 }));
@@ -120,9 +132,10 @@ describe("CreateTicketForm", () => {
     mocks.create.mockReset();
     mocks.create.mockResolvedValue(created);
     mocks.navigate.mockReset();
+    mocks.tiposPending = false;
   });
 
-  it("no pide estado, número, área, edificio, tipo ni nada del cierre", () => {
+  it("no pide estado, número, área, edificio ni nada del cierre", () => {
     render(<CreateTicketForm />);
 
     for (const label of [
@@ -130,7 +143,6 @@ describe("CreateTicketForm", () => {
       "Número",
       "Área",
       "Edificio",
-      "Tipo",
       "Fecha de cierre",
       "Fecha de reapertura",
       "Solución",
@@ -140,6 +152,7 @@ describe("CreateTicketForm", () => {
     }
     for (const label of [
       "Título",
+      "Tipo de ticket",
       "Prioridad",
       "Módulo",
       "Fecha de recepción",
@@ -316,6 +329,7 @@ describe("CreateTicketForm", () => {
         titulo: "Impresora rota",
         descripcion: null,
         prioridadId: "alta",
+        tipoId: null,
         moduloId: null,
         fechaRecepcion: hoyArgentina(),
         actuacionSimple: null,
@@ -329,6 +343,137 @@ describe("CreateTicketForm", () => {
           params: { ticketId: "t-77" },
         }),
       );
+    });
+  });
+
+  describe("tipo de ticket (SPEC 12)", () => {
+    const INC = "Algo que funcionaba dejó de funcionar.";
+
+    it("los campos van en este orden: Tipo, Módulo, Prioridad, Fecha de recepción, Descripción", () => {
+      render(<CreateTicketForm />);
+
+      const datos = screen.getByRole("region", { name: "Datos del ticket" });
+      const posicion = (label: string) =>
+        Array.from(datos.querySelectorAll("label")).findIndex((l) =>
+          l.textContent?.startsWith(label),
+        );
+      const orden = [
+        "Título",
+        "Tipo de ticket",
+        "Módulo",
+        "Prioridad",
+        "Fecha de recepción",
+        "Descripción",
+      ];
+      const posiciones = orden.map(posicion);
+
+      expect(posiciones.every((p) => p >= 0)).toBe(true);
+      expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b));
+    });
+
+    it("Tipo y Módulo comparten fila, y Prioridad y Fecha la de abajo", () => {
+      render(<CreateTicketForm />);
+
+      const fila = (label: string) => screen.getByLabelText(label).closest(".grid");
+      expect(fila("Tipo de ticket")).toBe(fila("Módulo"));
+      expect(fila("Prioridad")).toBe(fila("Fecha de recepción"));
+      const grilla = fila("Tipo de ticket") as HTMLElement;
+      const campos = Array.from(grilla.children).map(
+        (campo) => campo.querySelector("select, input")?.id,
+      );
+      expect(campos).toEqual(["tipoId", "moduloId", "prioridadId", "fechaRecepcion"]);
+    });
+
+    it("es opcional: «Sin asignar» y no está marcado como obligatorio", () => {
+      render(<CreateTicketForm />);
+
+      const tipo = screen.getByLabelText("Tipo de ticket");
+      expect(tipo).toHaveValue("");
+      expect(within(tipo).getByRole("option", { name: "Sin asignar" })).toBeInTheDocument();
+      expect(tipo).not.toBeRequired();
+      expect(tipo).not.toHaveAttribute("aria-required");
+    });
+
+    it("al elegir un tipo con descripción la muestra como ayuda bajo el campo", async () => {
+      render(<CreateTicketForm />);
+      expect(screen.queryByText(INC)).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
+
+      expect(screen.getByText(INC)).toBeVisible();
+      expect(screen.getByLabelText("Tipo de ticket")).toHaveAccessibleDescription(INC);
+    });
+
+    it("al pasar a «Sin asignar» o a un tipo sin descripción la ayuda desaparece", async () => {
+      render(<CreateTicketForm />);
+      const tipo = screen.getByLabelText("Tipo de ticket");
+      await userEvent.selectOptions(tipo, "inc");
+      expect(screen.getByText(INC)).toBeVisible();
+
+      await userEvent.selectOptions(tipo, "mejora");
+      expect(screen.queryByText(INC)).not.toBeInTheDocument();
+      expect(tipo).not.toHaveAccessibleDescription(expect.stringContaining("funcionaba"));
+
+      await userEvent.selectOptions(tipo, "inc");
+      await userEvent.selectOptions(tipo, "");
+      expect(screen.queryByText(INC)).not.toBeInTheDocument();
+    });
+
+    it("con la lista de tipos sin llegar, el campo se muestra sin ayuda ni error", async () => {
+      mocks.tiposPending = true;
+      render(<CreateTicketForm />);
+
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
+
+      expect(screen.queryByText(INC)).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Tipo de ticket")).not.toBeInvalid();
+      expect(screen.getByLabelText("Tipo de ticket")).not.toHaveAccessibleDescription();
+    });
+
+    it("se manda con el alta", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "La web no responde");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({ tipoId: "inc" });
+    });
+
+    it("volver a «Sin asignar» manda null", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "La web no responde");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+      expect(mocks.create.mock.calls[0]?.[0]).toMatchObject({ tipoId: null });
+    });
+
+    it("un 400 del servidor sobre el tipo se muestra bajo el campo", async () => {
+      const mensaje = "El tipo de ticket no existe o está desactivado";
+      mocks.create.mockRejectedValue(
+        new ORPCError("BAD_REQUEST", { status: 400, message: mensaje }),
+      );
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "La web no responde");
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+      await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
+      await userEvent.click(screen.getByRole("button", { name: "Crear ticket" }));
+
+      expect(await screen.findByText(mensaje)).toBeVisible();
+      expect(screen.getByLabelText("Tipo de ticket")).toHaveAccessibleDescription(
+        expect.stringContaining(mensaje),
+      );
+      // Solo bajo el campo: no se repite en la barra de acciones.
+      expect(screen.getAllByText(mensaje)).toHaveLength(1);
+      expect(mocks.navigate).not.toHaveBeenCalled();
     });
   });
 

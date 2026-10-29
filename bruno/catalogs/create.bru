@@ -42,7 +42,9 @@ docs {
   Contrato: `catalogs.<catálogo>.create` en `packages/contracts`.
   Método: POST
   Ruta: /catalogs/{catálogo}
-  Cuerpo: nombre (1 a 120 caracteres). Proveedores suma contacto, telefono, correo y sitioWeb,
+  Cuerpo: nombre (1 a 120 caracteres). Tipos de ticket (`tipos`) suma `descripcion`, opcional, hasta 500
+  caracteres: se recortan los espacios y en blanco se guarda null; es la ayuda que se ve al elegir el
+  tipo en el alta del ticket (el cuerpo de ejemplo no la manda). Proveedores suma contacto, telefono, correo y sitioWeb,
   todos opcionales; en blanco se guardan como null. Áreas suma `tipoId` (obligatorio): el id de un
   tipo de área activo. Módulos suma `departamentoIds` (obligatorio, al menos uno): ids de
   departamentos activos, que se toman de la variable `moduloDepartamentoId` (el id de un departamento,
