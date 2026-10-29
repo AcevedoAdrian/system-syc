@@ -40,6 +40,7 @@ Entrá como `a1`.
 | 1.12 | Mirar la barra lateral | No hay «Administración» (ni Departamentos, Catálogos o Usuarios). | | |
 | 1.13 | Escribir en la barra `/admin/usuarios` (y probar `/admin/departamentos` y `/admin/catalogos`) | Vuelve a `/tickets`; no se ve ninguna pantalla de administración. | | |
 | 1.14 | En `/tickets`, abrir el filtro «Tipo de área» y, en TA, abrir el selector «Área» | El filtro ofrece los tipos de área y el selector agrupa las áreas bajo el título de su tipo. No hay forma de crear o editar tipos de área desde ahí. | | |
+| 1.15 | En `/tickets`, abrir el filtro «Módulo»; en TA, el selector «Módulo»; y en `/tickets/nuevo`, el campo «Módulo» (`catalogs.modulos.list` para un agente) | Los tres ofrecen solo los módulos que tienen el departamento A: ninguno de los que son solo de B. | | |
 
 ## 2. Agente `a1`, ticket de otro departamento (TB)
 
@@ -72,6 +73,9 @@ Salí de `a1` y entrá como admin.
 | 3.10 | En Catálogos → «Tipos de área», crear un tipo, renombrarlo, desactivarlo, reactivarlo y eliminarlo | Las cinco acciones funcionan (un tipo sin áreas se elimina). | | |
 | 3.11 | En Catálogos → «Áreas», crear un área sin elegir tipo | No se envía: pide elegir un tipo. Con tipo, se crea y la tabla muestra la columna Tipo. | | |
 | 3.12 | Intentar eliminar un tipo de área que tiene al menos un área | Se rechaza: «Lo usa al menos un área: desactivalo en lugar de eliminarlo». Desactivarlo sí funciona. | | |
+| 3.13 | En Catálogos → «Módulos», crear un módulo sin tildar ningún departamento; después tildar A y B | Sin casillas no se envía: pide elegir al menos un departamento. Con A y B se crea y la tabla muestra «A, B» en la columna Departamentos. | | |
+| 3.14 | Mirar el filtro «Módulo» de `/tickets` y, en `/tickets/nuevo`, el selector «Módulo» eligiendo el departamento B | El filtro ofrece todos los módulos (los de A y los de B). El selector del alta, con B elegido, ofrece solo los de B, y cambiar el departamento vacía el módulo elegido. | | |
+| 3.15 | En un ticket de A con un módulo que solo tiene A, «Cambiar departamento» → B | El diálogo avisa que el ticket queda sin módulo si B no lo tiene. Al confirmar, el ticket pasa a B sin módulo. Volverlo a A. | | |
 
 ## 4. Después de cambiar de departamento
 
