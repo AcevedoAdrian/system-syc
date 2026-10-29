@@ -23,6 +23,6 @@ COPY packages/contracts packages/contracts
 # `VITE_API_URL` llega como variable de entorno del build, que Vite prefiere a cualquier `.env`.
 RUN pnpm --filter @syc/web build
 
-FROM nginx:1.30.6-alpine
+FROM nginx:1.31.0-alpine
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
