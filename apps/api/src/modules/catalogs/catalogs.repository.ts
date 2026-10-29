@@ -2,13 +2,20 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORPCError } from "@orpc/server";
 import { getPrismaClient } from "@syc/db";
 import { notDeleted, softDeleteData } from "../../common/soft-delete";
+import { normalizeName } from "../../common/text";
 import { ENV } from "../../config/config.module";
 import type { Env } from "../../config/env.schema";
 import { type AuditEntry, type AuditTransaction, writeAuditEntry } from "../audit/audit.repository";
-import type { CatalogDefinition, CatalogModel } from "./catalog-definitions";
+import type { CatalogDefinition, CatalogLinks, CatalogModel } from "./catalog-definitions";
 
-// `{ id, nombre }` es la relación de una referencia (`tipo` de un área).
-type CatalogValue = string | number | boolean | null | { id: string; nombre: string };
+export interface RelatedItem {
+  id: string;
+  nombre: string;
+}
+
+// `{ id, nombre }` es la relación de una referencia (`tipo` de un área); la lista, la de un vínculo
+// muchos a muchos (`departamentos` de un módulo).
+type CatalogValue = string | number | boolean | null | RelatedItem | RelatedItem[];
 
 // Fila de cualquiera de los 8 catálogos: la base más los campos extra de su definición
 // (`contacto`, `clave`, ...), que dependen del catálogo.
@@ -46,6 +53,16 @@ export interface OrdenChange {
 // Los 7 delegados de Prisma tienen la misma forma para lo que se usa acá, pero TypeScript no los
 // unifica. Esta interfaz es el único punto donde se afloja el tipado: los datos que entran ya los
 // armó el service a partir de los campos de la definición.
+// El destino de un vínculo y su tabla de unión, con lo mismo: el único punto donde se afloja el tipado
+// de esas dos tablas.
+interface LinkTargetDelegate {
+  findMany(args: { where: object; select: object }): Promise<Record<string, unknown>[]>;
+}
+
+interface LinkJoinDelegate {
+  deleteMany(args: { where: object }): Promise<unknown>;
+}
+
 interface CatalogDelegate {
   findFirst(args: { where: object; select: object }): Promise<ReferenceRow | null>;
   findMany(args: { where: object; orderBy: object[]; select: object }): Promise<CatalogRow[]>;
@@ -62,7 +79,38 @@ function selectOf(def: CatalogDefinition): Record<string, unknown> {
     select[def.reference.field] = true;
     select[def.reference.as] = { select: { id: true, nombre: true } };
   }
+  // Las filas de la unión con el destino de cada una; `readLinks` las aplana a `{ id, nombre }`.
+  if (def.links) {
+    const { as, target, targetName } = def.links;
+    select[as] = { select: { [target]: { select: { id: true, [targetName]: true } } } };
+  }
   return select;
+}
+
+// Por nombre normalizado y, si empatan, por id: el orden de la salida y del diff de la auditoría.
+export function sortRelated(items: readonly RelatedItem[]): RelatedItem[] {
+  return [...items].sort(
+    (a, b) =>
+      normalizeName(a.nombre).localeCompare(normalizeName(b.nombre)) || a.id.localeCompare(b.id),
+  );
+}
+
+// Aplana la relación de un vínculo (`[{ organization: { id, name } }]`) a `[{ id, nombre }]` ordenada.
+function readLinks(def: CatalogDefinition, row: CatalogRow): CatalogRow {
+  const links = def.links;
+  if (!links) return row;
+  const joins = row[links.as] as unknown as Record<string, Record<string, string>>[];
+  const items = joins.map((join) => {
+    const target = join[links.target] as Record<string, string>;
+    return { id: target.id as string, nombre: target[links.targetName] as string };
+  });
+  return { ...row, [links.as]: sortRelated(items) };
+}
+
+// Escribe la lista entera de la unión dentro del `create` o el `update` del ítem (una sola operación).
+function writeLinks(links: CatalogLinks, ids: readonly string[], replace: boolean) {
+  const create = ids.map((id) => ({ [links.targetFk]: id }));
+  return { [links.as]: replace ? { deleteMany: {}, create } : { create } };
 }
 
 function hasCode(error: unknown, code: string): boolean {
@@ -108,13 +156,28 @@ export class CatalogsRepository {
     });
   }
 
+  // Los destinos de un vínculo que existen (activos o no), para validar la lista que llega.
+  async findLinkTargets(links: CatalogLinks, ids: readonly string[]): Promise<ReferenceRow[]> {
+    const delegate = this.db[links.target] as unknown as LinkTargetDelegate;
+    const rows = await delegate.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, [links.targetName]: true, activo: true },
+    });
+    return rows.map((found) => ({
+      id: found.id as string,
+      nombre: found[links.targetName] as string,
+      activo: found.activo as boolean,
+    }));
+  }
+
   // No eliminados, activos e inactivos, en el orden de `list`.
   async findAll(def: CatalogDefinition): Promise<CatalogRow[]> {
-    return this.delegate(def, this.db).findMany({
+    const rows = await this.delegate(def, this.db).findMany({
       where: notDeleted,
       orderBy: [{ orden: "asc" }, { nombre: "asc" }],
       select: selectOf(def),
     });
+    return rows.map((row) => readLinks(def, row));
   }
 
   // Cada mutación escribe su `AuditLog` en la misma transacción: si falla la auditoría, falla la
@@ -124,15 +187,21 @@ export class CatalogsRepository {
     data: CatalogWrite,
     actorId: string,
     audit: Omit<AuditEntry, "entityId">,
+    linkIds: readonly string[] = [],
   ): Promise<CatalogRow> {
     try {
       return await this.db.$transaction(async (tx) => {
         const row = await this.delegate(def, tx).create({
-          data: { ...data, createdBy: actorId, updatedBy: actorId },
+          data: {
+            ...data,
+            createdBy: actorId,
+            updatedBy: actorId,
+            ...(def.links ? writeLinks(def.links, linkIds, false) : {}),
+          },
           select: selectOf(def),
         });
         await writeAuditEntry(tx, { ...audit, entityId: row.id });
-        return row;
+        return readLinks(def, row);
       });
     } catch (error) {
       return translate(def, error);
@@ -145,16 +214,22 @@ export class CatalogsRepository {
     data: CatalogWrite,
     actorId: string,
     audit: AuditEntry,
+    linkIds?: readonly string[],
   ): Promise<CatalogRow> {
     try {
       return await this.db.$transaction(async (tx) => {
         const row = await this.delegate(def, tx).update({
           where: { id, ...notDeleted },
-          data: { ...data, updatedBy: actorId },
+          // `linkIds` solo viene si el conjunto cambió: reemplaza la lista entera de la unión.
+          data: {
+            ...data,
+            updatedBy: actorId,
+            ...(def.links && linkIds ? writeLinks(def.links, linkIds, true) : {}),
+          },
           select: selectOf(def),
         });
         await writeAuditEntry(tx, audit);
-        return row;
+        return readLinks(def, row);
       });
     } catch (error) {
       return translate(def, error);
@@ -190,7 +265,9 @@ export class CatalogsRepository {
     }
   }
 
-  // Nunca hay `DELETE` físico sobre un catálogo.
+  // Nunca hay `DELETE` físico sobre un catálogo, salvo las filas de su unión: un ítem eliminado no se
+  // puede editar, y si las conservara bloquearía para siempre la eliminación de su destino (la FK
+  // `Restrict`).
   async softDelete(
     def: CatalogDefinition,
     id: string,
@@ -204,6 +281,10 @@ export class CatalogsRepository {
           data: softDeleteData(actorId),
           select: { id: true },
         });
+        if (def.links) {
+          const join = tx[def.links.join] as unknown as LinkJoinDelegate;
+          await join.deleteMany({ where: { [def.links.ownerFk]: id } });
+        }
         await writeAuditEntry(tx, audit);
       });
     } catch (error) {

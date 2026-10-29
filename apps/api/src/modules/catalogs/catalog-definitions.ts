@@ -37,6 +37,26 @@ export interface CatalogReference {
   invalid: string;
 }
 
+// Una relación muchos a muchos con otra tabla, por una tabla de unión (SPEC 11: Módulo →
+// departamentos). `field` es la lista de ids que el cliente escribe (no figura en `inputFields`),
+// `as` la relación que se lee y se audita como `[{ id, nombre }]` ordenada por nombre normalizado
+// (debe figurar en `snapshotFields` y llamarse igual que la relación de Prisma). `join` es el delegado
+// de la tabla de unión, `ownerFk` su FK hacia este catálogo y `targetFk` la FK hacia `target`, que a
+// la vez es el nombre de la relación de la unión. `targetName` es la columna del nombre en el destino
+// (`name` en Organization). El destino se borra físicamente, así que no tiene `deletedAt`. `empty` y
+// `invalid` son los 400 de una lista vacía y de un destino que no existe o está desactivado.
+export interface CatalogLinks {
+  field: string;
+  as: string;
+  join: "moduloDepartamento";
+  ownerFk: string;
+  target: "organization";
+  targetFk: string;
+  targetName: string;
+  empty: string;
+  invalid: string;
+}
+
 export interface CatalogDefinition {
   ruta: CatalogRuta;
   entityType: string; // `AuditLog.entityType`
@@ -47,6 +67,7 @@ export interface CatalogDefinition {
   // catálogo. El índice único parcial de la migración aplica la misma regla.
   uniqueWithin?: string;
   reference?: CatalogReference;
+  links?: CatalogLinks;
   // Campos que el cliente puede escribir en el alta y la edición. Todo lo demás (`orden`,
   // `nombreNormalizado`, `clave`, `createdBy`, `updatedBy`) lo decide el servidor.
   inputFields: readonly string[];
@@ -125,10 +146,26 @@ export const CATALOG_DEFINITIONS: Record<CatalogRuta, CatalogDefinition> = {
       },
     },
   },
-  modulos: simple("modulos", "Modulo", "modulo", {
-    notFound: "El módulo no existe",
-    duplicate: "Ya existe un módulo con ese nombre",
-  }),
+  // SPEC 11: pertenece a uno o más departamentos. `departamentoIds` no está en `inputFields`: es una
+  // lista, y la escribe el repository en la tabla de unión.
+  modulos: {
+    ...simple("modulos", "Modulo", "modulo", {
+      notFound: "El módulo no existe",
+      duplicate: "Ya existe un módulo con ese nombre",
+    }),
+    links: {
+      field: "departamentoIds",
+      as: "departamentos",
+      join: "moduloDepartamento",
+      ownerFk: "moduloId",
+      target: "organization",
+      targetFk: "organizationId",
+      targetName: "name",
+      empty: "Elegí al menos un departamento",
+      invalid: "El departamento no existe o está desactivado",
+    },
+    snapshotFields: [...BASE_FIELDS, "departamentos"],
+  },
   proveedores: {
     ruta: "proveedores",
     entityType: "Proveedor",

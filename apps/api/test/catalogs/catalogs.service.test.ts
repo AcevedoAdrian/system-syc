@@ -19,6 +19,7 @@ const edificios = CATALOG_DEFINITIONS.edificios;
 const proveedores = CATALOG_DEFINITIONS.proveedores;
 const estados = CATALOG_DEFINITIONS.estados;
 const prioridades = CATALOG_DEFINITIONS.prioridades;
+const modulos = CATALOG_DEFINITIONS.modulos;
 
 const admin: AuthenticatedUser = {
   id: "admin-1",
@@ -55,6 +56,7 @@ function buildService(
   const audits: AuditEntry[] = [];
   const actors: string[] = [];
   const creates: CatalogWrite[] = []; // lo que el service le pasa al repository en cada alta
+  const linkWrites: string[][] = []; // las listas de la unión que el service pide escribir
   const table = (ruta: string) => {
     if (!tables.has(ruta)) tables.set(ruta, []);
     return tables.get(ruta) as CatalogRow[];
@@ -75,6 +77,16 @@ function buildService(
     return r;
   };
   const find = (ruta: string, id: string) => table(ruta).find((r) => r.id === id) as CatalogRow;
+  // Como la base: la relación de un vínculo sale de los destinos (tabla "departamentos") a los que
+  // apuntan los ids escritos, ordenada por nombre normalizado.
+  const withLinks = (r: CatalogRow, ids: readonly string[]): CatalogRow => {
+    linkWrites.push([...ids]);
+    r.departamentos = ids
+      .map((id) => find("departamentos", id))
+      .map((d) => ({ id: d.id, nombre: d.nombre }))
+      .sort((a, b) => normalizeName(a.nombre).localeCompare(normalizeName(b.nombre)));
+    return r;
+  };
 
   const repository = {
     // Regla `usedBy`: filas no eliminadas de otro catálogo cuya FK apunta al ítem.
@@ -87,18 +99,24 @@ function buildService(
       const found = live(def?.ruta ?? "").find((r) => r.id === id);
       return found ? { id: found.id, nombre: found.nombre, activo: found.activo } : null;
     },
+    findLinkTargets: async (_links: unknown, ids: string[]) =>
+      table("departamentos")
+        .filter((d) => ids.includes(d.id))
+        .map((d) => ({ id: d.id, nombre: d.nombre, activo: d.activo })),
     findAll: async (def: { ruta: string }) => live(def.ruta).map((r) => ({ ...r })),
     create: async (
       def: { ruta: string },
       data: CatalogWrite,
       actorId: string,
       audit: Omit<AuditEntry, "entityId">,
+      linkIds: string[] = [],
     ) => {
       creates.push(data);
       const created = withRelation(def, {
         id: `${def.ruta}-${table(def.ruta).length + 1}`,
         ...data,
       } as CatalogRow);
+      if (def.ruta === "modulos") withLinks(created, linkIds);
       table(def.ruta).push(created);
       actors.push(actorId);
       audits.push({ ...audit, entityId: created.id });
@@ -110,10 +128,13 @@ function buildService(
       data: CatalogWrite,
       actorId: string,
       audit: AuditEntry,
+      linkIds?: string[],
     ) => {
       actors.push(actorId);
       audits.push(audit);
-      return { ...withRelation(def, Object.assign(find(def.ruta, id), data)) };
+      const updated = withRelation(def, Object.assign(find(def.ruta, id), data));
+      if (linkIds) withLinks(updated, linkIds);
+      return { ...updated };
     },
     setActive: async (
       def: { ruta: string },
@@ -150,6 +171,7 @@ function buildService(
     audits,
     actors,
     creates,
+    linkWrites,
     history,
     ordenes: (ruta: string) => live(ruta).map((r) => [r.id, r.orden]),
   };
@@ -670,6 +692,234 @@ describe("CatalogsService: Áreas con tipo", () => {
     await expect(
       service.update(areas, "a1", { nombre: "Acosta", tipoId: "t2" }, admin),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("CatalogsService: Módulos con departamentos", () => {
+  const desarrollo = { id: "d1", nombre: "Desarrollo" };
+  const redes = { id: "d2", nombre: "Redes" };
+  const tecnico = { id: "d3", nombre: "Técnico" };
+  const departamentos = () => [
+    row("d1", "Desarrollo", 1),
+    row("d2", "Redes", 2),
+    row("d3", "Técnico", 3),
+    row("d4", "Archivo", 4, { activo: false }),
+  ];
+  const servidores = (deps = [desarrollo, redes]) =>
+    row("m1", "Servidores", 1, { departamentos: deps });
+
+  it("list devuelve cada módulo con sus departamentos", async () => {
+    const { service } = buildService({ modulos: [servidores()] });
+
+    expect(await service.list(modulos)).toEqual([
+      {
+        id: "m1",
+        nombre: "Servidores",
+        orden: 1,
+        activo: true,
+        departamentos: [desarrollo, redes],
+      },
+    ]);
+  });
+
+  it("el alta con dos departamentos devuelve los dos ordenados y los audita", async () => {
+    const { service, audits, linkWrites } = buildService({ departamentos: departamentos() });
+
+    const created = await service.create(
+      modulos,
+      { nombre: "Servidores", departamentoIds: ["d2", "d1"] },
+      admin,
+    );
+
+    expect(created).toMatchObject({ departamentos: [desarrollo, redes] });
+    expect(linkWrites).toEqual([["d2", "d1"]]);
+    expect(audits[0]).toMatchObject({
+      entityType: "Modulo",
+      action: "create",
+      payload: {
+        after: { nombre: "Servidores", orden: 1, activo: true, departamentos: [desarrollo, redes] },
+      },
+    });
+  });
+
+  it("el mismo departamento dos veces cuenta una sola", async () => {
+    const { service, linkWrites } = buildService({ departamentos: departamentos() });
+
+    const created = await service.create(
+      modulos,
+      { nombre: "Servidores", departamentoIds: ["d1", "d1", "d1"] },
+      admin,
+    );
+
+    expect(linkWrites).toEqual([["d1"]]);
+    expect(created).toMatchObject({ departamentos: [desarrollo] });
+  });
+
+  it("sin departamentos, con lista vacía: 400 y no escribe", async () => {
+    const { service, audits } = buildService({ departamentos: departamentos() });
+
+    for (const input of [{ nombre: "Servidores" }, { nombre: "Servidores", departamentoIds: [] }]) {
+      await expect(service.create(modulos, input, admin)).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "Elegí al menos un departamento",
+      });
+    }
+    expect(audits).toEqual([]);
+  });
+
+  it("un departamento inexistente o desactivado en el alta: 400", async () => {
+    const { service, audits } = buildService({ departamentos: departamentos() });
+
+    for (const departamentoIds of [["nada"], ["d1", "nada"], ["d4"]]) {
+      await expect(
+        service.create(modulos, { nombre: "Servidores", departamentoIds }, admin),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        message: "El departamento no existe o está desactivado",
+      });
+    }
+    expect(audits).toEqual([]);
+  });
+
+  it("editar conservando un departamento que se desactivó después: 200", async () => {
+    const archivo = { id: "d4", nombre: "Archivo" };
+    const { service, audits } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores([archivo, desarrollo])],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d4", "d1", "d2"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [archivo, desarrollo, redes] });
+    expect(audits[0]?.payload).toEqual({
+      before: { departamentos: [archivo, desarrollo] },
+      after: { departamentos: [archivo, desarrollo, redes] },
+    });
+  });
+
+  it("agregar un departamento desactivado que el módulo no tenía: 400", async () => {
+    const { service } = buildService({ departamentos: departamentos(), modulos: [servidores()] });
+
+    await expect(
+      service.update(modulos, "m1", { nombre: "Servidores", departamentoIds: ["d1", "d4"] }, admin),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("quitar un departamento deja un update con departamentos antes y después", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d1"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [desarrollo] });
+    expect(linkWrites).toEqual([["d1"]]);
+    expect(audits).toEqual([
+      {
+        entityType: "Modulo",
+        entityId: "m1",
+        action: "update",
+        actorId: "admin-1",
+        payload: {
+          before: { departamentos: [desarrollo, redes] },
+          after: { departamentos: [desarrollo] },
+        },
+      },
+    ]);
+  });
+
+  it("reenviar los mismos departamentos en otro orden: 200, sin escribir ni auditar", async () => {
+    const { service, audits, actors, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    const updated = await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores", departamentoIds: ["d2", "d1"] },
+      admin,
+    );
+
+    expect(updated).toMatchObject({ departamentos: [desarrollo, redes] });
+    expect(audits).toEqual([]);
+    expect(actors).toEqual([]);
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("renombrar sin tocar los departamentos no reescribe la unión", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores()],
+    });
+
+    await service.update(
+      modulos,
+      "m1",
+      { nombre: "Servidores web", departamentoIds: ["d1", "d2"] },
+      admin,
+    );
+
+    expect(audits[0]?.payload).toEqual({
+      before: { nombre: "Servidores" },
+      after: { nombre: "Servidores web" },
+    });
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("el nombre sigue siendo único en todo el catálogo, no por departamento", async () => {
+    const { service } = buildService({ departamentos: departamentos(), modulos: [servidores()] });
+
+    await expect(
+      service.create(modulos, { nombre: "servidores", departamentoIds: ["d3"] }, admin),
+    ).rejects.toMatchObject({ code: "CONFLICT", message: "Ya existe un módulo con ese nombre" });
+  });
+
+  it("desactivar y mover no cambian los departamentos", async () => {
+    const { service, audits, linkWrites } = buildService({
+      departamentos: departamentos(),
+      modulos: [servidores(), row("m2", "Correo", 2, { departamentos: [tecnico] })],
+    });
+
+    const inactive = await service.setActive(modulos, "m1", false, admin);
+    await service.move(modulos, "m1", "bajar", admin);
+
+    expect(inactive).toMatchObject({ activo: false, departamentos: [desarrollo, redes] });
+    expect(audits[0]?.payload).toEqual({ before: { activo: true }, after: { activo: false } });
+    expect(JSON.stringify(audits.slice(1))).not.toContain("departamentos");
+    expect(linkWrites).toEqual([]);
+  });
+
+  it("un módulo con un ticket no eliminado sigue dando 409; sin tickets se elimina", async () => {
+    const { service, audits } = buildService(
+      { modulos: [servidores(), row("m2", "Correo", 2, { departamentos: [tecnico] })] },
+      { "modulos:m1": 1 },
+    );
+
+    await expect(service.remove(modulos, "m1", admin)).rejects.toMatchObject({ code: "CONFLICT" });
+    await service.remove(modulos, "m2", admin);
+
+    expect(audits.map((a) => [a.entityId, a.action])).toEqual([["m2", "delete"]]);
+  });
+
+  it("un catálogo simple ignora departamentoIds: no valida ni escribe nada", async () => {
+    const { service, creates, linkWrites } = buildService();
+
+    await service.create(edificios, { nombre: "Anexo", departamentoIds: [] }, admin);
+
+    expect(creates[0]).not.toHaveProperty("departamentoIds");
+    expect(linkWrites).toEqual([]);
   });
 });
 
