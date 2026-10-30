@@ -340,6 +340,27 @@ describe("CatalogOptionSelect: áreas agrupadas por tipo", () => {
     expect(screen.getByRole("combobox")).toHaveTextContent("Diputado · Acosta");
   });
 
+  it("desde 3 caracteres el buscador recorta por nombre o tipo y elegir avisa con el id", async () => {
+    options.data = areasActivas();
+    const onChange = vi.fn();
+    render(<CatalogOptionSelect id="area" ruta="areas" value="" onChange={onChange} />);
+    await userEvent.click(screen.getByRole("combobox"));
+    const search = screen.getByRole("combobox", { name: "Buscar área" });
+
+    await userEvent.type(search, "ac");
+    expect(optionNames()).toHaveLength(4);
+
+    await userEvent.type(search, "o");
+    expect(optionNames()).toEqual(["Acosta"]);
+
+    await userEvent.clear(search);
+    await userEvent.type(search, "BLOQ");
+    expect(optionNames()).toEqual(["UCR"]);
+
+    await userEvent.click(screen.getByRole("option", { name: "UCR" }));
+    expect(onChange).toHaveBeenCalledWith("a1");
+  });
+
   it("con `emptyLabel` ofrece «sin valor» antes de los grupos", async () => {
     options.data = areasActivas();
     render(

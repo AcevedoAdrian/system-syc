@@ -167,7 +167,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
       icon: Users,
       ruta: "areas",
       current: ticket.area,
-      hint: "Agrupada por tipo.",
+      hint: "Agrupada por tipo. Escribí 3 letras para buscar.",
     },
     {
       id: "edificioId",
