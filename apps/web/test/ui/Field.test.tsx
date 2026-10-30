@@ -97,6 +97,44 @@ describe("Field", () => {
     expect(screen.getByRole("button", { name: "Usar hoy" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Título" })).toBeInTheDocument();
   });
+
+  it("un campo modificado lo dice en su descripción, para el lector de pantalla", () => {
+    renderField({ modified: true });
+
+    const input = screen.getByRole("textbox", { name: "Título" });
+    expect(input).toHaveAccessibleDescription("Modificado.");
+    expect(screen.getByText("Modificado.").id).toBe("titulo-modified");
+  });
+
+  it("«Modificado.» se lee después de la ayuda y del error", () => {
+    renderField({ modified: true, hint: "Elegí un proveedor.", error: "Formato inválido." });
+
+    expect(screen.getByRole("textbox")).toHaveAccessibleDescription(
+      "Elegí un proveedor. Formato inválido. Modificado.",
+    );
+  });
+
+  it("un campo modificado se marca con un punto decorativo y la clase que lo tiñe", () => {
+    const { container } = renderField({ modified: true });
+
+    expect(container.firstElementChild).toHaveClass("field-modified");
+    expect(document.querySelector("label ~ [aria-hidden='true'].rounded-full")).toBeInTheDocument();
+  });
+
+  it("modificado no marca el campo como inválido", () => {
+    renderField({ modified: true });
+
+    expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("sin modificar no hay marca, ni punto, ni nada en la descripción", () => {
+    const { container } = renderField();
+
+    expect(container.firstElementChild).not.toHaveClass("field-modified");
+    expect(screen.queryByText("Modificado.")).not.toBeInTheDocument();
+    expect(document.querySelector(".rounded-full")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox")).not.toHaveAttribute("aria-describedby");
+  });
 });
 
 describe("TodayButton", () => {

@@ -385,7 +385,7 @@ describe("TicketForm", () => {
       const titulo = screen.getByLabelText("Título");
       await waitFor(() => expect(titulo).toHaveAttribute("aria-invalid", "true"));
       expect(titulo).toHaveAccessibleDescription(
-        "El título es obligatorio (hasta 200 caracteres).",
+        expect.stringContaining("El título es obligatorio (hasta 200 caracteres)."),
       );
     });
 
@@ -830,6 +830,109 @@ describe("TicketForm", () => {
       renderForm();
 
       expect(screen.getByLabelText("Fecha de recepción")).toHaveAttribute("max", hoyArgentina());
+    });
+  });
+
+  describe("campos modificados (SPEC 09, etapa 9.9)", () => {
+    const MODIFICADO = /Modificado\./;
+    const conProveedor = {
+      proveedor: { id: "acme", nombre: "Acme" },
+      referenciaExterna: "19092/2026",
+      numeroFactura: "0003-00004567",
+      descripcion: "No imprime",
+    };
+
+    it("al abrir un ticket con todo cargado no hay nada marcado", () => {
+      renderForm(conProveedor);
+
+      expect(screen.queryByText("Modificado.")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Título")).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("cambiar el título lo marca, y «Descartar cambios» le saca la marca", async () => {
+      renderForm();
+      const titulo = screen.getByLabelText("Título");
+
+      await userEvent.type(titulo, "!");
+      expect(titulo).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getAllByText("Modificado.")).toHaveLength(1);
+
+      await userEvent.click(screen.getByRole("button", { name: "Descartar cambios" }));
+      expect(titulo).not.toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.queryByText("Modificado.")).not.toBeInTheDocument();
+    });
+
+    it("volver al valor guardado le saca la marca aunque no se descarte", async () => {
+      renderForm();
+      const titulo = screen.getByLabelText("Título");
+
+      await userEvent.type(titulo, "!");
+      await userEvent.type(titulo, "{Backspace}");
+
+      expect(titulo).toHaveValue("Impresora rota");
+      expect(titulo).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("solo se marca lo que cambió: el resto de los campos sigue sin marca", async () => {
+      renderForm(conProveedor);
+
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "baja");
+
+      expect(screen.getByLabelText("Prioridad")).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getAllByText("Modificado.")).toHaveLength(1);
+    });
+
+    it("completar un campo de clasificación que estaba sin asignar lo marca", async () => {
+      renderForm();
+
+      await userEvent.selectOptions(screen.getByLabelText("Área"), "sist");
+
+      expect(screen.getByLabelText("Área")).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getByLabelText("Edificio")).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("cambiar de proveedor marca el proveedor y también la referencia y la factura que se vaciaron", async () => {
+      renderForm(conProveedor);
+
+      await userEvent.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "otro");
+
+      expect(screen.getByRole("combobox", { name: "Proveedor" })).toHaveAccessibleDescription(
+        MODIFICADO,
+      );
+      expect(screen.getByLabelText("Referencia externa")).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getByLabelText("N.º de factura")).toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("marcar «Notificado» tiñe el recuadro y se anuncia en la casilla; desmarcarlo lo deja como estaba", async () => {
+      const { container } = render(
+        <TicketForm
+          ticket={makeTicket()}
+          onSaved={onSaved}
+          onReload={onReload}
+          onDirtyChange={onDirtyChange}
+        />,
+      );
+      const casilla = screen.getByRole("checkbox", { name: "Notificado" });
+      const recuadro = container.querySelector("label.form-callout");
+      expect(recuadro).not.toHaveAttribute("data-modified");
+
+      await userEvent.click(casilla);
+      expect(recuadro).toHaveAttribute("data-modified");
+      expect(casilla).toHaveAccessibleDescription(MODIFICADO);
+      expect(casilla).toHaveAccessibleDescription(/No se marca sola\./);
+
+      await userEvent.click(casilla);
+      expect(recuadro).not.toHaveAttribute("data-modified");
+      expect(casilla).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("el departamento y el estado, que son de solo lectura, nunca se marcan", async () => {
+      renderForm();
+
+      await userEvent.type(screen.getByLabelText("Título"), "!");
+
+      expect(screen.getByLabelText("Departamento")).not.toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getByLabelText("Estado")).not.toHaveAccessibleDescription(MODIFICADO);
     });
   });
 });

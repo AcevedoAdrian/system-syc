@@ -2,12 +2,11 @@ import { areaLabel, type CatalogRuta } from "@syc/contracts";
 import { cn } from "cn";
 import type { ReactNode } from "react";
 import { type FieldControlProps, selectClass } from "@/components/common/Field";
+import { type SearchableOption, SearchableSelect } from "@/components/common/SearchableSelect";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -114,7 +113,8 @@ function FlatOptionSelect({
 // SPEC 08: las áreas se agrupan bajo un título por tipo. Los grupos siguen el orden del catálogo
 // Tipos de área (activos e inactivos: desactivar un tipo no saca a sus áreas del selector), las áreas
 // de cada grupo el de Áreas, y un grupo sin áreas activas no se muestra. El botón muestra el valor
-// elegido como «Tipo · Nombre».
+// elegido como «Tipo · Nombre». La lista es larga: el desplegable trae un buscador que, desde 3
+// caracteres, recorta por tipo y nombre.
 function AreaOptionSelect({
   id,
   value,
@@ -132,7 +132,7 @@ function AreaOptionSelect({
   const { data: tipos = [] } = useCatalog("tiposArea");
   const options = allOptions.filter((option) => option.id !== excludeId);
 
-  const { groups } = groupAreasByTipo(options, tipos);
+  const { groups, rest } = groupAreasByTipo(options, tipos);
 
   const currentIsOutOfOptions =
     !isPending && current && !options.some((option) => option.id === current.id);
@@ -149,35 +149,43 @@ function AreaOptionSelect({
         ? labelOf(current)
         : undefined;
 
+  // Las áreas de un tipo que no se conoce (o mientras Tipos de área carga) van al final, sin grupo, junto
+  // al valor actual que no está entre las opciones.
+  const loose: SearchableOption[] = [
+    ...rest.map((area) => ({
+      value: area.id,
+      label: area.nombre,
+      searchText: `${area.tipo?.nombre ?? ""} ${area.nombre}`,
+    })),
+    ...(isPending && current ? [{ value: current.id, label: current.nombre }] : []),
+    ...(currentIsOutOfOptions
+      ? [{ value: current.id, label: `${labelOf(current)} (inactivo)` }]
+      : []),
+  ];
+
   return (
-    <Select
-      value={value === "" && emptyLabel ? NONE : value}
-      onValueChange={(next) => onChange(next === NONE ? "" : next)}
+    <SearchableSelect
+      id={id}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      searchLabel="Buscar área"
+      selectedLabel={value === "" ? undefined : selectedLabel}
+      leadingOptions={emptyLabel ? [{ value: "", label: emptyLabel }] : []}
+      groups={groups.map(({ tipo, areas }) => ({
+        id: tipo.id,
+        label: tipo.nombre,
+        options: areas.map((area) => ({
+          value: area.id,
+          label: area.nombre,
+          searchText: `${tipo.nombre} ${area.nombre}`,
+        })),
+      }))}
+      rest={loose}
       disabled={disabled}
-    >
-      <SelectTrigger id={id} className={cn(selectClass, leading && leadingClass)} {...aria}>
-        {leading}
-        <SelectValue placeholder={placeholder}>
-          {value === "" ? undefined : selectedLabel}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {emptyLabel && <SelectItem value={NONE}>{emptyLabel}</SelectItem>}
-        {groups.map(({ tipo, areas }) => (
-          <SelectGroup key={tipo.id}>
-            <SelectLabel>{tipo.nombre}</SelectLabel>
-            {areas.map((area) => (
-              <SelectItem key={area.id} value={area.id}>
-                {area.nombre}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        ))}
-        {isPending && current && <SelectItem value={current.id}>{current.nombre}</SelectItem>}
-        {currentIsOutOfOptions && (
-          <SelectItem value={current.id}>{labelOf(current)} (inactivo)</SelectItem>
-        )}
-      </SelectContent>
-    </Select>
+      leading={leading}
+      triggerClassName={cn(selectClass, leading && leadingClass)}
+      {...aria}
+    />
   );
 }

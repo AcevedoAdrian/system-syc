@@ -567,5 +567,19 @@ export default defineSpec({
         );
       },
     ),
+
+    criterion(
+      42,
+      "El alta y la edición marcan con un tinte y un punto los campos que el usuario cambió, y lo dicen en la descripción accesible",
+      async () => {
+        vitest(
+          "@syc/web",
+          "Los campos modificados",
+          "test/ui/Field.test.tsx",
+          "test/tickets/components/CreateTicketForm.test.tsx",
+          "test/tickets/components/TicketForm.test.tsx",
+        );
+      },
+    ),
   ],
 });

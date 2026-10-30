@@ -9,7 +9,6 @@ import { useTicket } from "../hooks/useTicket";
 import { useRemoveTicket } from "../hooks/useTicketMutations";
 import { ChangeDepartmentDialog } from "./ChangeDepartmentDialog";
 import { ChangeStatusDialog } from "./ChangeStatusDialog";
-import { EstadoPill } from "./TicketBadges";
 import { TicketComments } from "./TicketComments";
 import { TicketForm } from "./TicketForm";
 import { TicketHistory } from "./TicketHistory";
@@ -87,9 +86,6 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
             <h1 className="font-heading text-4xl leading-[1.15] font-medium tracking-[-0.02em] wrap-break-word">
               {formatTicketNumber(ticket.numero)} · {ticket.titulo}
             </h1>
-            <p className="text-base text-muted-foreground">
-              Actualizá los datos del ticket. Los campos con * son obligatorios.
-            </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -125,10 +121,6 @@ export function TicketDetail({ ticketId }: { ticketId: string }) {
             )}
           </div>
         </div>
-        <p className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <EstadoPill estado={ticket.estado} />
-          {ticket.departamento.nombre}
-        </p>
         {dirty && (
           <p id={dirtyHintId} className="text-sm text-muted-foreground">
             Guardá o descartá los cambios para cambiar el estado o el departamento.

@@ -1,13 +1,10 @@
+import { normalizeSearch as normalize } from "@/lib/search";
 import type { CatalogEntry } from "./hooks/catalog-api";
 
 export type StatusFilter = "todos" | "activos" | "desactivados";
 
 // 10 filas por página, como la maqueta.
 export const CATALOG_PAGE_SIZE = 10;
-
-// Sin mayúsculas ni acentos, como el resto de las búsquedas del sistema.
-const normalize = (text: string) =>
-  text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 
 /**
  * Las filas que cumplen la búsqueda y el filtro de estado. La búsqueda mira el nombre y, en las áreas,

@@ -2,15 +2,14 @@ import { areaLabel, type CatalogRuta } from "@syc/contracts";
 import { cn } from "cn";
 import { ListFilter, Search } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type SearchableOption, SearchableSelect } from "@/components/common/SearchableSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -54,7 +53,7 @@ const MORE_PANEL_ID = "filtros-adicionales";
 
 // Los ítems activos primero y, al final, los inactivos marcados: un ticket histórico de un área
 // desactivada se tiene que poder seguir encontrando. Cada grupo conserva su orden.
-function activeFirst(options: FilterOption[]): FilterOption[] {
+function activeFirst<T extends { activo: boolean }>(options: T[]): T[] {
   return [...options.filter((o) => o.activo), ...options.filter((o) => !o.activo)];
 }
 
@@ -148,7 +147,8 @@ function CatalogFilter({
 
 // El filtro de área, agrupado por tipo como el selector del formulario (SPEC 09, 9.7). Ofrece las áreas
 // activas e inactivas: dentro de cada grupo, las inactivas al final. Las de un tipo que no se conoce (o
-// mientras Tipos de área carga) van al final, sin grupo.
+// mientras Tipos de área carga) van al final, sin grupo. Como la lista es larga, el desplegable trae un
+// buscador que, desde 3 caracteres, recorta por tipo y nombre.
 function AreaFilter({ filters, onChange }: { filters: TicketsSearch; onChange: FiltersChange }) {
   const { data: areas = [] } = useCatalog("areas");
   const { data: tipos = [] } = useCatalog("tiposArea");
@@ -158,27 +158,33 @@ function AreaFilter({ filters, onChange }: { filters: TicketsSearch; onChange: F
     ? areaLabel({ nombre: selected.nombre, tipo: selected.tipo })
     : selected?.nombre;
   const selectedLabel = selected && !selected.activo ? `${name} (inactivo)` : name;
+  const toOption = (area: (typeof areas)[number]): SearchableOption => ({
+    value: area.id,
+    label: area.activo ? area.nombre : `${area.nombre} (inactivo)`,
+    searchText: `${area.tipo?.nombre ?? ""} ${area.nombre}`,
+  });
 
   return (
-    <FilterSelect
-      id="filtro-areaId"
-      label="Área"
-      value={filters.areaId}
-      onChange={(value) => onChange(withFilter(filters, "areaId", value))}
-      selectedLabel={selectedLabel}
-    >
-      {groups.map(({ tipo, areas: grouped }) => (
-        <SelectGroup key={tipo.id}>
-          <SelectLabel>{tipo.nombre}</SelectLabel>
-          {activeFirst(grouped).map((area) => (
-            <OptionItem key={area.id} option={area} />
-          ))}
-        </SelectGroup>
-      ))}
-      {activeFirst(rest).map((area) => (
-        <OptionItem key={area.id} option={area} />
-      ))}
-    </FilterSelect>
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor="filtro-areaId" className="text-[13px]">
+        Área
+      </Label>
+      <SearchableSelect
+        id="filtro-areaId"
+        value={filters.areaId ?? ""}
+        onChange={(value) => onChange(withFilter(filters, "areaId", value || undefined))}
+        searchLabel="Buscar área"
+        selectedLabel={filters.areaId === undefined ? undefined : selectedLabel}
+        leadingOptions={[{ value: "", label: "Todos" }]}
+        groups={groups.map(({ tipo, areas: grouped }) => ({
+          id: tipo.id,
+          label: tipo.nombre,
+          options: activeFirst(grouped).map(toOption),
+        }))}
+        rest={activeFirst(rest).map(toOption)}
+        triggerClassName="w-full data-[size=default]:h-10"
+      />
+    </div>
   );
 }
 
