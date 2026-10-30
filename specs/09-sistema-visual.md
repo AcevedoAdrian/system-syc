@@ -29,7 +29,7 @@ Decisiones del usuario del 2026-10-16:
 | 9.6 | Administración: departamentos, usuarios, catálogos y diálogos | Hecha |
 | 9.7 | Ajustes: filtro de área agrupado, aviso de errores del formulario, página no encontrada | Hecha |
 | 9.8 | Actuación simple con el año en curso precargado en el alta | Hecha |
-| 9.9 | Marca de los campos modificados en el alta y la edición del ticket | En curso |
+| 9.9 | Marca de los campos modificados en el alta y la edición del ticket | Hecha |
 
 Las etapas 9.2 a 9.7 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
 
@@ -433,7 +433,9 @@ Al elegir o escribir algo en el alta o en la edición, el campo se ve igual que 
 
 ### Criterios de aceptación (9.9)
 
-- [ ] **09.42** En el alta y en la edición, un campo que el usuario cambió muestra el punto y el tinte, y su descripción accesible incluye «Modificado.». Al volver al valor inicial, descartar o guardar, la marca se va. Los valores precargados del alta (la fecha de hoy y `/{año}`) no se marcan hasta que se tocan.
+- [x] **09.42** En el alta y en la edición, un campo que el usuario cambió muestra el punto y el tinte, y su descripción accesible incluye «Modificado.». Al volver al valor inicial, descartar o guardar, la marca se va. Los valores precargados del alta (la fecha de hoy y `/{año}`) no se marcan hasta que se tocan.
+
+`pnpm verify --spec 09` lo cubre con los tests de `Field.test.tsx`, `CreateTicketForm.test.tsx` y `TicketForm.test.tsx`. Que el tinte se distinga en claro y en oscuro no lo cubre un test: se mira a mano.
 
 ## Decisiones
 
