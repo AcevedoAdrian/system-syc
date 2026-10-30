@@ -173,6 +173,35 @@ describe("TicketsFilters", () => {
       expect(onChange).toHaveBeenCalledWith({ areaId: "aco", page: undefined });
     });
 
+    it("el buscador del filtro de área recorta desde 3 caracteres, por nombre o por tipo, también las inactivas", async () => {
+      const { onChange } = renderFilters();
+      await openMore();
+      await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
+      const search = screen.getByRole("combobox", { name: "Buscar área" });
+
+      await userEvent.type(search, "di");
+      expect(optionNames()).toHaveLength(4);
+
+      await userEvent.type(search, "r");
+      expect(optionNames()).toEqual(["Sistemas", "Archivo (inactivo)"]);
+
+      await userEvent.clear(search);
+      await userEvent.type(search, "ACÓ");
+      expect(optionNames()).toEqual(["Acosta"]);
+
+      await userEvent.click(screen.getByRole("option", { name: "Acosta" }));
+      expect(onChange).toHaveBeenCalledWith({ areaId: "aco", page: undefined });
+    });
+
+    it("elegir «Todos» en el filtro de área quita el filtro", async () => {
+      const { onChange } = renderFilters({ areaId: "sis", page: 3 });
+
+      await userEvent.click(screen.getByRole("combobox", { name: "Área" }));
+      await userEvent.click(screen.getByRole("option", { name: "Todos" }));
+
+      expect(onChange).toHaveBeenCalledWith({ areaId: undefined, page: undefined });
+    });
+
     it("con un área elegida, el botón la muestra como «Tipo · Nombre»", () => {
       renderFilters({ areaId: "sis" });
 
