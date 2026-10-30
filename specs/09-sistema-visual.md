@@ -29,6 +29,7 @@ Decisiones del usuario del 2026-10-16:
 | 9.6 | Administración: departamentos, usuarios, catálogos y diálogos | Hecha |
 | 9.7 | Ajustes: filtro de área agrupado, aviso de errores del formulario, página no encontrada | Hecha |
 | 9.8 | Actuación simple con el año en curso precargado en el alta | Hecha |
+| 9.9 | Marca de los campos modificados en el alta y la edición del ticket | En curso |
 
 Las etapas 9.2 a 9.7 se detallan (alcance, criterios) cuando arranca cada una. Cada etapa se implementa y se revisa antes de la siguiente.
 
@@ -396,6 +397,43 @@ Una actuación simple tiene la forma `número/año` y, por lo general, las que l
 - [x] **09.41** El alta muestra «Actuación simple» con `/{año en curso}`; al entrar sin haberlo tocado, el cursor queda delante de la barra; enviar con el número da `número/año`; enviar sin tocarlo manda la actuación vacía (`null`). La edición no cambia.
 
 `pnpm verify --spec 09` lo cubre con los tests de `CreateTicketForm.test.tsx` (y que la edición no cambia, con los de `TicketForm.test.tsx`).
+
+## Etapa 9.9 — Campos modificados
+
+Cambia `Field` y los dos formularios del ticket (`CreateTicketForm` y `TicketForm`). La API, los contratos y la base no cambian.
+
+### Por qué
+
+Al elegir o escribir algo en el alta o en la edición, el campo se ve igual que antes de tocarlo: no se nota qué se cambió antes de crear o de guardar.
+
+### Alcance
+
+**Dentro:**
+
+- **`Field` acepta `modified`** (booleano). Con `modified` el control toma un **tinte de fondo** con el color de su sección (`--sc` mezclado con el fondo, igual que el fondo de la sección y del recuadro, pero más fuerte) y la etiqueta suma un **punto** del mismo color. El color solo no alcanza (WCAG 1.4.1): el punto es la segunda señal, y un lector de pantalla oye «Modificado.» como parte de la descripción del campo (después de la ayuda y del error).
+- **Quién lo calcula:** cada formulario, con `formState.dirtyFields` de react-hook-form. Un campo está modificado cuando su valor difiere del valor con el que se abrió el formulario; si el usuario vuelve a ese valor, la marca se va.
+- **Los dos formularios con el mismo criterio.** En el alta, la fecha de recepción de hoy y la actuación simple `/{año}` precargadas no se marcan hasta que se tocan. En la edición solo se marca lo que se cambió respecto de lo guardado.
+- **«Notificado»** (el recuadro de la edición) se marca igual: tinte más fuerte en el recuadro y el punto junto a su texto.
+- **Proveedor, en el alta.** Quitar el proveedor vacía la referencia y la factura con `shouldDirty: true` (como ya hace la edición), para que `dirtyFields` quede al día.
+
+**Fuera:**
+
+- Los formularios de administración (`DrawerForm`) y los diálogos de cambiar estado y cambiar departamento.
+- Los campos de solo lectura (el departamento del agente en el alta; el departamento y el estado en la edición): nunca cambian.
+- Cambios en la API, los contratos o la base.
+
+### Decisiones
+
+- **Se compara con el valor inicial, no con «tiene valor».** En la edición todo viene lleno y en el alta hay valores precargados: «tiene valor» marcaría todo sin que el usuario haya hecho nada.
+- **Una sola prop booleana,** no `state: "filled" | "modified"`: con un solo criterio no hay dos estados que distinguir.
+- **Sin token nuevo:** el tinte reutiliza `--sc`, que ya fija `FormSection` con su `tone-*`, y se ve igual en claro y en oscuro.
+- **Sin negritas:** cambian el ancho del texto y mueven el layout mientras se escribe.
+- **Un campo que se vació solo sigue marcado.** Al cambiar el proveedor en la edición, la referencia y la factura se vacían y quedan marcadas, porque al guardar se van a borrar.
+- **Guardar y «Descartar cambios» limpian la marca** sin código propio: guardar vuelve a montar el formulario y descartar hace `reset`.
+
+### Criterios de aceptación (9.9)
+
+- [ ] **09.42** En el alta y en la edición, un campo que el usuario cambió muestra el punto y el tinte, y su descripción accesible incluye «Modificado.». Al volver al valor inicial, descartar o guardar, la marca se va. Los valores precargados del alta (la fecha de hoy y `/{año}`) no se marcan hasta que se tocan.
 
 ## Decisiones
 
