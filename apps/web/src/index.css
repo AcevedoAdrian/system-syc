@@ -358,3 +358,30 @@
     }
   }
 }
+
+/*
+ * Campos modificados de los formularios del ticket (componente Field, prop `modified`): el tinte es el color
+ * de la sección (--sc) mezclado con el fondo, más fuerte que el de la sección (5%) y el del recuadro (9%) para
+ * que se distinga de los dos. Va en `utilities` porque el fondo del control (`bg-transparent`,
+ * `dark:bg-input/30`, `dark:hover:bg-input/50`) también es una utilidad y una capa anterior perdería sin
+ * importar la especificidad; `:is(*, :hover)` sube la especificidad al nivel del hover en oscuro, y al estar
+ * después de las utilidades de Tailwind gana el empate.
+ */
+@layer utilities {
+  .field-modified
+    :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(*, :hover) {
+    background: var(--muted);
+  }
+  .form-callout[data-modified] {
+    background: var(--muted);
+  }
+  @supports (background: color-mix(in srgb, red 10%, white)) {
+    .field-modified
+      :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):is(*, :hover) {
+      background: color-mix(in srgb, var(--sc) 14%, var(--background));
+    }
+    .form-callout[data-modified] {
+      background: color-mix(in srgb, var(--sc) 16%, var(--background));
+    }
+  }
+}

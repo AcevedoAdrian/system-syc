@@ -1,3 +1,4 @@
+import { cn } from "cn";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,18 @@ interface FieldProps {
   counter?: { value: number; max: number };
   // Un control chico a la derecha de la etiqueta (por ejemplo, «Usar hoy»).
   action?: ReactNode;
+  // El usuario cambió el valor con el que se abrió el formulario (lo calcula el formulario con `dirtyFields`).
+  modified?: boolean;
   children: (control: FieldControlProps) => ReactNode;
+}
+
+// El texto que el lector de pantalla agrega a la descripción de un campo modificado.
+export const MODIFIED_TEXT = "Modificado.";
+
+// El punto de «modificado», en el color de la sección (`--sc`). Es la señal que acompaña al tinte de fondo:
+// el color solo no alcanza.
+export function ModifiedDot() {
+  return <span aria-hidden="true" className="size-1.5 self-center rounded-full bg-(--sc)" />;
 }
 
 // Etiqueta + control + ayuda + error de un campo de los formularios del ticket. El error y la ayuda se
@@ -44,14 +56,18 @@ export function Field({
   icon: Icon,
   counter,
   action,
+  modified,
   children,
 }: FieldProps) {
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
-  const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(" ");
+  const modifiedId = `${id}-modified`;
+  const describedBy = [hint && hintId, error && errorId, modified && modifiedId]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", modified && "field-modified")}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-1">
           <Label htmlFor={id} className="text-[13px] text-foreground">
@@ -64,6 +80,7 @@ export function Field({
               *
             </span>
           )}
+          {modified && <ModifiedDot />}
         </div>
         {action}
         {counter && (
@@ -86,6 +103,11 @@ export function Field({
         <p id={errorId} className="text-[13px] text-destructive">
           {error}
         </p>
+      )}
+      {modified && (
+        <span id={modifiedId} className="sr-only">
+          {MODIFIED_TEXT}
+        </span>
       )}
     </div>
   );
