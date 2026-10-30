@@ -30,7 +30,14 @@ import {
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { controlClass, Field, TodayButton, textareaClass } from "@/components/common/Field";
+import {
+  controlClass,
+  Field,
+  MODIFIED_TEXT,
+  ModifiedDot,
+  TodayButton,
+  textareaClass,
+} from "@/components/common/Field";
 import { FormActionBar } from "@/components/common/FormActionBar";
 import { FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { FormSection } from "@/components/common/FormSection";
@@ -111,11 +118,14 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
     setValue,
     setError,
     reset,
-    formState: { errors, isSubmitting, isDirty, submitCount },
+    formState: { errors, isSubmitting, isDirty, submitCount, dirtyFields },
   } = useForm<TicketFormInput, unknown, UpdateTicketInput>({
     resolver: zodResolver(updateTicketInputSchema),
     defaultValues: valuesOf(ticket),
   });
+  // El usuario cambió el campo respecto de lo guardado. Guardar vuelve a montar el formulario y «Descartar
+  // cambios» hace `reset`: los dos limpian la marca sin código propio.
+  const modified = (name: keyof TicketFormInput) => Boolean(dirtyFields[name]);
   const hasProveedor = Boolean(watch("proveedorId"));
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
@@ -215,6 +225,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             id="actuacionSimple"
             label="Actuación simple"
             icon={FileText}
+            modified={modified("actuacionSimple")}
             hint="Suele ser corta."
             error={errors.actuacionSimple && "Hasta 500 caracteres."}
           >
@@ -253,6 +264,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
           label="Título"
           icon={Type}
           required
+          modified={modified("titulo")}
           counter={{ value: (watch("titulo") ?? "").length, max: 200 }}
           error={errors.titulo && "El título es obligatorio (hasta 200 caracteres)."}
         >
@@ -275,6 +287,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             label="Prioridad"
             icon={Flag}
             required
+            modified={modified("prioridadId")}
             error={errors.prioridadId && "Elegí una prioridad."}
           >
             {(aria) => (
@@ -317,6 +330,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             label="Fecha de recepción"
             icon={CalendarDays}
             required
+            modified={modified("fechaRecepcion")}
             action={
               <TodayButton
                 onClick={() =>
@@ -355,6 +369,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                   label="Fecha de cierre"
                   icon={CalendarDays}
                   required
+                  modified={modified("fechaCierre")}
                   error={errors.fechaCierre && DATE_ERROR}
                 >
                   {(aria) => (
@@ -375,6 +390,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                   label="Fecha de reapertura"
                   icon={CalendarDays}
                   required
+                  modified={modified("fechaReabierto")}
                   error={errors.fechaReabierto && DATE_ERROR}
                 >
                   {(aria) => (
@@ -397,6 +413,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
           id="descripcion"
           label="Descripción"
           icon={TextAlignStart}
+          modified={modified("descripcion")}
           counter={{ value: (watch("descripcion") ?? "").length, max: 5000 }}
           error={errors.descripcion && "Hasta 5000 caracteres."}
         >
@@ -429,6 +446,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                 label={catalog.label}
                 icon={catalog.icon}
                 hint={catalog.hint}
+                modified={modified(catalog.id)}
                 error={catalog.id === "moduloId" ? errors.moduloId?.message : undefined}
               >
                 {(aria) => (
@@ -463,7 +481,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
           description="No cambia el estado del ticket."
           className="min-w-0 flex-[2_1_300px]"
         >
-          <Field id="proveedorId" label="Proveedor" icon={Truck}>
+          <Field id="proveedorId" label="Proveedor" icon={Truck} modified={modified("proveedorId")}>
             {(aria) => (
               <Controller
                 control={control}
@@ -493,6 +511,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             id="referenciaExterna"
             label="Referencia externa"
             icon={Hash}
+            modified={modified("referenciaExterna")}
             hint={hasProveedor ? undefined : REFERENCIA_SIN_PROVEEDOR}
             error={errors.referenciaExterna && REFERENCIA_ERROR}
           >
@@ -512,6 +531,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             id="numeroFactura"
             label="N.º de factura"
             icon={Receipt}
+            modified={modified("numeroFactura")}
             hint={hasProveedor ? undefined : FACTURA_SIN_PROVEEDOR}
             error={errors.numeroFactura && FACTURA_ERROR}
           >
@@ -541,6 +561,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
           id="solucionDescripcion"
           label="Descripción de la solución"
           icon={Wrench}
+          modified={modified("solucionDescripcion")}
           hint="No es obligatoria, ni siquiera para un estado de cierre."
           counter={{ value: (watch("solucionDescripcion") ?? "").length, max: 5000 }}
           error={errors.solucionDescripcion && "Hasta 5000 caracteres."}
@@ -559,6 +580,7 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
         <label
           htmlFor="notificado"
           className="form-callout cursor-pointer flex-row items-center gap-3.5"
+          data-modified={modified("notificado") || undefined}
         >
           <Controller
             control={control}
@@ -568,7 +590,11 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
                 id="notificado"
                 className="size-5"
                 aria-labelledby="notificado-etiqueta"
-                aria-describedby="notificado-ayuda"
+                aria-describedby={
+                  modified("notificado")
+                    ? "notificado-ayuda notificado-modificado"
+                    : "notificado-ayuda"
+                }
                 checked={field.value}
                 onCheckedChange={(checked) => field.onChange(checked === true)}
               />
@@ -581,10 +607,16 @@ export function TicketForm({ ticket, onSaved, onReload, onDirtyChange, notice }:
             >
               <Bell aria-hidden="true" className="size-4 text-(--sc)" />
               Notificado
+              {modified("notificado") && <ModifiedDot />}
             </span>
             <span id="notificado-ayuda" className="text-[13px] text-muted-foreground">
               Registra que se avisó a quien hizo el requerimiento. No se marca sola.
             </span>
+            {modified("notificado") && (
+              <span id="notificado-modificado" className="sr-only">
+                {MODIFIED_TEXT}
+              </span>
+            )}
           </span>
         </label>
       </FormSection>

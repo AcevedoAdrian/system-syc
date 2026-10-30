@@ -123,7 +123,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
     watch,
     setValue,
     setError,
-    formState: { errors, isSubmitting, submitCount },
+    formState: { errors, isSubmitting, submitCount, dirtyFields },
   } = useForm<CreateTicketFormInput, unknown, CreateTicketInput>({
     resolver: zodResolver(createTicketFormSchema),
     defaultValues: {
@@ -140,6 +140,8 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
       numeroFactura: "",
     },
   });
+  // El usuario cambió el campo respecto de su valor inicial: la fecha de hoy y «/2026» no cuentan hasta que se tocan.
+  const modified = (name: keyof CreateTicketFormInput) => Boolean(dirtyFields[name]);
   const hasProveedor = Boolean(watch("proveedorId"));
   const departamentoId = watch("departamentoId");
   // La ayuda del tipo sale de la misma lista que llena el selector: cambiar el tipo no llama a la API.
@@ -180,6 +182,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             id="actuacionSimple"
             label="Actuación simple"
             icon={FileText}
+            modified={modified("actuacionSimple")}
             hint="Escribí el número antes de la barra."
             error={errors.actuacionSimple && "Hasta 500 caracteres."}
           >
@@ -200,6 +203,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             label="Departamento"
             icon={Building2}
             required={isAdmin}
+            modified={isAdmin && modified("departamentoId")}
             hint={isAdmin ? undefined : "Es el departamento de tu cuenta. No se puede cambiar."}
             error={errors.departamentoId?.message}
           >
@@ -245,6 +249,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
           label="Título"
           icon={Type}
           required
+          modified={modified("titulo")}
           counter={{ value: (watch("titulo") ?? "").length, max: 200 }}
           error={errors.titulo && "El título es obligatorio (hasta 200 caracteres)."}
         >
@@ -267,6 +272,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             id="tipoId"
             label="Tipo de ticket"
             icon={Tag}
+            modified={modified("tipoId")}
             hint={tipoAyuda}
             error={errors.tipoId?.message}
           >
@@ -292,6 +298,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             id="moduloId"
             label="Módulo"
             icon={Box}
+            modified={modified("moduloId")}
             hint={departamentoId ? MODULO_HINT : MODULO_SIN_DEPARTAMENTO}
             error={errors.moduloId?.message}
           >
@@ -320,6 +327,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             label="Prioridad"
             icon={Flag}
             required
+            modified={modified("prioridadId")}
             error={errors.prioridadId?.message}
           >
             {(aria) => (
@@ -345,6 +353,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             label="Fecha de recepción"
             icon={CalendarDays}
             required
+            modified={modified("fechaRecepcion")}
             action={
               <TodayButton
                 onClick={() =>
@@ -374,6 +383,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
           id="descripcion"
           label="Descripción"
           icon={TextAlignStart}
+          modified={modified("descripcion")}
           counter={{ value: (watch("descripcion") ?? "").length, max: 5000 }}
           error={errors.descripcion && "Hasta 5000 caracteres."}
         >
@@ -397,7 +407,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
         description="No cambia el estado del ticket."
       >
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="proveedorId" label="Proveedor" icon={Truck}>
+          <Field id="proveedorId" label="Proveedor" icon={Truck} modified={modified("proveedorId")}>
             {(aria) => (
               <Controller
                 control={control}
@@ -411,8 +421,8 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
                       field.onChange(value);
                       // La referencia y la factura son del proveedor: sin proveedor no existen.
                       if (!value) {
-                        setValue("referenciaExterna", "");
-                        setValue("numeroFactura", "");
+                        setValue("referenciaExterna", "", { shouldDirty: true });
+                        setValue("numeroFactura", "", { shouldDirty: true });
                       }
                     }}
                     placeholder="Sin proveedor"
@@ -427,6 +437,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
             id="referenciaExterna"
             label="Referencia externa"
             icon={Hash}
+            modified={modified("referenciaExterna")}
             hint={hasProveedor ? undefined : REFERENCIA_SIN_PROVEEDOR}
             error={errors.referenciaExterna && REFERENCIA_ERROR}
           >
@@ -447,6 +458,7 @@ function Form({ isAdmin, ownDepartment }: FormProps) {
               id="numeroFactura"
               label="N.º de factura"
               icon={Receipt}
+              modified={modified("numeroFactura")}
               hint={hasProveedor ? undefined : FACTURA_SIN_PROVEEDOR}
               error={errors.numeroFactura && FACTURA_ERROR}
             >

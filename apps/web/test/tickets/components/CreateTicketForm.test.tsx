@@ -401,7 +401,10 @@ describe("CreateTicketForm", () => {
       await userEvent.selectOptions(screen.getByLabelText("Tipo de ticket"), "inc");
 
       expect(screen.getByText(INC)).toBeVisible();
-      expect(screen.getByLabelText("Tipo de ticket")).toHaveAccessibleDescription(INC);
+      // Después de la ayuda va «Modificado.»: el tipo ya se eligió.
+      expect(screen.getByLabelText("Tipo de ticket")).toHaveAccessibleDescription(
+        `${INC} Modificado.`,
+      );
     });
 
     it("al pasar a «Sin asignar» o a un tipo sin descripción la ayuda desaparece", async () => {
@@ -427,7 +430,8 @@ describe("CreateTicketForm", () => {
 
       expect(screen.queryByText(INC)).not.toBeInTheDocument();
       expect(screen.getByLabelText("Tipo de ticket")).not.toBeInvalid();
-      expect(screen.getByLabelText("Tipo de ticket")).not.toHaveAccessibleDescription();
+      // Sin ayuda ni error: lo único que describe al campo es que se lo cambió.
+      expect(screen.getByLabelText("Tipo de ticket")).toHaveAccessibleDescription("Modificado.");
     });
 
     it("se manda con el alta", async () => {
@@ -680,7 +684,7 @@ describe("CreateTicketForm", () => {
       const titulo = screen.getByLabelText("Título");
       await waitFor(() => expect(titulo).toHaveAttribute("aria-invalid", "true"));
       expect(titulo).toHaveAccessibleDescription(
-        "El título es obligatorio (hasta 200 caracteres).",
+        expect.stringContaining("El título es obligatorio (hasta 200 caracteres)."),
       );
     });
 
@@ -938,5 +942,114 @@ describe("CreateTicketForm", () => {
       "Esa referencia ya está cargada en el ticket TE-000013",
     );
     expect(mocks.navigate).not.toHaveBeenCalled();
+  });
+
+  describe("campos modificados (SPEC 09, etapa 9.9)", () => {
+    const MODIFICADO = /Modificado\./;
+
+    it("al abrir no hay nada marcado: ni la fecha de hoy ni «/año» cuentan como cambio", () => {
+      render(<CreateTicketForm />);
+
+      expect(screen.queryByText("Modificado.")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Fecha de recepción")).not.toHaveAccessibleDescription(
+        MODIFICADO,
+      );
+      expect(screen.getByLabelText("Actuación simple")).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("escribir el título lo marca, y borrarlo (vuelve al valor inicial) le saca la marca", async () => {
+      render(<CreateTicketForm />);
+      const titulo = screen.getByLabelText("Título");
+
+      await userEvent.type(titulo, "Falla");
+      expect(titulo).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getAllByText("Modificado.")).toHaveLength(1);
+
+      await userEvent.clear(titulo);
+      expect(titulo).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("elegir una prioridad la marca", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.selectOptions(screen.getByLabelText("Prioridad"), "alta");
+
+      expect(screen.getByLabelText("Prioridad")).toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("cambiar la fecha de recepción la marca, y «Usar hoy» le saca la marca", async () => {
+      render(<CreateTicketForm />);
+      const fecha = screen.getByLabelText("Fecha de recepción");
+
+      fireEvent.change(fecha, { target: { value: "2020-01-01" } });
+      expect(fecha).toHaveAccessibleDescription(MODIFICADO);
+
+      await userEvent.click(screen.getByRole("button", { name: "Usar hoy" }));
+      expect(fecha).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("escribir el número en la actuación simple la marca, y volver a «/año» le saca la marca", async () => {
+      render(<CreateTicketForm />);
+      const actuacion = screen.getByLabelText("Actuación simple");
+      const prefijo = `/${hoyArgentina().slice(0, 4)}`;
+
+      await userEvent.type(actuacion, "1023");
+      expect(actuacion).toHaveAccessibleDescription(MODIFICADO);
+
+      await userEvent.clear(actuacion);
+      await userEvent.type(actuacion, prefijo);
+      expect(actuacion).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("quitar el proveedor deja sin marca la referencia y la factura, que vuelven a estar vacías", async () => {
+      render(<CreateTicketForm />);
+      const proveedor = screen.getByRole("combobox", { name: "Proveedor" });
+
+      await userEvent.selectOptions(proveedor, "acme");
+      await userEvent.type(screen.getByLabelText("Referencia externa"), "5/2026");
+      expect(proveedor).toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getByLabelText("Referencia externa")).toHaveAccessibleDescription(MODIFICADO);
+
+      await userEvent.selectOptions(proveedor, "");
+
+      expect(proveedor).not.toHaveAccessibleDescription(MODIFICADO);
+      expect(screen.getByLabelText("Referencia externa")).not.toHaveAccessibleDescription(
+        MODIFICADO,
+      );
+      expect(screen.getByLabelText("N.º de factura")).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("el admin que elige el departamento lo marca", async () => {
+      mocks.user = admin;
+      render(<CreateTicketForm />);
+      // El selector de departamento de este archivo es un `<select>` falso que no reenvía los `aria-*`: la
+      // marca se lee en el contenedor del campo.
+      const departamento = screen.getByLabelText("Departamento");
+      expect(departamento.closest(".field-modified")).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(departamento, "tec");
+
+      expect(departamento.closest(".field-modified")).toBeInTheDocument();
+      expect(screen.getAllByText("Modificado.")).toHaveLength(1);
+    });
+
+    it("el departamento del agente es de solo lectura y nunca se marca", async () => {
+      render(<CreateTicketForm />);
+
+      await userEvent.type(screen.getByLabelText("Título"), "Falla");
+
+      expect(screen.getByLabelText("Departamento")).not.toHaveAccessibleDescription(MODIFICADO);
+    });
+
+    it("la marca lleva un punto decorativo junto a la etiqueta y tiñe el campo", async () => {
+      const { container } = render(<CreateTicketForm />);
+      expect(container.querySelector(".field-modified")).not.toBeInTheDocument();
+
+      await userEvent.type(screen.getByLabelText("Título"), "Falla");
+
+      const campo = container.querySelector(".field-modified");
+      expect(campo).toContainElement(screen.getByLabelText("Título"));
+      expect(campo?.querySelector("[aria-hidden='true'].rounded-full")).toBeInTheDocument();
+    });
   });
 });
